@@ -2,7 +2,7 @@
  * GOV COLLAB PORTAL - Backend REST API (Node.js + Express + PostgreSQL)
  * Blueprint v2 (Definitive)
  *
- * This server serves both the API under /api and (optionally) static frontend files from backend/public.
+ * This server exposes the API under /api and can also serve static frontend files from backend/public.
  */
 
 'use strict';
@@ -15,12 +15,13 @@ const { Pool } = require('pg');
 const path = require('path');
 
 const PORT = process.env.PORT || 3000;
-const DATABASE_URL = process.env.DATABASE_URL || '';
+const DATABASE_URL = process.env.DATABASE_URL;
 const JWT_SECRET = process.env.JWT_SECRET || 'dev_secret_change_me';
 const CORS_ORIGIN = process.env.CORS_ORIGIN || '*';
 
 if (!DATABASE_URL) {
-  console.warn('[WARN] DATABASE_URL is not set. The server will fail when it tries to query the database.');
+  console.error('Missing DATABASE_URL env var.');
+  process.exit(1);
 }
 
 const pool = new Pool({
@@ -36,8 +37,7 @@ app.use(cors({
   credentials: true,
 }));
 
-// ✅ Serve frontend (static files) from backend/public
-// Put your login.html, styles.css, js/ folder, etc. inside backend/public/
+// Serve the frontend from backend/public (so /login.html works on Render)
 app.use(express.static(path.join(__dirname, 'public')));
 
 /** Utilities **/
@@ -51,616 +51,1033 @@ async function queryOne(text, params) {
   return res.rows[0] || null;
 }
 
-async function queryMany(text, params) {
+async function queryAll(text, params) {
   const res = await pool.query(text, params);
-  return res.rows || [];
+  return res.rows;
 }
 
-function requireAuth(req, res, next) {
-  const auth = req.headers.authorization || '';
-  const token = auth.startsWith('Bearer ') ? auth.slice(7) : null;
-  if (!token) return res.status(401).json({ error: 'Missing token' });
+function pickUserPayload(row) {
+  // Blueprint wants: { id, fullName, email, role }
+  return {
+    id: row.id,
+    fullName: row.full_name,
+    email: row.email,
+    role: row.role_key,
+    username: row.username,
+    isActive: row.is_active,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+function authRequired(req, res, next) {
+  const header = req.headers.authorization || '';
+  const m = header.match(/^Bearer\s+(.+)$/i);
+  if (!m) return res.status(401).json({ error: 'Missing Bearer token' });
 
   try {
+    const token = m[1];
     const payload = jwt.verify(token, JWT_SECRET);
-    req.user = payload;
+    req.auth = payload; // { userId, role }
     return next();
-  } catch (e) {
-    return res.status(401).json({ error: 'Invalid/expired token' });
+  } catch (err) {
+    return res.status(401).json({ error: 'Invalid token' });
   }
 }
 
-function requireRole(...allowedRoleKeys) {
-  const allowed = new Set(allowedRoleKeys.map(normalizeRoleKey));
+async function attachUser(req, res, next) {
+  if (!req.auth?.userId) return res.status(401).json({ error: 'Unauthorized' });
+
+  const user = await queryOne(
+    `
+    SELECT u.*, r.key AS role_key, r.label AS role_label
+    FROM users u
+    JOIN roles r ON r.id = u.role_id
+    WHERE u.id = $1
+    `,
+    [req.auth.userId]
+  );
+
+  if (!user || !user.is_active) return res.status(401).json({ error: 'User inactive or not found' });
+
+  req.user = user;
+  next();
+}
+
+function requireRole(...allowed) {
+  const allowedSet = new Set(allowed.map(normalizeRoleKey));
   return (req, res, next) => {
-    const rk = normalizeRoleKey(req.user?.role_key);
-    if (!allowed.has(rk)) return res.status(403).json({ error: 'Forbidden' });
-    return next();
+    const roleKey = normalizeRoleKey(req.user?.role_key);
+    if (!allowedSet.has(roleKey)) return res.status(403).json({ error: 'Forbidden' });
+    next();
   };
 }
 
-function requireAnyRole(allowedSet) {
-  return (req, res, next) => {
-    const rk = normalizeRoleKey(req.user?.role_key);
-    if (!allowedSet.has(rk)) return res.status(403).json({ error: 'Forbidden' });
-    return next();
-  };
-}
-
-const ROLE = {
-  ADMIN: 'admin',
-  CHAIRMAN: 'chairman',
-  SUPERVISOR: 'supervisor',
-  COLLABORATOR: 'collaborator',
-  VIEWER: 'viewer',
-  PROTOCOL: 'protocol',
-};
-
-const ANY_STAFF = new Set([ROLE.ADMIN, ROLE.CHAIRMAN, ROLE.SUPERVISOR, ROLE.COLLABORATOR, ROLE.PROTOCOL, ROLE.VIEWER]);
-
-async function getUserByUsername(username) {
-  return queryOne(
-    `SELECT u.id, u.username, u.full_name, u.password_hash, u.is_active, r.role_key
-     FROM users u
-     JOIN roles r ON r.id = u.role_id
-     WHERE LOWER(u.username) = LOWER($1)`,
-    [username]
+async function ensureDocumentStatus(eventId, countryId) {
+  // Create row if missing
+  await pool.query(
+    `
+    INSERT INTO document_status (event_id, country_id, status)
+    VALUES ($1, $2, 'in_progress')
+    ON CONFLICT (event_id, country_id) DO NOTHING
+    `,
+    [eventId, countryId]
   );
 }
 
-async function getUserById(userId) {
-  return queryOne(
-    `SELECT u.id, u.username, u.full_name, u.is_active, r.role_key
-     FROM users u
-     JOIN roles r ON r.id = u.role_id
-     WHERE u.id = $1`,
-    [userId]
+async function ensureTpRow(eventId, countryId, sectionId, userId) {
+  await pool.query(
+    `
+    INSERT INTO tp_content (event_id, country_id, section_id, html_content, status, last_updated_by_user_id, last_updated_at)
+    VALUES ($1, $2, $3, '', 'draft', $4, NOW())
+    ON CONFLICT (event_id, country_id, section_id) DO NOTHING
+    `,
+    [eventId, countryId, sectionId, userId || null]
   );
 }
 
-async function getRoleIdByKey(roleKey) {
-  const row = await queryOne(`SELECT id FROM roles WHERE role_key = $1`, [normalizeRoleKey(roleKey)]);
-  return row?.id || null;
+async function isCollaboratorAssignedToSection(userId, sectionId) {
+  const row = await queryOne(
+    `SELECT 1 FROM section_assignments WHERE user_id=$1 AND section_id=$2`,
+    [userId, sectionId]
+  );
+  return !!row;
 }
 
-async function logAudit({ actor_user_id, action, entity_type, entity_id, details_json }) {
-  try {
-    await pool.query(
-      `INSERT INTO audit_log(actor_user_id, action, entity_type, entity_id, details_json)
-       VALUES ($1, $2, $3, $4, $5)`,
-      [actor_user_id || null, action, entity_type, entity_id || null, details_json || null]
+async function getEventWithSections(eventId, countryIdForStatuses = null) {
+  const event = await queryOne(
+    `
+    SELECT e.*, c.name_en AS country_name_en, c.code AS country_code
+    FROM events e
+    JOIN countries c ON c.id = e.country_id
+    WHERE e.id = $1
+    `,
+    [eventId]
+  );
+  if (!event) return null;
+
+  const requiredSections = await queryAll(
+    `
+    SELECT s.id, s.key, s.label, s.order_index
+    FROM event_required_sections ers
+    JOIN sections s ON s.id = ers.section_id
+    WHERE ers.event_id = $1
+    ORDER BY s.order_index ASC, s.id ASC
+    `,
+    [eventId]
+  );
+
+  let sectionStatuses = null;
+  if (countryIdForStatuses) {
+    // Ensure rows exist for required sections to make dashboard deterministic.
+    await ensureDocumentStatus(eventId, countryIdForStatuses);
+    for (const s of requiredSections) {
+      await ensureTpRow(eventId, countryIdForStatuses, s.id, null);
+    }
+
+    sectionStatuses = await queryAll(
+      `
+      SELECT t.section_id, t.status, t.status_comment, t.last_updated_at,
+             u.full_name AS last_updated_by
+      FROM tp_content t
+      LEFT JOIN users u ON u.id = t.last_updated_by_user_id
+      WHERE t.event_id = $1 AND t.country_id = $2
+      `,
+      [eventId, countryIdForStatuses]
     );
-  } catch (e) {
-    // non-fatal
-    console.warn('[WARN] audit_log insert failed:', e.message);
   }
+
+  return {
+    id: event.id,
+    countryId: event.country_id,
+    countryName: event.country_name_en,
+    countryCode: event.country_code,
+    title: event.title,
+    occasion: event.occasion,
+    deadlineDate: event.deadline_date,
+    isActive: event.is_active,
+    createdAt: event.created_at,
+    updatedAt: event.updated_at,
+    requiredSections,
+    sectionStatuses,
+  };
 }
 
-/** Health */
-app.get('/api/health', async (req, res) => {
-  try {
-    await pool.query('SELECT 1 as ok');
-    res.json({ ok: true });
-  } catch (e) {
-    res.status(500).json({ ok: false, error: e.message });
-  }
-});
+/** 7.1 Authentication **/
 
-/** Auth */
 app.post('/api/auth/login', async (req, res) => {
   const { username, password } = req.body || {};
-  if (!username || !password) return res.status(400).json({ error: 'Missing username/password' });
+  if (!username || !password) return res.status(400).json({ error: 'username and password required' });
 
-  try {
-    const user = await getUserByUsername(username);
-    if (!user) return res.status(401).json({ error: 'Invalid credentials' });
-    if (!user.is_active) return res.status(403).json({ error: 'User is inactive' });
+  const user = await queryOne(
+    `
+    SELECT u.*, r.key AS role_key
+    FROM users u
+    JOIN roles r ON r.id = u.role_id
+    WHERE u.username = $1
+    `,
+    [String(username)]
+  );
 
-    const ok = await bcrypt.compare(String(password), user.password_hash);
-    if (!ok) return res.status(401).json({ error: 'Invalid credentials' });
+  if (!user || !user.is_active) return res.status(401).json({ error: 'Invalid credentials' });
 
-    const token = jwt.sign(
-      {
-        user_id: user.id,
-        username: user.username,
-        full_name: user.full_name,
-        role_key: user.role_key,
-      },
-      JWT_SECRET,
-      { expiresIn: '12h' }
-    );
+  const ok = await bcrypt.compare(String(password), user.password_hash);
+  if (!ok) return res.status(401).json({ error: 'Invalid credentials' });
 
-    await logAudit({
-      actor_user_id: user.id,
-      action: 'LOGIN',
-      entity_type: 'user',
-      entity_id: user.id,
-      details_json: { username: user.username }
-    });
+  const token = jwt.sign(
+    { userId: user.id, role: user.role_key },
+    JWT_SECRET,
+    { expiresIn: '12h' }
+  );
 
-    res.json({
-      token,
-      user: {
-        id: user.id,
-        username: user.username,
-        full_name: user.full_name,
-        role_key: user.role_key,
-      }
-    });
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
-});
-
-app.get('/api/auth/me', requireAuth, async (req, res) => {
-  try {
-    const user = await getUserById(req.user.user_id);
-    if (!user) return res.status(404).json({ error: 'Not found' });
-    res.json({ user });
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
-});
-
-/** Reference data */
-app.get('/api/roles', requireAuth, requireRole(ROLE.ADMIN), async (req, res) => {
-  try {
-    const rows = await queryMany(`SELECT id, role_key, role_name FROM roles ORDER BY role_name ASC`, []);
-    res.json({ roles: rows });
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
-});
-
-app.get('/api/sections', requireAuth, requireAnyRole(ANY_STAFF), async (req, res) => {
-  try {
-    const rows = await queryMany(`SELECT id, section_key, section_name FROM sections ORDER BY sort_order ASC`, []);
-    res.json({ sections: rows });
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
-});
-
-app.get('/api/countries', requireAuth, requireAnyRole(ANY_STAFF), async (req, res) => {
-  try {
-    const rows = await queryMany(`SELECT id, country_code, country_name FROM countries ORDER BY country_name ASC`, []);
-    res.json({ countries: rows });
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
-});
-
-/** Users (Admin) */
-app.get('/api/admin/users', requireAuth, requireRole(ROLE.ADMIN), async (req, res) => {
-  try {
-    const rows = await queryMany(
-      `SELECT u.id, u.username, u.full_name, u.is_active,
-              r.role_key, r.role_name
-       FROM users u
-       JOIN roles r ON r.id = u.role_id
-       ORDER BY u.id DESC`,
-      []
-    );
-    res.json({ users: rows });
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
-});
-
-app.post('/api/admin/users', requireAuth, requireRole(ROLE.ADMIN), async (req, res) => {
-  const { username, full_name, password, role_key, is_active } = req.body || {};
-  if (!username || !full_name || !password || !role_key) {
-    return res.status(400).json({ error: 'Missing required fields' });
-  }
-
-  try {
-    const roleId = await getRoleIdByKey(role_key);
-    if (!roleId) return res.status(400).json({ error: 'Invalid role_key' });
-
-    const password_hash = await bcrypt.hash(String(password), 10);
-
-    const row = await queryOne(
-      `INSERT INTO users (username, full_name, password_hash, role_id, is_active)
-       VALUES ($1, $2, $3, $4, $5)
-       RETURNING id, username, full_name, is_active`,
-      [username, full_name, password_hash, roleId, is_active !== false]
-    );
-
-    await logAudit({
-      actor_user_id: req.user.user_id,
-      action: 'CREATE_USER',
-      entity_type: 'user',
-      entity_id: row.id,
-      details_json: { username, role_key }
-    });
-
-    res.status(201).json({ user: row });
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
-});
-
-app.patch('/api/admin/users/:id', requireAuth, requireRole(ROLE.ADMIN), async (req, res) => {
-  const userId = Number(req.params.id);
-  const { full_name, password, role_key, is_active } = req.body || {};
-
-  try {
-    const existing = await queryOne(`SELECT id FROM users WHERE id = $1`, [userId]);
-    if (!existing) return res.status(404).json({ error: 'Not found' });
-
-    let roleId = null;
-    if (role_key) {
-      roleId = await getRoleIdByKey(role_key);
-      if (!roleId) return res.status(400).json({ error: 'Invalid role_key' });
+  return res.json({
+    token,
+    user: {
+      id: user.id,
+      fullName: user.full_name,
+      email: user.email,
+      role: user.role_key,
     }
-
-    let password_hash = null;
-    if (password) {
-      password_hash = await bcrypt.hash(String(password), 10);
-    }
-
-    const row = await queryOne(
-      `UPDATE users
-       SET full_name = COALESCE($2, full_name),
-           password_hash = COALESCE($3, password_hash),
-           role_id = COALESCE($4, role_id),
-           is_active = COALESCE($5, is_active),
-           updated_at = NOW()
-       WHERE id = $1
-       RETURNING id, username, full_name, is_active`,
-      [userId, full_name || null, password_hash || null, roleId || null, typeof is_active === 'boolean' ? is_active : null]
-    );
-
-    await logAudit({
-      actor_user_id: req.user.user_id,
-      action: 'UPDATE_USER',
-      entity_type: 'user',
-      entity_id: userId,
-      details_json: { full_name, role_key, is_active: typeof is_active === 'boolean' ? is_active : undefined, password_changed: !!password }
-    });
-
-    res.json({ user: row });
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
+  });
 });
 
-/** Section assignments (Admin) */
-app.get('/api/admin/assignments', requireAuth, requireRole(ROLE.ADMIN), async (req, res) => {
-  try {
-    const rows = await queryMany(
-      `SELECT sa.id, sa.user_id, u.username, u.full_name,
-              sa.section_id, s.section_key, s.section_name
-       FROM section_assignments sa
-       JOIN users u ON u.id = sa.user_id
-       JOIN sections s ON s.id = sa.section_id
-       ORDER BY sa.id DESC`,
-      []
-    );
-    res.json({ assignments: rows });
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
+app.get('/api/auth/me', authRequired, attachUser, async (req, res) => {
+  const u = req.user;
+  return res.json({
+    id: u.id,
+    fullName: u.full_name,
+    email: u.email,
+    role: u.role_key,
+    username: u.username,
+  });
 });
 
-app.post('/api/admin/assignments', requireAuth, requireRole(ROLE.ADMIN), async (req, res) => {
-  const { user_id, section_id } = req.body || {};
-  if (!user_id || !section_id) return res.status(400).json({ error: 'Missing user_id/section_id' });
+/** Protected routes (everything below) **/
+app.use('/api', authRequired, attachUser);
 
-  try {
-    const row = await queryOne(
-      `INSERT INTO section_assignments (user_id, section_id)
-       VALUES ($1, $2)
-       ON CONFLICT (user_id, section_id) DO NOTHING
-       RETURNING id, user_id, section_id`,
-      [Number(user_id), Number(section_id)]
-    );
-
-    await logAudit({
-      actor_user_id: req.user.user_id,
-      action: 'ASSIGN_SECTION',
-      entity_type: 'section_assignment',
-      entity_id: row?.id || null,
-      details_json: { user_id, section_id }
-    });
-
-    res.status(201).json({ assignment: row || null });
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
+/** 7.2 Users (Admin only) **/
+app.get('/api/users', requireRole('admin'), async (req, res) => {
+  const rows = await queryAll(
+    `
+    SELECT u.*, r.key AS role_key
+    FROM users u
+    JOIN roles r ON r.id = u.role_id
+    ORDER BY u.id ASC
+    `,
+    []
+  );
+  return res.json(rows.map(pickUserPayload));
 });
 
-app.delete('/api/admin/assignments/:id', requireAuth, requireRole(ROLE.ADMIN), async (req, res) => {
+app.post('/api/users', requireRole('admin'), async (req, res) => {
+  const { username, password, fullName, email, role, isActive } = req.body || {};
+  if (!username || !password || !fullName || !role) {
+    return res.status(400).json({ error: 'username, password, fullName, role required' });
+  }
+
+  const roleRow = await queryOne(`SELECT id, key FROM roles WHERE key=$1`, [normalizeRoleKey(role)]);
+  if (!roleRow) return res.status(400).json({ error: 'Invalid role' });
+
+  const passwordHash = await bcrypt.hash(String(password), 10);
+
+  const created = await queryOne(
+    `
+    INSERT INTO users (username, password_hash, full_name, email, role_id, is_active, created_at, updated_at)
+    VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())
+    RETURNING id
+    `,
+    [
+      String(username),
+      passwordHash,
+      String(fullName),
+      email ? String(email) : null,
+      roleRow.id,
+      (isActive === false) ? false : true
+    ]
+  );
+
+  const out = await queryOne(
+    `
+    SELECT u.*, r.key AS role_key
+    FROM users u
+    JOIN roles r ON r.id = u.role_id
+    WHERE u.id = $1
+    `,
+    [created.id]
+  );
+
+  return res.status(201).json(pickUserPayload(out));
+});
+
+app.put('/api/users/:id', requireRole('admin'), async (req, res) => {
   const id = Number(req.params.id);
-  try {
-    const row = await queryOne(`DELETE FROM section_assignments WHERE id = $1 RETURNING id`, [id]);
-    if (!row) return res.status(404).json({ error: 'Not found' });
+  if (!Number.isFinite(id)) return res.status(400).json({ error: 'Invalid id' });
 
-    await logAudit({
-      actor_user_id: req.user.user_id,
-      action: 'REMOVE_SECTION_ASSIGNMENT',
-      entity_type: 'section_assignment',
-      entity_id: id,
-      details_json: {}
-    });
+  const { username, password, fullName, email, role, isActive } = req.body || {};
 
-    res.json({ ok: true });
-  } catch (e) {
-    res.status(500).json({ error: e.message });
+  const fields = [];
+  const values = [];
+  let idx = 1;
+
+  if (username !== undefined) { fields.push(`username=$${idx++}`); values.push(String(username)); }
+  if (fullName !== undefined) { fields.push(`full_name=$${idx++}`); values.push(String(fullName)); }
+  if (email !== undefined) { fields.push(`email=$${idx++}`); values.push(email ? String(email) : null); }
+  if (isActive !== undefined) { fields.push(`is_active=$${idx++}`); values.push(Boolean(isActive)); }
+
+  if (role !== undefined) {
+    const roleRow = await queryOne(`SELECT id FROM roles WHERE key=$1`, [normalizeRoleKey(role)]);
+    if (!roleRow) return res.status(400).json({ error: 'Invalid role' });
+    fields.push(`role_id=$${idx++}`);
+    values.push(roleRow.id);
   }
+
+  if (password !== undefined && String(password).length > 0) {
+    const passwordHash = await bcrypt.hash(String(password), 10);
+    fields.push(`password_hash=$${idx++}`);
+    values.push(passwordHash);
+  }
+
+  if (fields.length === 0) return res.status(400).json({ error: 'No fields to update' });
+
+  fields.push(`updated_at=NOW()`);
+
+  values.push(id);
+
+  await pool.query(
+    `UPDATE users SET ${fields.join(', ')} WHERE id=$${idx}`,
+    values
+  );
+
+  const out = await queryOne(
+    `
+    SELECT u.*, r.key AS role_key
+    FROM users u
+    JOIN roles r ON r.id = u.role_id
+    WHERE u.id = $1
+    `,
+    [id]
+  );
+
+  if (!out) return res.status(404).json({ error: 'User not found' });
+
+  return res.json(pickUserPayload(out));
 });
 
-/** Events */
-app.get('/api/events', requireAuth, requireAnyRole(ANY_STAFF), async (req, res) => {
-  const { country_id, status } = req.query || {};
-  try {
-    const params = [];
-    const where = [];
-
-    if (country_id) {
-      params.push(Number(country_id));
-      where.push(`e.country_id = $${params.length}`);
-    }
-    if (status) {
-      params.push(String(status));
-      where.push(`e.status = $${params.length}`);
-    }
-
-    const sql = `
-      SELECT e.id, e.title, e.meeting_date, e.status,
-             e.country_id, c.country_name,
-             e.created_by_user_id, u.username AS created_by_username,
-             e.created_at, e.updated_at
-      FROM events e
-      JOIN countries c ON c.id = e.country_id
-      JOIN users u ON u.id = e.created_by_user_id
-      ${where.length ? `WHERE ${where.join(' AND ')}` : ''}
-      ORDER BY e.meeting_date DESC, e.id DESC
-    `;
-
-    const rows = await queryMany(sql, params);
-    res.json({ events: rows });
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
-});
-
-app.post('/api/events', requireAuth, requireAnyRole(new Set([ROLE.ADMIN, ROLE.CHAIRMAN, ROLE.SUPERVISOR, ROLE.PROTOCOL])), async (req, res) => {
-  const { title, meeting_date, country_id } = req.body || {};
-  if (!title || !meeting_date || !country_id) return res.status(400).json({ error: 'Missing required fields' });
-
-  try {
-    const row = await queryOne(
-      `INSERT INTO events (title, meeting_date, country_id, status, created_by_user_id)
-       VALUES ($1, $2, $3, 'DRAFT', $4)
-       RETURNING id, title, meeting_date, status, country_id, created_by_user_id, created_at`,
-      [String(title), String(meeting_date), Number(country_id), req.user.user_id]
-    );
-
-    await logAudit({
-      actor_user_id: req.user.user_id,
-      action: 'CREATE_EVENT',
-      entity_type: 'event',
-      entity_id: row.id,
-      details_json: { title, meeting_date, country_id }
-    });
-
-    res.status(201).json({ event: row });
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
-});
-
-app.patch('/api/events/:id', requireAuth, requireAnyRole(new Set([ROLE.ADMIN, ROLE.CHAIRMAN, ROLE.SUPERVISOR, ROLE.PROTOCOL])), async (req, res) => {
+app.delete('/api/users/:id', requireRole('admin'), async (req, res) => {
   const id = Number(req.params.id);
-  const { title, meeting_date, country_id, status } = req.body || {};
+  if (!Number.isFinite(id)) return res.status(400).json({ error: 'Invalid id' });
 
-  try {
-    const existing = await queryOne(`SELECT id FROM events WHERE id = $1`, [id]);
-    if (!existing) return res.status(404).json({ error: 'Not found' });
-
-    const row = await queryOne(
-      `UPDATE events
-       SET title = COALESCE($2, title),
-           meeting_date = COALESCE($3, meeting_date),
-           country_id = COALESCE($4, country_id),
-           status = COALESCE($5, status),
-           updated_at = NOW()
-       WHERE id = $1
-       RETURNING id, title, meeting_date, status, country_id, updated_at`,
-      [id, title || null, meeting_date || null, country_id ? Number(country_id) : null, status || null]
-    );
-
-    await logAudit({
-      actor_user_id: req.user.user_id,
-      action: 'UPDATE_EVENT',
-      entity_type: 'event',
-      entity_id: id,
-      details_json: { title, meeting_date, country_id, status }
-    });
-
-    res.json({ event: row });
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
+  await pool.query(`UPDATE users SET is_active=false, updated_at=NOW() WHERE id=$1`, [id]);
+  return res.json({ ok: true });
 });
 
-/** Documents (Talking Points / Info Doc / etc) */
-app.get('/api/events/:eventId/docs', requireAuth, requireAnyRole(ANY_STAFF), async (req, res) => {
-  const eventId = Number(req.params.eventId);
-  try {
-    const rows = await queryMany(
-      `SELECT d.id, d.event_id, d.section_id, s.section_key, s.section_name,
-              d.doc_type, d.status, d.content_html, d.updated_at,
-              d.created_by_user_id, u.username AS created_by_username
-       FROM documents d
-       JOIN sections s ON s.id = d.section_id
-       JOIN users u ON u.id = d.created_by_user_id
-       WHERE d.event_id = $1
-       ORDER BY s.sort_order ASC, d.doc_type ASC`,
-      [eventId]
+/** 7.3 Sections **/
+app.get('/api/sections', async (req, res) => {
+  // Needed by Calendar, dashboards and editor. Mutations remain Admin-only.
+  // If ?mine=1, return only sections assigned to the current user (for collaborator dropdown).
+  const mine = String(req.query.mine || '') === '1';
+
+  if (mine) {
+    const rows = await queryAll(
+      `
+      SELECT s.id, s.key, s.label, s.order_index, s.is_active
+      FROM section_assignments sa
+      JOIN sections s ON s.id = sa.section_id
+      WHERE sa.user_id = $1 AND s.is_active = true
+      ORDER BY s.order_index ASC, s.id ASC
+      `,
+      [req.user.id]
     );
-    res.json({ documents: rows });
-  } catch (e) {
-    res.status(500).json({ error: e.message });
+    return res.json(rows);
   }
+
+  const roleKey = normalizeRoleKey(req.user.role_key);
+  const includeInactive = roleKey === 'admin';
+
+  const rows = await queryAll(
+    `
+    SELECT id, key, label, order_index, is_active, created_at, updated_at
+    FROM sections
+    WHERE ($1::boolean = true) OR (is_active = true)
+    ORDER BY order_index ASC, id ASC
+    `,
+    [includeInactive]
+  );
+  return res.json(rows);
 });
 
-app.post('/api/events/:eventId/docs', requireAuth, requireAnyRole(new Set([ROLE.ADMIN, ROLE.SUPERVISOR, ROLE.COLLABORATOR, ROLE.PROTOCOL, ROLE.CHAIRMAN])), async (req, res) => {
-  const eventId = Number(req.params.eventId);
-  const { section_id, doc_type, content_html, status } = req.body || {};
+app.post('/api/sections', requireRole('admin'), async (req, res) => {
+  const { key, label, orderIndex } = req.body || {};
+  if (!key || !label) return res.status(400).json({ error: 'key and label required' });
 
-  if (!section_id || !doc_type) return res.status(400).json({ error: 'Missing section_id/doc_type' });
+  const row = await queryOne(
+    `
+    INSERT INTO sections (key, label, order_index, is_active, created_at, updated_at)
+    VALUES ($1, $2, $3, true, NOW(), NOW())
+    RETURNING *
+    `,
+    [String(key), String(label), Number(orderIndex) || 0]
+  );
+  return res.status(201).json(row);
+});
 
+app.put('/api/sections/:id', requireRole('admin'), async (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isFinite(id)) return res.status(400).json({ error: 'Invalid id' });
+
+  const { key, label, orderIndex, isActive } = req.body || {};
+  const fields = [];
+  const values = [];
+  let idx = 1;
+
+  if (key !== undefined) { fields.push(`key=$${idx++}`); values.push(String(key)); }
+  if (label !== undefined) { fields.push(`label=$${idx++}`); values.push(String(label)); }
+  if (orderIndex !== undefined) { fields.push(`order_index=$${idx++}`); values.push(Number(orderIndex) || 0); }
+  if (isActive !== undefined) { fields.push(`is_active=$${idx++}`); values.push(Boolean(isActive)); }
+
+  if (fields.length === 0) return res.status(400).json({ error: 'No fields to update' });
+  fields.push(`updated_at=NOW()`);
+
+  values.push(id);
+  await pool.query(`UPDATE sections SET ${fields.join(', ')} WHERE id=$${idx}`, values);
+
+  const out = await queryOne(`SELECT * FROM sections WHERE id=$1`, [id]);
+  if (!out) return res.status(404).json({ error: 'Section not found' });
+  return res.json(out);
+});
+
+app.delete('/api/sections/:id', requireRole('admin'), async (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isFinite(id)) return res.status(400).json({ error: 'Invalid id' });
+
+  await pool.query(`UPDATE sections SET is_active=false, updated_at=NOW() WHERE id=$1`, [id]);
+  return res.json({ ok: true });
+});
+
+/** 7.4 Section Assignments (Admin only) **/
+app.get('/api/section-assignments', requireRole('admin'), async (req, res) => {
+  const rows = await queryAll(
+    `
+    SELECT sa.id,
+           sa.user_id, u.username, u.full_name,
+           sa.section_id, s.label AS section_label,
+           sa.created_at
+    FROM section_assignments sa
+    JOIN users u ON u.id = sa.user_id
+    JOIN sections s ON s.id = sa.section_id
+    ORDER BY sa.id ASC
+    `,
+    []
+  );
+  return res.json(rows);
+});
+
+app.post('/api/section-assignments', requireRole('admin'), async (req, res) => {
+  const { userId, sectionId } = req.body || {};
+  const uid = Number(userId);
+  const sid = Number(sectionId);
+  if (!Number.isFinite(uid) || !Number.isFinite(sid)) return res.status(400).json({ error: 'userId and sectionId required' });
+
+  // Enforce "Only collaborators should be in this table" by app logic (blueprint).
+  const user = await queryOne(
+    `SELECT u.id, r.key AS role_key FROM users u JOIN roles r ON r.id=u.role_id WHERE u.id=$1`,
+    [uid]
+  );
+  if (!user) return res.status(404).json({ error: 'User not found' });
+  if (normalizeRoleKey(user.role_key) !== 'collaborator') return res.status(400).json({ error: 'Only collaborators can be assigned to sections' });
+
+  const ins = await queryOne(
+    `
+    INSERT INTO section_assignments (user_id, section_id, created_at)
+    VALUES ($1, $2, NOW())
+    ON CONFLICT (user_id, section_id) DO NOTHING
+    RETURNING id
+    `,
+    [uid, sid]
+  );
+
+  // If it already existed, fetch its id
+  const row = ins || await queryOne(
+    `SELECT id FROM section_assignments WHERE user_id=$1 AND section_id=$2`,
+    [uid, sid]
+  );
+
+  return res.status(201).json({ id: row.id });
+});
+
+app.delete('/api/section-assignments/:id', requireRole('admin'), async (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isFinite(id)) return res.status(400).json({ error: 'Invalid id' });
+
+  await pool.query(`DELETE FROM section_assignments WHERE id=$1`, [id]);
+  return res.json({ ok: true });
+});
+
+/** 7.5 Countries **/
+app.get('/api/countries', async (req, res) => {
+  const rows = await queryAll(
+    `
+    SELECT id, name_en, code
+    FROM countries
+    WHERE is_active = true
+    ORDER BY name_en ASC
+    `,
+    []
+  );
+  return res.json(rows);
+});
+
+/** 7.6 Events and Calendar **/
+app.get('/api/events', async (req, res) => {
+  const { country_id, is_active } = req.query || {};
+
+  const where = [];
+  const vals = [];
+  let idx = 1;
+
+  if (country_id) { where.push(`e.country_id=$${idx++}`); vals.push(Number(country_id)); }
+  if (is_active !== undefined) { where.push(`e.is_active=$${idx++}`); vals.push(String(is_active) === 'true'); }
+
+  const rows = await queryAll(
+    `
+    SELECT e.id, e.country_id, c.name_en AS country_name_en, c.code AS country_code,
+           e.title, e.occasion, e.deadline_date, e.is_active, e.created_at, e.updated_at
+    FROM events e
+    JOIN countries c ON c.id = e.country_id
+    ${where.length ? 'WHERE ' + where.join(' AND ') : ''}
+    ORDER BY (e.deadline_date IS NULL) ASC, e.deadline_date ASC, e.id DESC
+    `,
+    vals
+  );
+  return res.json(rows);
+});
+
+app.get('/api/events/upcoming', async (req, res) => {
+  const rows = await queryAll(
+    `
+    SELECT e.id, e.country_id, c.name_en AS country_name_en, c.code AS country_code,
+           e.title, e.occasion, e.deadline_date
+    FROM events e
+    JOIN countries c ON c.id = e.country_id
+    WHERE e.is_active = true
+    ORDER BY (e.deadline_date IS NULL) ASC, e.deadline_date ASC, e.id DESC
+    LIMIT 50
+    `,
+    []
+  );
+  return res.json(rows);
+});
+
+app.get('/api/events/:id', async (req, res) => {
+  const eventId = Number(req.params.id);
+  if (!Number.isFinite(eventId)) return res.status(400).json({ error: 'Invalid id' });
+
+  const countryId = req.query.country_id ? Number(req.query.country_id) : null;
+
+  const event = await getEventWithSections(eventId, countryId);
+  if (!event) return res.status(404).json({ error: 'Event not found' });
+
+  return res.json(event);
+});
+
+app.post('/api/events', requireRole('admin', 'chairman', 'supervisor', 'protocol'), async (req, res) => {
+  const { countryId, title, occasion, deadlineDate, requiredSectionIds } = req.body || {};
+  if (!countryId || !title) return res.status(400).json({ error: 'countryId and title required' });
+
+  const client = await pool.connect();
   try {
-    const row = await queryOne(
-      `INSERT INTO documents (event_id, section_id, doc_type, content_html, status, created_by_user_id)
-       VALUES ($1, $2, $3, $4, $5, $6)
-       ON CONFLICT (event_id, section_id, doc_type)
-       DO UPDATE SET content_html = EXCLUDED.content_html,
-                     status = COALESCE(EXCLUDED.status, documents.status),
-                     updated_at = NOW()
-       RETURNING id, event_id, section_id, doc_type, status, updated_at`,
+    await client.query('BEGIN');
+
+    const ev = await client.query(
+      `
+      INSERT INTO events (country_id, title, occasion, deadline_date, created_by_user_id, is_active, created_at, updated_at)
+      VALUES ($1, $2, $3, $4, $5, true, NOW(), NOW())
+      RETURNING id
+      `,
       [
-        eventId,
-        Number(section_id),
-        String(doc_type),
-        content_html || '',
-        status || 'DRAFT',
-        req.user.user_id
+        Number(countryId),
+        String(title),
+        occasion ? String(occasion) : null,
+        deadlineDate ? String(deadlineDate) : null,
+        req.user.id
       ]
     );
+    const eventId = ev.rows[0].id;
 
-    await logAudit({
-      actor_user_id: req.user.user_id,
-      action: 'UPSERT_DOCUMENT',
-      entity_type: 'document',
-      entity_id: row.id,
-      details_json: { event_id: eventId, section_id, doc_type, status: row.status }
-    });
-
-    res.status(201).json({ document: row });
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
-});
-
-/** Library */
-app.get('/api/library', requireAuth, requireAnyRole(ANY_STAFF), async (req, res) => {
-  const { country_id } = req.query || {};
-  try {
-    const params = [];
-    const where = [`d.status = 'APPROVED'`];
-
-    if (country_id) {
-      params.push(Number(country_id));
-      where.push(`e.country_id = $${params.length}`);
+    const sectionIds = Array.isArray(requiredSectionIds) ? requiredSectionIds.map(Number).filter(Number.isFinite) : [];
+    for (const sid of sectionIds) {
+      await client.query(
+        `
+        INSERT INTO event_required_sections (event_id, section_id, created_at)
+        VALUES ($1, $2, NOW())
+        ON CONFLICT (event_id, section_id) DO NOTHING
+        `,
+        [eventId, sid]
+      );
     }
 
-    const rows = await queryMany(
-      `SELECT d.id, d.doc_type, d.section_id, s.section_name,
-              d.event_id, e.title AS event_title, e.meeting_date, c.country_name,
-              d.updated_at
-       FROM documents d
-       JOIN events e ON e.id = d.event_id
-       JOIN countries c ON c.id = e.country_id
-       JOIN sections s ON s.id = d.section_id
-       WHERE ${where.join(' AND ')}
-       ORDER BY e.meeting_date DESC, s.sort_order ASC, d.doc_type ASC`,
-      params
-    );
+    await client.query('COMMIT');
 
-    res.json({ items: rows });
-  } catch (e) {
-    res.status(500).json({ error: e.message });
+    const out = await getEventWithSections(eventId, null);
+    return res.status(201).json(out);
+  } catch (err) {
+    await client.query('ROLLBACK');
+    console.error(err);
+    return res.status(500).json({ error: 'Failed to create event' });
+  } finally {
+    client.release();
   }
 });
 
-/** Calendar Events */
-app.get('/api/calendar', requireAuth, requireAnyRole(ANY_STAFF), async (req, res) => {
+app.put('/api/events/:id', requireRole('admin', 'chairman', 'supervisor', 'protocol'), async (req, res) => {
+  const eventId = Number(req.params.id);
+  if (!Number.isFinite(eventId)) return res.status(400).json({ error: 'Invalid id' });
+
+  const { countryId, title, occasion, deadlineDate, isActive, requiredSectionIds } = req.body || {};
+
+  const client = await pool.connect();
   try {
-    const rows = await queryMany(
-      `SELECT id, title, start_ts, end_ts, location, description, created_by_user_id, created_at
-       FROM calendar_events
-       ORDER BY start_ts ASC`,
-      []
-    );
-    res.json({ calendar_events: rows });
-  } catch (e) {
-    res.status(500).json({ error: e.message });
+    await client.query('BEGIN');
+
+    const fields = [];
+    const vals = [];
+    let idx = 1;
+
+    if (countryId !== undefined) { fields.push(`country_id=$${idx++}`); vals.push(Number(countryId)); }
+    if (title !== undefined) { fields.push(`title=$${idx++}`); vals.push(String(title)); }
+    if (occasion !== undefined) { fields.push(`occasion=$${idx++}`); vals.push(occasion ? String(occasion) : null); }
+    if (deadlineDate !== undefined) { fields.push(`deadline_date=$${idx++}`); vals.push(deadlineDate ? String(deadlineDate) : null); }
+    if (isActive !== undefined) { fields.push(`is_active=$${idx++}`); vals.push(Boolean(isActive)); }
+
+    if (fields.length) {
+      fields.push(`updated_at=NOW()`);
+      vals.push(eventId);
+      await client.query(`UPDATE events SET ${fields.join(', ')} WHERE id=$${idx}`, vals);
+    }
+
+    if (Array.isArray(requiredSectionIds)) {
+      // Replace required sections
+      await client.query(`DELETE FROM event_required_sections WHERE event_id=$1`, [eventId]);
+      const sectionIds = requiredSectionIds.map(Number).filter(Number.isFinite);
+      for (const sid of sectionIds) {
+        await client.query(
+          `
+          INSERT INTO event_required_sections (event_id, section_id, created_at)
+          VALUES ($1, $2, NOW())
+          ON CONFLICT (event_id, section_id) DO NOTHING
+          `,
+          [eventId, sid]
+        );
+      }
+    }
+
+    await client.query('COMMIT');
+
+    const out = await getEventWithSections(eventId, null);
+    if (!out) return res.status(404).json({ error: 'Event not found' });
+    return res.json(out);
+  } catch (err) {
+    await client.query('ROLLBACK');
+    console.error(err);
+    return res.status(500).json({ error: 'Failed to update event' });
+  } finally {
+    client.release();
   }
 });
 
-app.post('/api/calendar', requireAuth, requireAnyRole(new Set([ROLE.ADMIN, ROLE.PROTOCOL, ROLE.SUPERVISOR, ROLE.CHAIRMAN])), async (req, res) => {
-  const { title, start_ts, end_ts, location, description } = req.body || {};
-  if (!title || !start_ts) return res.status(400).json({ error: 'Missing title/start_ts' });
+/** 7.7 Talking Points Content **/
 
-  try {
-    const row = await queryOne(
-      `INSERT INTO calendar_events (title, start_ts, end_ts, location, description, created_by_user_id)
-       VALUES ($1, $2, $3, $4, $5, $6)
-       RETURNING id, title, start_ts, end_ts, location, description, created_at`,
-      [String(title), String(start_ts), end_ts ? String(end_ts) : null, location || null, description || null, req.user.user_id]
-    );
+app.get('/api/tp', async (req, res) => {
+  const eventId = Number(req.query.event_id);
+  const countryId = Number(req.query.country_id);
+  const sectionId = Number(req.query.section_id);
 
-    await logAudit({
-      actor_user_id: req.user.user_id,
-      action: 'CREATE_CALENDAR_EVENT',
-      entity_type: 'calendar_event',
-      entity_id: row.id,
-      details_json: { title, start_ts, end_ts }
-    });
-
-    res.status(201).json({ calendar_event: row });
-  } catch (e) {
-    res.status(500).json({ error: e.message });
+  if (!Number.isFinite(eventId) || !Number.isFinite(countryId) || !Number.isFinite(sectionId)) {
+    return res.status(400).json({ error: 'event_id, country_id, section_id required' });
   }
+
+  const roleKey = normalizeRoleKey(req.user.role_key);
+  if (roleKey === 'protocol') return res.status(403).json({ error: 'Forbidden' });
+
+  await ensureDocumentStatus(eventId, countryId);
+  await ensureTpRow(eventId, countryId, sectionId, req.user.id);
+
+  const row = await queryOne(
+    `
+    SELECT t.*, s.label AS section_label, e.title AS event_title, c.name_en AS country_name,
+           u.full_name AS last_updated_by
+    FROM tp_content t
+    JOIN sections s ON s.id = t.section_id
+    JOIN events e ON e.id = t.event_id
+    JOIN countries c ON c.id = t.country_id
+    LEFT JOIN users u ON u.id = t.last_updated_by_user_id
+    WHERE t.event_id=$1 AND t.country_id=$2 AND t.section_id=$3
+    `,
+    [eventId, countryId, sectionId]
+  );
+
+  return res.json({
+    id: row.id,
+    eventId: row.event_id,
+    countryId: row.country_id,
+    sectionId: row.section_id,
+    sectionLabel: row.section_label,
+    eventTitle: row.event_title,
+    countryName: row.country_name,
+    htmlContent: row.html_content,
+    status: row.status,
+    statusComment: row.status_comment,
+    lastUpdatedAt: row.last_updated_at,
+    lastUpdatedBy: row.last_updated_by,
+  });
 });
 
-/** Stats */
-app.get('/api/stats/overview', requireAuth, requireAnyRole(ANY_STAFF), async (req, res) => {
-  try {
-    const [eventsCount, docsCount, approvedCount] = await Promise.all([
-      queryOne(`SELECT COUNT(*)::int AS n FROM events`, []),
-      queryOne(`SELECT COUNT(*)::int AS n FROM documents`, []),
-      queryOne(`SELECT COUNT(*)::int AS n FROM documents WHERE status='APPROVED'`, []),
-    ]);
+app.post('/api/tp/save', async (req, res) => {
+  const { eventId, countryId, sectionId, htmlContent } = req.body || {};
+  const eid = Number(eventId);
+  const cid = Number(countryId);
+  const sid = Number(sectionId);
 
-    res.json({
-      events_total: eventsCount?.n || 0,
-      documents_total: docsCount?.n || 0,
-      documents_approved: approvedCount?.n || 0
-    });
-  } catch (e) {
-    res.status(500).json({ error: e.message });
+  if (!Number.isFinite(eid) || !Number.isFinite(cid) || !Number.isFinite(sid)) {
+    return res.status(400).json({ error: 'eventId, countryId, sectionId required' });
   }
-});
 
-/** Audit log (Admin) */
-app.get('/api/admin/audit', requireAuth, requireRole(ROLE.ADMIN), async (req, res) => {
-  try {
-    const rows = await queryMany(
-      `SELECT a.id, a.created_at, a.action, a.entity_type, a.entity_id, a.details_json,
-              u.username AS actor_username, u.full_name AS actor_full_name
-       FROM audit_log a
-       LEFT JOIN users u ON u.id = a.actor_user_id
-       ORDER BY a.id DESC
-       LIMIT 500`,
-      []
-    );
-    res.json({ audit: rows });
-  } catch (e) {
-    res.status(500).json({ error: e.message });
+  const roleKey = normalizeRoleKey(req.user.role_key);
+  if (roleKey === 'protocol' || roleKey === 'viewer') return res.status(403).json({ error: 'Forbidden' });
+
+  if (roleKey === 'collaborator') {
+    const assigned = await isCollaboratorAssignedToSection(req.user.id, sid);
+    if (!assigned) return res.status(403).json({ error: 'Not assigned to this section' });
   }
+
+  await ensureDocumentStatus(eid, cid);
+  await ensureTpRow(eid, cid, sid, req.user.id);
+
+  await pool.query(
+    `
+    UPDATE tp_content
+    SET html_content=$1,
+        last_updated_by_user_id=$2,
+        last_updated_at=NOW()
+    WHERE event_id=$3 AND country_id=$4 AND section_id=$5
+    `,
+    [String(htmlContent || ''), req.user.id, eid, cid, sid]
+  );
+
+  return res.json({ ok: true });
 });
 
-/** Not found handler for API */
-app.use('/api', (req, res) => {
-  res.status(404).json({ error: 'Not found' });
+app.post('/api/tp/submit', async (req, res) => {
+  const { eventId, countryId, sectionId } = req.body || {};
+  const eid = Number(eventId);
+  const cid = Number(countryId);
+  const sid = Number(sectionId);
+
+  if (!Number.isFinite(eid) || !Number.isFinite(cid) || !Number.isFinite(sid)) {
+    return res.status(400).json({ error: 'eventId, countryId, sectionId required' });
+  }
+
+  const roleKey = normalizeRoleKey(req.user.role_key);
+  if (roleKey === 'protocol' || roleKey === 'viewer') return res.status(403).json({ error: 'Forbidden' });
+
+  if (roleKey === 'collaborator') {
+    const assigned = await isCollaboratorAssignedToSection(req.user.id, sid);
+    if (!assigned) return res.status(403).json({ error: 'Not assigned to this section' });
+  }
+
+  await ensureDocumentStatus(eid, cid);
+  await ensureTpRow(eid, cid, sid, req.user.id);
+
+  await pool.query(
+    `
+    UPDATE tp_content
+    SET status='submitted',
+        status_comment=NULL,
+        last_updated_by_user_id=$1,
+        last_updated_at=NOW()
+    WHERE event_id=$2 AND country_id=$3 AND section_id=$4
+    `,
+    [req.user.id, eid, cid, sid]
+  );
+
+  return res.json({ ok: true });
 });
 
-/** Start */
+app.post('/api/tp/return', requireRole('admin', 'supervisor', 'chairman'), async (req, res) => {
+  const { eventId, countryId, sectionId, comment } = req.body || {};
+  const eid = Number(eventId);
+  const cid = Number(countryId);
+  const sid = Number(sectionId);
+
+  if (!Number.isFinite(eid) || !Number.isFinite(cid) || !Number.isFinite(sid)) {
+    return res.status(400).json({ error: 'eventId, countryId, sectionId required' });
+  }
+
+  await ensureDocumentStatus(eid, cid);
+  await ensureTpRow(eid, cid, sid, req.user.id);
+
+  await pool.query(
+    `
+    UPDATE tp_content
+    SET status='returned',
+        status_comment=$1,
+        last_updated_by_user_id=$2,
+        last_updated_at=NOW()
+    WHERE event_id=$3 AND country_id=$4 AND section_id=$5
+    `,
+    [comment ? String(comment) : null, req.user.id, eid, cid, sid]
+  );
+
+  return res.json({ ok: true });
+});
+
+app.post('/api/tp/approve-section', requireRole('admin', 'supervisor'), async (req, res) => {
+  const { eventId, countryId, sectionId } = req.body || {};
+  const eid = Number(eventId);
+  const cid = Number(countryId);
+  const sid = Number(sectionId);
+
+  if (!Number.isFinite(eid) || !Number.isFinite(cid) || !Number.isFinite(sid)) {
+    return res.status(400).json({ error: 'eventId, countryId, sectionId required' });
+  }
+
+  await ensureDocumentStatus(eid, cid);
+  await ensureTpRow(eid, cid, sid, req.user.id);
+
+  await pool.query(
+    `
+    UPDATE tp_content
+    SET status='approved_by_supervisor',
+        status_comment=NULL,
+        last_updated_by_user_id=$1,
+        last_updated_at=NOW()
+    WHERE event_id=$2 AND country_id=$3 AND section_id=$4
+    `,
+    [req.user.id, eid, cid, sid]
+  );
+
+  return res.json({ ok: true });
+});
+
+app.post('/api/tp/approve-section-chairman', requireRole('admin', 'chairman'), async (req, res) => {
+  const { eventId, countryId, sectionId } = req.body || {};
+  const eid = Number(eventId);
+  const cid = Number(countryId);
+  const sid = Number(sectionId);
+
+  if (!Number.isFinite(eid) || !Number.isFinite(cid) || !Number.isFinite(sid)) {
+    return res.status(400).json({ error: 'eventId, countryId, sectionId required' });
+  }
+
+  await ensureDocumentStatus(eid, cid);
+  await ensureTpRow(eid, cid, sid, req.user.id);
+
+  await pool.query(
+    `
+    UPDATE tp_content
+    SET status='approved_by_chairman',
+        status_comment=NULL,
+        last_updated_by_user_id=$1,
+        last_updated_at=NOW()
+    WHERE event_id=$2 AND country_id=$3 AND section_id=$4
+    `,
+    [req.user.id, eid, cid, sid]
+  );
+
+  return res.json({ ok: true });
+});
+
+/** 7.8 Document Status and Library **/
+
+app.get('/api/document-status', async (req, res) => {
+  const eventId = Number(req.query.event_id);
+  const countryId = Number(req.query.country_id);
+  if (!Number.isFinite(eventId) || !Number.isFinite(countryId)) {
+    return res.status(400).json({ error: 'event_id and country_id required' });
+  }
+
+  await ensureDocumentStatus(eventId, countryId);
+  const row = await queryOne(
+    `
+    SELECT * FROM document_status WHERE event_id=$1 AND country_id=$2
+    `,
+    [eventId, countryId]
+  );
+
+  return res.json({
+    eventId: row.event_id,
+    countryId: row.country_id,
+    status: row.status,
+    chairmanComment: row.chairman_comment,
+    updatedAt: row.updated_at,
+  });
+});
+
+app.post('/api/document/submit-to-chairman', requireRole('admin', 'supervisor'), async (req, res) => {
+  const { eventId, countryId } = req.body || {};
+  const eid = Number(eventId);
+  const cid = Number(countryId);
+
+  if (!Number.isFinite(eid) || !Number.isFinite(cid)) return res.status(400).json({ error: 'eventId and countryId required' });
+
+  await ensureDocumentStatus(eid, cid);
+
+  await pool.query(
+    `
+    UPDATE document_status
+    SET status='submitted_to_chairman',
+        updated_at=NOW()
+    WHERE event_id=$1 AND country_id=$2
+    `,
+    [eid, cid]
+  );
+
+  return res.json({ ok: true });
+});
+
+app.post('/api/document/approve', requireRole('admin', 'chairman'), async (req, res) => {
+  const { eventId, countryId } = req.body || {};
+  const eid = Number(eventId);
+  const cid = Number(countryId);
+
+  if (!Number.isFinite(eid) || !Number.isFinite(cid)) return res.status(400).json({ error: 'eventId and countryId required' });
+
+  await ensureDocumentStatus(eid, cid);
+
+  // Mark document approved
+  await pool.query(
+    `
+    UPDATE document_status
+    SET status='approved',
+        chairman_comment=NULL,
+        updated_at=NOW()
+    WHERE event_id=$1 AND country_id=$2
+    `,
+    [eid, cid]
+  );
+
+  // Optionally, stamp all required sections as approved_by_chairman for consistency.
+  await pool.query(
+    `
+    UPDATE tp_content
+    SET status='approved_by_chairman',
+        status_comment=NULL,
+        last_updated_by_user_id=$1,
+        last_updated_at=NOW()
+    WHERE event_id=$2 AND country_id=$3
+    `,
+    [req.user.id, eid, cid]
+  );
+
+  return res.json({ ok: true });
+});
+
+app.post('/api/document/return', requireRole('admin', 'chairman'), async (req, res) => {
+  const { eventId, countryId, comment } = req.body || {};
+  const eid = Number(eventId);
+  const cid = Number(countryId);
+
+  if (!Number.isFinite(eid) || !Number.isFinite(cid)) return res.status(400).json({ error: 'eventId and countryId required' });
+
+  await ensureDocumentStatus(eid, cid);
+
+  await pool.query(
+    `
+    UPDATE document_status
+    SET status='returned',
+        chairman_comment=$1,
+        updated_at=NOW()
+    WHERE event_id=$2 AND country_id=$3
+    `,
+    [comment ? String(comment) : null, eid, cid]
+  );
+
+  return res.json({ ok: true });
+});
+
+app.get('/api/library', async (req, res) => {
+  // List approved documents for a country
+  const countryId = Number(req.query.country_id);
+  if (!Number.isFinite(countryId)) return res.status(400).json({ error: 'country_id required' });
+
+  const rows = await queryAll(
+    `
+    SELECT e.id AS event_id,
+           e.title,
+           e.deadline_date,
+           ds.updated_at AS last_updated
+    FROM document_status ds
+    JOIN events e ON e.id = ds.event_id
+    WHERE ds.country_id = $1 AND ds.status = 'approved'
+    ORDER BY ds.updated_at DESC
+    `,
+    [countryId]
+  );
+
+  return res.json(rows);
+});
+
+app.get('/api/library/document', async (req, res) => {
+  const eventId = Number(req.query.event_id);
+  const countryId = Number(req.query.country_id);
+  if (!Number.isFinite(eventId) || !Number.isFinite(countryId)) return res.status(400).json({ error: 'event_id and country_id required' });
+
+  const event = await getEventWithSections(eventId, null);
+  if (!event) return res.status(404).json({ error: 'Event not found' });
+
+  // Always include required sections in order, with content (even if empty).
+  await ensureDocumentStatus(eventId, countryId);
+  for (const s of event.requiredSections) {
+    await ensureTpRow(eventId, countryId, s.id, null);
+  }
+
+  const sections = await queryAll(
+    `
+    SELECT s.id AS section_id, s.label AS section_label, s.order_index,
+           t.html_content, t.status, t.last_updated_at
+    FROM event_required_sections ers
+    JOIN sections s ON s.id = ers.section_id
+    LEFT JOIN tp_content t
+      ON t.event_id = ers.event_id AND t.section_id = ers.section_id AND t.country_id = $2
+    WHERE ers.event_id = $1
+    ORDER BY s.order_index ASC, s.id ASC
+    `,
+    [eventId, countryId]
+  );
+
+  const doc = await queryOne(
+    `
+    SELECT status, chairman_comment, updated_at
+    FROM document_status
+    WHERE event_id=$1 AND country_id=$2
+    `,
+    [eventId, countryId]
+  );
+
+  return res.json({
+    event,
+    documentStatus: doc ? {
+      status: doc.status,
+      chairmanComment: doc.chairman_comment,
+      updatedAt: doc.updated_at
+    } : null,
+    sections: sections.map(r => ({
+      sectionId: r.section_id,
+      sectionLabel: r.section_label,
+      orderIndex: r.order_index,
+      htmlContent: r.html_content || '',
+      status: r.status || 'draft',
+      lastUpdatedAt: r.last_updated_at
+    }))
+  });
+});
+
+/** Error handler */
+app.use((err, req, res, next) => {
+  console.error(err);
+  res.status(500).json({ error: 'Server error' });
+});
+
 app.listen(PORT, () => {
   console.log(`GOV COLLAB PORTAL API listening on port ${PORT}`);
 });
-
