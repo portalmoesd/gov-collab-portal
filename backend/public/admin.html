@@ -101,6 +101,18 @@
           <tbody id="assignmentTbody"></tbody>
         </table>
       </div>
+      <div class="col-12" style="margin-top:18px;">
+        <div style="font-weight:900; margin-bottom:10px;">Assign collaborator to countries</div>
+        <form id="assignCountriesForm" class="row">
+          <div class="field"><label>Collaborator</label><select id="assignCountryUser"></select></div>
+          <div class="col-12" style="margin-top:10px;">
+            <div id="countryGroups" class="country-groups"></div>
+          </div>
+          <div style="align-self:flex-end;"><button class="btn primary" type="submit">Save countries</button></div>
+          <div id="msgAssignCountries" class="small" style="color:var(--danger); font-weight:800;"></div>
+        </form>
+      </div>
+
     </div>
   </div>
 </section>

@@ -245,3 +245,11 @@ textarea{min-height:120px; resize:vertical}
 }
 .checkitem:hover{ background:#f8fafc; }
 .checkitem input{ margin-top:2px; }
+
+/* Country assignment groups (Admin) */
+.country-groups{ display:flex; flex-direction:column; gap:10px; }
+.country-group{ border:1px solid rgba(255,255,255,0.10); border-radius:12px; background:rgba(0,0,0,0.14); overflow:hidden; }
+.country-group-head{ padding:10px 12px; background:rgba(255,255,255,0.06); }
+.country-group-body{ padding:10px 12px; display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:8px 12px; }
+.country-item{ display:flex; gap:8px; align-items:center; font-weight:800; opacity:0.95; }
+.country-item input{ transform: translateY(1px); }

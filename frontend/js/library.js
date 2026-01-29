@@ -35,12 +35,10 @@
   }
 
   function fmtDate(s){
-    if (!s) return "—";
-    try{ return new Date(s).toLocaleDateString(); }catch{ return String(s); }
+    return window.GCP.formatDateOnly ? window.GCP.formatDateOnly(s) : (s ? String(s).slice(0,10) : "");
   }
   function fmtDateTime(s){
-    if (!s) return "—";
-    try{ return new Date(s).toLocaleString(); }catch{ return String(s); }
+    return window.GCP.formatDateTime ? window.GCP.formatDateTime(s) : (s ? String(s) : "");
   }
 
   async function loadDocs(){
@@ -158,7 +156,7 @@
         container.style.fontSize = "12px";
         container.innerHTML = `
           <div style="text-align:center; margin-bottom:14px;">
-            <h1 style="margin:0; font-size:20px;">${window.GCP.escapeHtml(doc.event.title)}</h1>
+            <h1 style="margin:0; font-size:14px;">${window.GCP.escapeHtml(doc.event.title)}</h1>
           </div>
           ${selected.map(s => `
             <div style="page-break-inside:avoid; margin:0 0 14px 0;">

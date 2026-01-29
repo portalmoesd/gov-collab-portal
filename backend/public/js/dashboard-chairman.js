@@ -38,13 +38,13 @@
     for (const ev of events){
       const opt = document.createElement("option");
       opt.value = ev.id;
-      opt.textContent = `${ev.title} (${ev.country_name_en}${ev.deadline_date ? ', ' + ev.deadline_date : ''})`;
+      opt.textContent = `${ev.title} (${ev.country_name_en}${ev.deadline_date ? ", " + (window.GCP.formatDateOnly ? window.GCP.formatDateOnly(ev.deadline_date) : ev.deadline_date) : ""})`;
       eventSelect.appendChild(opt);
     }
   }
 
   function pill(status){
-    return `<span class="pill ${status}">${status.replaceAll("_"," ")}</span>`;
+    return `<span class="pill ${status}">${(window.GCP.statusLabel ? window.GCP.statusLabel(status) : String(status||"").replaceAll("_"," "))}</span>`;
   }
 
   async function refresh(){
