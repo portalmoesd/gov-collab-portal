@@ -25,9 +25,11 @@ const pool = new Pool({
 
 const ROLES = [
   ['admin', 'Admin'],
-  ['chairman', 'Chairman'],
+  ['minister', 'Minister'],
+  ['chairman', 'Deputy'],
   ['supervisor', 'Supervisor'],
   ['protocol', 'Protocol'],
+  ['super_collaborator', 'Super-collaborator'],
   ['collaborator', 'Collaborator'],
   ['viewer', 'Viewer'],
 ];

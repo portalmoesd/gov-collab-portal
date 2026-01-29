@@ -49,7 +49,7 @@
         <td>${window.GCP.escapeHtml(u.username)}</td>
         <td>${window.GCP.escapeHtml(u.fullName)}</td>
         <td>${window.GCP.escapeHtml(u.email || "")}</td>
-        <td>${window.GCP.escapeHtml(u.role)}</td>
+        <td>${window.GCP.escapeHtml(window.GCP.roleToTitle(u.role))}</td>
         <td>${u.isActive ? 'Yes' : 'No'}</td>
         <td class="row">
           <button class="btn" data-act="edit">Edit</button>
@@ -61,7 +61,7 @@
         if (newFull === null) return;
         const newEmail = prompt("Email:", u.email || "");
         if (newEmail === null) return;
-        const newRole = prompt("Role (admin/chairman/supervisor/protocol/collaborator/viewer):", u.role);
+        const newRole = prompt("Role (admin/minister/chairman(=deputy)/supervisor/protocol/super_collaborator/collaborator/viewer):", u.role);
         if (newRole === null) return;
         const pw = prompt("New password (leave blank to keep):", "");
         try{
@@ -109,37 +109,66 @@
   async function loadSections(){
     const sections = await window.GCP.apiFetch("/sections", { method:"GET" });
     sectionsTbody.innerHTML = "";
+
     for (const s of sections){
       const tr = document.createElement("tr");
+
       tr.innerHTML = `
         <td>${window.GCP.escapeHtml(s.key)}</td>
         <td>${window.GCP.escapeHtml(s.label)}</td>
-        <td>${s.order_index}</td>
+        <td style="max-width:120px;">
+          <input type="number" class="orderInput" value="${Number(s.order_index || 0)}" style="width:100%; padding:8px 10px; border:1px solid var(--border); border-radius:12px;" />
+        </td>
         <td>${s.is_active ? 'Yes' : 'No'}</td>
         <td class="row">
-          <button class="btn" data-act="edit">Edit</button>
-          <button class="btn danger" data-act="deactivate">Deactivate</button>
+          <button class="btn" data-act="rename">Rename</button>
+          <button class="btn" data-act="saveOrder">Save order</button>
+          <button class="btn ${s.is_active ? 'danger' : ''}" data-act="toggle">${s.is_active ? 'Deactivate' : 'Activate'}</button>
         </td>
       `;
-      tr.querySelector('[data-act="edit"]').addEventListener("click", async () => {
-        const newLabel = prompt("Label:", s.label);
+
+      const orderInput = tr.querySelector('.orderInput');
+
+      tr.querySelector('[data-act="rename"]').addEventListener('click', async () => {
+        const newLabel = prompt('Section label:', s.label);
         if (newLabel === null) return;
-        const newOrder = prompt("Order index:", String(s.order_index));
-        if (newOrder === null) return;
         try{
-          await window.GCP.apiFetch(`/sections/${s.id}`, { method:"PUT", body: JSON.stringify({ label: newLabel, orderIndex: Number(newOrder) }) });
+          await window.GCP.apiFetch(`/sections/${s.id}`, { method:"PUT", body: JSON.stringify({ label: newLabel }) });
           await loadSections();
           await loadAssignmentsPicklists();
-        }catch(err){ alert(err.message || "Failed"); }
+        }catch(err){ alert(err.message || 'Failed'); }
       });
-      tr.querySelector('[data-act="deactivate"]').addEventListener("click", async () => {
-        if (!confirm("Deactivate this section?")) return;
+
+      tr.querySelector('[data-act="saveOrder"]').addEventListener('click', async () => {
+        const val = Number(orderInput.value);
+        if (!Number.isFinite(val)) return alert('Order must be a number');
         try{
-          await window.GCP.apiFetch(`/sections/${s.id}`, { method:"DELETE" });
+          await window.GCP.apiFetch(`/sections/${s.id}`, { method:"PUT", body: JSON.stringify({ orderIndex: val }) });
           await loadSections();
           await loadAssignmentsPicklists();
-        }catch(err){ alert(err.message || "Failed"); }
+        }catch(err){ alert(err.message || 'Failed'); }
       });
+
+      orderInput.addEventListener('keydown', async (ev) => {
+        if (ev.key === 'Enter'){
+          ev.preventDefault();
+          tr.querySelector('[data-act="saveOrder"]').click();
+        }
+      });
+
+      tr.querySelector('[data-act="toggle"]').addEventListener('click', async () => {
+        try{
+          if (s.is_active){
+            if (!confirm('Deactivate this section?')) return;
+            await window.GCP.apiFetch(`/sections/${s.id}`, { method:"DELETE" });
+          }else{
+            await window.GCP.apiFetch(`/sections/${s.id}`, { method:"PUT", body: JSON.stringify({ isActive: true }) });
+          }
+          await loadSections();
+          await loadAssignmentsPicklists();
+        }catch(err){ alert(err.message || 'Failed'); }
+      });
+
       sectionsTbody.appendChild(tr);
     }
   }
@@ -172,7 +201,7 @@
     const users = await window.GCP.apiFetch("/users", { method:"GET" });
     const sections = await window.GCP.apiFetch("/sections", { method:"GET" });
 
-    const collaborators = users.filter(u => String(u.role).toLowerCase() === "collaborator" && u.isActive);
+    const collaborators = users.filter(u => ['collaborator','super_collaborator'].includes(String(u.role).toLowerCase()) && u.isActive);
 
     assignUser.innerHTML = collaborators.map(u => `<option value="${u.id}">${window.GCP.escapeHtml(u.fullName)} (${window.GCP.escapeHtml(u.username)})</option>`).join("");
     assignSection.innerHTML = sections.filter(s => s.is_active).map(s => `<option value="${s.id}">${window.GCP.escapeHtml(s.label)}</option>`).join("");

@@ -35,9 +35,9 @@
         <label>Deadline</label>
         <input id="deadlineDate" type="date" />
       </div>
-      <div class="field" style="min-width:320px;">
-        <label>Required sections (multi-select)</label>
-        <select id="requiredSections" multiple size="6"></select>
+      <div class="field" style="min-width:320px; max-width:420px;">
+        <label>Required sections</label>
+        <div id="requiredSectionsBox" class="checklist" style="max-height:180px; overflow:auto;"></div>
       </div>
       <div class="row" style="align-self:flex-end;">
         <button class="btn primary" id="saveEventBtn" type="submit">Create event</button>

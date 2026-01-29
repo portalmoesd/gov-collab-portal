@@ -1,5 +1,6 @@
 // GOV COLLAB PORTAL - app.js (shared layout + auth)
 (function(){
+  // Navigation per role (file names stay the same; labels reflect the renamed roles)
   const ROLE_NAV = {
     admin: [
       { href: "admin.html", label: "Admin" },
@@ -7,8 +8,13 @@
       { href: "library.html", label: "Library" },
       { href: "statistics.html", label: "Statistics" },
     ],
-    chairman: [
+    chairman: [ // displayed as Deputy
       { href: "dashboard-chairman.html", label: "Dashboard" },
+      { href: "calendar.html", label: "Calendar" },
+      { href: "library.html", label: "Library" },
+      { href: "statistics.html", label: "Statistics" },
+    ],
+    minister: [
       { href: "calendar.html", label: "Calendar" },
       { href: "library.html", label: "Library" },
       { href: "statistics.html", label: "Statistics" },
@@ -24,15 +30,19 @@
       { href: "library.html", label: "Library" },
       { href: "statistics.html", label: "Statistics" },
     ],
-    collaborator: [
+    super_collaborator: [
       { href: "dashboard-collab.html", label: "Dashboard" },
       { href: "calendar.html", label: "Calendar (Read)" },
       { href: "library.html", label: "Library" },
       { href: "statistics.html", label: "Statistics" },
     ],
+    collaborator: [
+      { href: "dashboard-collab.html", label: "Dashboard" },
+      { href: "calendar.html", label: "Calendar (Read)" },
+      { href: "statistics.html", label: "Statistics" },
+    ],
     viewer: [
       { href: "statistics.html", label: "Statistics" },
-      { href: "library.html", label: "Library" },
     ],
   };
 
@@ -41,7 +51,16 @@
   }
 
   function roleToTitle(r){
-    const map = { admin:"Admin", chairman:"Chairman", supervisor:"Supervisor", protocol:"Protocol", collaborator:"Collaborator", viewer:"Viewer" };
+    const map = {
+      admin:"Admin",
+      chairman:"Deputy",
+      minister:"Minister",
+      supervisor:"Supervisor",
+      protocol:"Protocol",
+      super_collaborator:"Super-collaborator",
+      collaborator:"Collaborator",
+      viewer:"Viewer"
+    };
     return map[String(r||"").toLowerCase()] || r;
   }
 

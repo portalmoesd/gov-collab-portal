@@ -4,7 +4,7 @@
   if (!me) return;
 
   const role = String(me.role).toLowerCase();
-  const canEdit = ["admin","chairman","supervisor","protocol"].includes(role);
+  const canEdit = ['admin','chairman','minister','supervisor','protocol'].includes(role);
 
   const msg = document.getElementById("msg");
   const eventsTbody = document.getElementById("eventsTbody");
@@ -15,7 +15,7 @@
   const titleInput = document.getElementById("title");
   const occasionInput = document.getElementById("occasion");
   const deadlineInput = document.getElementById("deadlineDate");
-  const requiredSelect = document.getElementById("requiredSections");
+  const requiredBox = document.getElementById("requiredSectionsBox");
   const saveBtn = document.getElementById("saveEventBtn");
   const resetBtn = document.getElementById("resetFormBtn");
 
@@ -31,8 +31,14 @@
   }
 
   async function loadSections(){
-    const sections = await window.GCP.apiFetch("/sections", { method:"GET" });
-    requiredSelect.innerHTML = sections.filter(s => s.is_active).map(s => `<option value="${s.id}">${window.GCP.escapeHtml(s.label)}</option>`).join("");
+    const sections = await window.GCP.apiFetch('/sections', { method:'GET' });
+    const active = sections.filter(s => s.is_active);
+    requiredBox.innerHTML = active.map(s => (
+      `<label class="checkitem">
+        <input type="checkbox" value="${s.id}">
+        <span>${window.GCP.escapeHtml(s.label)}</span>
+      </label>`
+    )).join('');
   }
 
   function formatDate(d){
@@ -69,8 +75,8 @@
           deadlineInput.value = formatDate(details.deadlineDate);
           // select required sections
           const reqIds = new Set((details.requiredSections || []).map(s => String(s.id)));
-          for (const opt of requiredSelect.options){
-            opt.selected = reqIds.has(String(opt.value));
+          for (const cb of requiredBox.querySelectorAll('input[type=checkbox]')){
+            cb.checked = reqIds.has(String(cb.value));
           }
           saveBtn.textContent = "Update event";
           msg.textContent = `Editing event #${ev.id}`;
@@ -98,7 +104,7 @@
     e.preventDefault();
     if (!canEdit) return;
 
-    const requiredSectionIds = Array.from(requiredSelect.selectedOptions).map(o => Number(o.value));
+    const requiredSectionIds = Array.from(requiredBox.querySelectorAll('input[type=checkbox]:checked')).map(cb => Number(cb.value));
     const payload = {
       countryId: Number(countrySelect.value),
       title: titleInput.value.trim(),

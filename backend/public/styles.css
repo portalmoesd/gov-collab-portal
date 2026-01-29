@@ -227,3 +227,21 @@ textarea{min-height:120px; resize:vertical}
 }
 .modal h2{margin:0 0 10px}
 .modal .close-row{display:flex; justify-content:flex-end; margin-bottom:10px}
+
+
+/* Checkbox lists (Calendar required sections, PDF export selections) */
+.checklist{
+  border:1px solid var(--border);
+  background:#fff;
+  border-radius:14px;
+  padding:8px;
+}
+.checkitem{
+  display:flex;
+  gap:10px;
+  align-items:flex-start;
+  padding:6px 8px;
+  border-radius:12px;
+}
+.checkitem:hover{ background:#f8fafc; }
+.checkitem input{ margin-top:2px; }

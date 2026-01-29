@@ -28,7 +28,7 @@
   }
 
   // Buttons visible depending on role (Blueprint editor behaviour)
-  const canEdit = ["admin","chairman","supervisor","collaborator"].includes(role);
+  const canEdit = ["admin","chairman","supervisor","collaborator","super_collaborator"].includes(role);
   const isViewer = role === "viewer";
   const isProtocol = role === "protocol";
 
@@ -100,7 +100,7 @@
     try{
       await window.GCP.apiFetch("/tp/submit", {
         method:"POST",
-        body: JSON.stringify({ eventId, countryId, sectionId })
+        body: JSON.stringify({ eventId, countryId, sectionId, htmlContent: getHtml() })
       });
       await load();
       msg.textContent = "Submitted.";
@@ -114,12 +114,12 @@
       if (role === "chairman"){
         await window.GCP.apiFetch("/tp/approve-section-chairman", {
           method:"POST",
-          body: JSON.stringify({ eventId, countryId, sectionId })
+          body: JSON.stringify({ eventId, countryId, sectionId, htmlContent: getHtml() })
         });
       } else {
         await window.GCP.apiFetch("/tp/approve-section", {
           method:"POST",
-          body: JSON.stringify({ eventId, countryId, sectionId })
+          body: JSON.stringify({ eventId, countryId, sectionId, htmlContent: getHtml() })
         });
       }
       await load();

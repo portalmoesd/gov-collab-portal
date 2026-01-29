@@ -2,7 +2,7 @@
  * GOV COLLAB PORTAL - Backend REST API (Node.js + Express + PostgreSQL)
  * Blueprint v2 (Definitive)
  *
- * This server exposes the API under /api and can also serve static frontend files from backend/public.
+ * This server is JSON-only (no HTML pages). All routes live under /api.
  */
 
 'use strict';
@@ -36,9 +36,6 @@ app.use(cors({
   origin: CORS_ORIGIN === '*' ? true : CORS_ORIGIN,
   credentials: true,
 }));
-
-// Serve the frontend from backend/public (so /login.html works on Render)
-app.use(express.static(path.join(__dirname, 'public')));
 
 /** Utilities **/
 
@@ -484,7 +481,8 @@ app.post('/api/section-assignments', requireRole('admin'), async (req, res) => {
     [uid]
   );
   if (!user) return res.status(404).json({ error: 'User not found' });
-  if (normalizeRoleKey(user.role_key) !== 'collaborator') return res.status(400).json({ error: 'Only collaborators can be assigned to sections' });
+  const rk = normalizeRoleKey(user.role_key);
+  if (!(rk === "collaborator" || rk === "super_collaborator")) return res.status(400).json({ error: 'Only collaborators or super-collaborators can be assigned to sections' });
 
   const ins = await queryOne(
     `
@@ -580,7 +578,7 @@ app.get('/api/events/:id', async (req, res) => {
   return res.json(event);
 });
 
-app.post('/api/events', requireRole('admin', 'chairman', 'supervisor', 'protocol'), async (req, res) => {
+app.post('/api/events', requireRole('admin', 'chairman', 'minister', 'supervisor', 'protocol'), async (req, res) => {
   const { countryId, title, occasion, deadlineDate, requiredSectionIds } = req.body || {};
   if (!countryId || !title) return res.status(400).json({ error: 'countryId and title required' });
 
@@ -629,7 +627,7 @@ app.post('/api/events', requireRole('admin', 'chairman', 'supervisor', 'protocol
   }
 });
 
-app.put('/api/events/:id', requireRole('admin', 'chairman', 'supervisor', 'protocol'), async (req, res) => {
+app.put('/api/events/:id', requireRole('admin', 'chairman', 'minister', 'supervisor', 'protocol'), async (req, res) => {
   const eventId = Number(req.params.id);
   if (!Number.isFinite(eventId)) return res.status(400).json({ error: 'Invalid id' });
 
@@ -745,7 +743,7 @@ app.post('/api/tp/save', async (req, res) => {
   const roleKey = normalizeRoleKey(req.user.role_key);
   if (roleKey === 'protocol' || roleKey === 'viewer') return res.status(403).json({ error: 'Forbidden' });
 
-  if (roleKey === 'collaborator') {
+  if (roleKey === 'collaborator' || roleKey === 'super_collaborator') {
     const assigned = await isCollaboratorAssignedToSection(req.user.id, sid);
     if (!assigned) return res.status(403).json({ error: 'Not assigned to this section' });
   }
@@ -768,7 +766,7 @@ app.post('/api/tp/save', async (req, res) => {
 });
 
 app.post('/api/tp/submit', async (req, res) => {
-  const { eventId, countryId, sectionId } = req.body || {};
+  const { eventId, countryId, sectionId, htmlContent } = req.body || {};
   const eid = Number(eventId);
   const cid = Number(countryId);
   const sid = Number(sectionId);
@@ -780,7 +778,7 @@ app.post('/api/tp/submit', async (req, res) => {
   const roleKey = normalizeRoleKey(req.user.role_key);
   if (roleKey === 'protocol' || roleKey === 'viewer') return res.status(403).json({ error: 'Forbidden' });
 
-  if (roleKey === 'collaborator') {
+  if (roleKey === 'collaborator' || roleKey === 'super_collaborator') {
     const assigned = await isCollaboratorAssignedToSection(req.user.id, sid);
     if (!assigned) return res.status(403).json({ error: 'Not assigned to this section' });
   }
@@ -788,16 +786,19 @@ app.post('/api/tp/submit', async (req, res) => {
   await ensureDocumentStatus(eid, cid);
   await ensureTpRow(eid, cid, sid, req.user.id);
 
+  const content = (htmlContent === undefined) ? null : String(htmlContent);
+
   await pool.query(
     `
     UPDATE tp_content
-    SET status='submitted',
+    SET html_content = COALESCE($1, html_content),
+        status='submitted',
         status_comment=NULL,
-        last_updated_by_user_id=$1,
+        last_updated_by_user_id=$2,
         last_updated_at=NOW()
-    WHERE event_id=$2 AND country_id=$3 AND section_id=$4
+    WHERE event_id=$3 AND country_id=$4 AND section_id=$5
     `,
-    [req.user.id, eid, cid, sid]
+    [content, req.user.id, eid, cid, sid]
   );
 
   return res.json({ ok: true });
@@ -995,7 +996,7 @@ app.post('/api/document/return', requireRole('admin', 'chairman'), async (req, r
   return res.json({ ok: true });
 });
 
-app.get('/api/library', async (req, res) => {
+app.get('/api/library', requireRole('admin','chairman','minister','supervisor','super_collaborator','protocol'), async (req, res) => {
   // List approved documents for a country
   const countryId = Number(req.query.country_id);
   if (!Number.isFinite(countryId)) return res.status(400).json({ error: 'country_id required' });
@@ -1017,7 +1018,7 @@ app.get('/api/library', async (req, res) => {
   return res.json(rows);
 });
 
-app.get('/api/library/document', async (req, res) => {
+app.get('/api/library/document', requireRole('admin','chairman','minister','supervisor','super_collaborator','protocol'), async (req, res) => {
   const eventId = Number(req.query.event_id);
   const countryId = Number(req.query.country_id);
   if (!Number.isFinite(eventId) || !Number.isFinite(countryId)) return res.status(400).json({ error: 'event_id and country_id required' });
@@ -1070,6 +1071,17 @@ app.get('/api/library/document', async (req, res) => {
       lastUpdatedAt: r.last_updated_at
     }))
   });
+});
+
+
+/** Static frontend (served from backend/public for Render) **/
+const PUBLIC_DIR = path.join(__dirname, 'public');
+app.use(express.static(PUBLIC_DIR));
+
+// SPA-style fallback: send login.html for any non-API route
+app.get('*', (req, res) => {
+  if (req.path.startsWith('/api')) return res.status(404).json({ error: 'Not found' });
+  return res.sendFile(path.join(PUBLIC_DIR, 'login.html'));
 });
 
 /** Error handler */

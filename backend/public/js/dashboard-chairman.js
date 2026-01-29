@@ -62,7 +62,7 @@
 
     docStatusBox.innerHTML = `
       <div><b>Document status:</b> ${pill(ds.status)}</div>
-      ${ds.chairmanComment ? `<div class="small"><b>Chairman comment:</b> ${window.GCP.escapeHtml(ds.chairmanComment)}</div>` : ''}
+      ${ds.chairmanComment ? `<div class="small"><b>Deputy comment:</b> ${window.GCP.escapeHtml(ds.chairmanComment)}</div>` : ''}
       <div class="small muted">Updated: ${window.GCP.escapeHtml(ds.updatedAt)}</div>
     `;
 
