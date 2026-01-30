@@ -59,6 +59,18 @@ CREATE INDEX IF NOT EXISTS idx_sections_is_active ON sections(is_active);
 CREATE INDEX IF NOT EXISTS idx_sections_order_index ON sections(order_index);
 
 -- Section assignments (collaborator -> section), global (NOT per country)
+
+CREATE TABLE IF NOT EXISTS country_assignments (
+  id          SERIAL PRIMARY KEY,
+  user_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  country_id  INTEGER NOT NULL REFERENCES countries(id) ON DELETE CASCADE,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  CONSTRAINT uq_country_assignments_user_country UNIQUE (user_id, country_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_country_assignments_user_id ON country_assignments(user_id);
+CREATE INDEX IF NOT EXISTS idx_country_assignments_country_id ON country_assignments(country_id);
+
 CREATE TABLE IF NOT EXISTS section_assignments (
   id          SERIAL PRIMARY KEY,
   user_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -148,15 +160,3 @@ CREATE INDEX IF NOT EXISTS idx_document_status_country_id ON document_status(cou
 CREATE INDEX IF NOT EXISTS idx_document_status_status ON document_status(status);
 
 COMMIT;
-
-
--- Country assignments for collaborators / super-collaborators
-CREATE TABLE IF NOT EXISTS user_country_assignments (
-  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  country_id INTEGER NOT NULL REFERENCES countries(id) ON DELETE CASCADE,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  PRIMARY KEY (user_id, country_id)
-);
-
-CREATE INDEX IF NOT EXISTS idx_user_country_assignments_user ON user_country_assignments(user_id);
-CREATE INDEX IF NOT EXISTS idx_user_country_assignments_country ON user_country_assignments(country_id);

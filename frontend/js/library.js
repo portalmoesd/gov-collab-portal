@@ -35,10 +35,12 @@
   }
 
   function fmtDate(s){
-    return window.GCP.formatDateOnly ? window.GCP.formatDateOnly(s) : (s ? String(s).slice(0,10) : "");
+    if (!s) return "—";
+    try{ return window.GCP.formatDate(s); }catch{ return String(s); }
   }
   function fmtDateTime(s){
-    return window.GCP.formatDateTime ? window.GCP.formatDateTime(s) : (s ? String(s) : "");
+    if (!s) return "—";
+    try{ return window.GCP.formatDateTime(s); }catch{ return String(s); }
   }
 
   async function loadDocs(){
@@ -84,7 +86,7 @@
           <h2 style="margin:0 0 6px;">${window.GCP.escapeHtml(doc.event.title)}</h2>
           <div class="small muted">${window.GCP.escapeHtml(doc.event.countryName)}</div>
         </div>
-        <div class="small muted">Last updated: ${doc.documentStatus?.updatedAt ? window.GCP.escapeHtml(new Date(doc.documentStatus.updatedAt).toLocaleString()) : '—'}</div>
+        <div class="small muted">Last updated: ${doc.documentStatus?.updatedAt ? window.GCP.escapeHtml(window.GCP.formatDateTime(doc.documentStatus.updatedAt)) : '—'}</div>
       </div>
       <hr style="margin:12px 0; border:none; border-top:1px solid var(--border);" />`);
 
@@ -156,7 +158,7 @@
         container.style.fontSize = "12px";
         container.innerHTML = `
           <div style="text-align:center; margin-bottom:14px;">
-            <h1 style="margin:0; font-size:14px;">${window.GCP.escapeHtml(doc.event.title)}</h1>
+            <h1 style="margin:0; font-size:20px;">${window.GCP.escapeHtml(doc.event.title)}</h1>
           </div>
           ${selected.map(s => `
             <div style="page-break-inside:avoid; margin:0 0 14px 0;">

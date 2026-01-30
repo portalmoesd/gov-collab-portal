@@ -95,24 +95,45 @@
       </div>
 
       <div class="col-12" style="margin-top:8px;">
-        <div style="font-weight:900; margin-bottom:10px;">Current assignments</div>
+        
+    <div style="font-weight:900; margin:22px 0 10px 0;">Assign collaborator to countries</div>
+    <form id="assignCountriesForm" class="row">
+      <div class="field">
+        <label>Collaborator</label>
+        <select id="assignUserCountries"></select>
+      </div>
+
+      <div class="field" style="flex:1 1 520px; min-width:320px;">
+        <label>Countries (choose one or many)</label>
+        <div id="countryChecklist" class="checklist"></div>
+      </div>
+
+      <div style="align-self:flex-end;">
+        <button class="btn primary" type="submit">Assign countries</button>
+      </div>
+      <div id="msgAssignCountries" style="margin-left:10px; align-self:flex-end; font-size:12px; color:#2b445b;"></div>
+    </form>
+
+    <div style="font-weight:900; margin:18px 0 10px 0;">Current country assignments</div>
+    <table class="table">
+      <thead>
+        <tr>
+          <th>User</th>
+          <th>Country</th>
+          <th>Group</th>
+          <th>Created</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody id="countryAssignTbody"></tbody>
+    </table>
+
+<div style="font-weight:900; margin-bottom:10px;">Current assignments</div>
         <table class="table">
           <thead><tr><th>User</th><th>Section</th><th>Created</th><th></th></tr></thead>
           <tbody id="assignmentTbody"></tbody>
         </table>
       </div>
-      <div class="col-12" style="margin-top:18px;">
-        <div style="font-weight:900; margin-bottom:10px;">Assign collaborator to countries</div>
-        <form id="assignCountriesForm" class="row">
-          <div class="field"><label>Collaborator</label><select id="assignCountryUser"></select></div>
-          <div class="col-12" style="margin-top:10px;">
-            <div id="countryGroups" class="country-groups"></div>
-          </div>
-          <div style="align-self:flex-end;"><button class="btn primary" type="submit">Save countries</button></div>
-          <div id="msgAssignCountries" class="small" style="color:var(--danger); font-weight:800;"></div>
-        </form>
-      </div>
-
     </div>
   </div>
 </section>

@@ -40,7 +40,51 @@ app.use(cors({
 /** Utilities **/
 
 function normalizeRoleKey(roleKey) {
-  return String(roleKey || '').trim().toLowerCase();
+  let k = String(roleKey || '').trim().toLowerCase();
+  // normalize separators
+  k = k.replace(/\s+/g, '_').replace(/-/g, '_');
+  // UI/wording aliases
+  if (k === 'deputy') k = 'chairman';
+  if (k === 'supercollaborator') k = 'super_collaborator';
+  return k;
+}
+
+
+async function ensureBaseData(){
+  // Keep the server resilient on fresh DBs / partial seeds.
+  // 1) Ensure roles exist (used by user creation and auth checks).
+  const roles = [
+    ['admin', 'Admin'],
+    ['minister', 'Minister'],
+    ['chairman', 'Deputy'],
+    ['supervisor', 'Supervisor'],
+    ['protocol', 'Protocol'],
+    ['super_collaborator', 'Super-collaborator'],
+    ['collaborator', 'Collaborator'],
+    ['viewer', 'Viewer'],
+  ];
+  for (const [key, label] of roles){
+    await queryOne(
+      `INSERT INTO roles (key, label) VALUES ($1, $2)
+       ON CONFLICT (key) DO UPDATE SET label = EXCLUDED.label
+       RETURNING id`,
+      [key, label]
+    );
+  }
+
+  // 2) Ensure country assignments table exists (needed for collaborator filtering).
+  await queryOne(
+    `CREATE TABLE IF NOT EXISTS country_assignments (
+      id          SERIAL PRIMARY KEY,
+      user_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      country_id  INTEGER NOT NULL REFERENCES countries(id) ON DELETE CASCADE,
+      created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      CONSTRAINT uq_country_assignments_user_country UNIQUE (user_id, country_id)
+    );`,
+    []
+  );
+  await queryOne(`CREATE INDEX IF NOT EXISTS idx_country_assignments_user_id ON country_assignments(user_id);`, []);
+  await queryOne(`CREATE INDEX IF NOT EXISTS idx_country_assignments_country_id ON country_assignments(country_id);`, []);
 }
 
 async function queryOne(text, params) {
@@ -153,6 +197,9 @@ async function getEventWithSections(eventId, countryIdForStatuses = null) {
   );
   if (!event) return null;
 
+  // Events are single-country, so default statuses to the event's country.
+  countryIdForStatuses = countryIdForStatuses || event.country_id;
+
   const requiredSections = await queryAll(
     `
     SELECT s.id, s.key, s.label, s.order_index
@@ -165,11 +212,11 @@ async function getEventWithSections(eventId, countryIdForStatuses = null) {
   );
 
   let sectionStatuses = null;
-  if (Number.isFinite(resolvedCid)) {
+  if (countryIdForStatuses) {
     // Ensure rows exist for required sections to make dashboard deterministic.
-    await ensureDocumentStatus(eventId, resolvedCid);
+    await ensureDocumentStatus(eventId, countryIdForStatuses);
     for (const s of requiredSections) {
-      await ensureTpRow(eventId, resolvedCid, s.id, null);
+      await ensureTpRow(eventId, countryIdForStatuses, s.id, null);
     }
 
     sectionStatuses = await queryAll(
@@ -180,7 +227,7 @@ async function getEventWithSections(eventId, countryIdForStatuses = null) {
       LEFT JOIN users u ON u.id = t.last_updated_by_user_id
       WHERE t.event_id = $1 AND t.country_id = $2
       `,
-      [eventId, resolvedCid]
+      [eventId, countryIdForStatuses]
     );
   }
 
@@ -525,63 +572,6 @@ app.get('/api/countries', async (req, res) => {
   return res.json(rows);
 });
 
-// Country assignments (Admin) - for collaborators / super-collaborators
-app.get('/api/country-assignments', requireRole('admin'), async (req, res) => {
-  const userId = Number(req.query.user_id);
-  if (!Number.isFinite(userId)) return res.status(400).json({ error: 'user_id required' });
-  const { rows } = await pool.query(
-    'SELECT country_id FROM user_country_assignments WHERE user_id = $1 ORDER BY country_id',
-    [userId]
-  );
-  res.json(rows.map(r => r.country_id));
-});
-
-app.put('/api/country-assignments', requireRole('admin'), async (req, res) => {
-  const userId = Number(req.body.userId);
-  const countryIds = Array.isArray(req.body.countryIds) ? req.body.countryIds.map(Number).filter(Number.isFinite) : [];
-  if (!Number.isFinite(userId)) return res.status(400).json({ error: 'userId required' });
-
-  const u = await pool.query(
-    `SELECT u.id, r.key AS role_key
-     FROM users u JOIN roles r ON r.id = u.role_id
-     WHERE u.id = $1`,
-    [userId]
-  );
-  if (!u.rows.length) return res.status(404).json({ error: 'User not found' });
-  const roleKey = String(u.rows[0].role_key || '').toLowerCase();
-  if (!(roleKey === 'collaborator' || roleKey === 'super_collaborator')) {
-    return res.status(400).json({ error: 'Only collaborator and super-collaborator can be assigned to countries' });
-  }
-
-  const client = await pool.connect();
-  try{
-    await client.query('BEGIN');
-    await client.query('DELETE FROM user_country_assignments WHERE user_id = $1', [userId]);
-    for (const cid of countryIds){
-      await client.query(
-        'INSERT INTO user_country_assignments (user_id, country_id) VALUES ($1, $2) ON CONFLICT DO NOTHING',
-        [userId, cid]
-      );
-    }
-    await client.query('COMMIT');
-    res.json({ ok: true });
-  }catch(err){
-    await client.query('ROLLBACK');
-    throw err;
-  }finally{
-    client.release();
-  }
-});
-
-// For the current user
-app.get('/api/country-assignments/mine', authRequired, attachUser, async (req, res) => {
-  const { rows } = await pool.query(
-    'SELECT country_id FROM user_country_assignments WHERE user_id = $1 ORDER BY country_id',
-    [req.user.id]
-  );
-  res.json(rows.map(r => r.country_id));
-});
-
 /** 7.6 Events and Calendar **/
 app.get('/api/events', async (req, res) => {
   const { country_id, is_active } = req.query || {};
@@ -607,39 +597,44 @@ app.get('/api/events', async (req, res) => {
   return res.json(rows);
 });
 
-app.get('/api/events/upcoming', authRequired, attachUser, async (req, res) => {
-  const role = String(req.user?.role_key || '').toLowerCase();
-
-  // Collaborators only see events they are assigned to (by country + required section)
-  if (role === 'collaborator' || role === 'super_collaborator') {
-    const userId = req.user.id;
-    const { rows } = await pool.query(
-      `SELECT DISTINCT e.id, e.title, e.deadline_date, e.created_at,
-              c.name_en AS country_name_en, c.name_ka AS country_name_ka, c.code AS country_code
-       FROM events e
-       JOIN countries c ON c.id = e.country_id
-       JOIN user_country_assignments uca ON uca.country_id = e.country_id AND uca.user_id = $1
-       JOIN event_required_sections ers ON ers.event_id = e.id
-       JOIN section_assignments sa ON sa.section_id = ers.section_id AND sa.user_id = $1
-       WHERE e.is_active = true
-       ORDER BY e.deadline_date NULLS LAST, e.created_at DESC
-       LIMIT 50`,
-      [userId]
-    );
-    return res.json(rows);
+app.get('/api/events/upcoming-for-me', authRequired, async (req, res) => {
+  const roleKey = normalizeRoleKey(req.user.role_key);
+  if (!['collaborator','super_collaborator'].includes(roleKey)){
+    return res.status(403).json({ error: 'Forbidden' });
   }
 
-  // Others see all active events
-  const { rows } = await pool.query(
-    `SELECT e.id, e.title, e.deadline_date, e.created_at,
-            c.name_en AS country_name_en, c.name_ka AS country_name_ka, c.code AS country_code
-     FROM events e
-     JOIN countries c ON c.id = e.country_id
-     WHERE e.is_active = true
-     ORDER BY e.deadline_date NULLS LAST, e.created_at DESC
-     LIMIT 50`
+  const rows = await queryAll(
+    `
+    SELECT DISTINCT e.id, e.country_id, c.name_en AS country_name_en, c.code AS country_code,
+           e.title, e.occasion, e.deadline_date
+    FROM events e
+    JOIN countries c ON c.id = e.country_id
+    JOIN event_required_sections ers ON ers.event_id = e.id
+    JOIN section_assignments sa ON sa.user_id = $1 AND sa.section_id = ers.section_id
+    JOIN country_assignments ca ON ca.user_id = $1 AND ca.country_id = e.country_id
+    WHERE e.is_active = true
+    ORDER BY (e.deadline_date IS NULL) ASC, e.deadline_date ASC, e.id DESC
+    LIMIT 50
+    `,
+    [req.user.id]
   );
-  res.json(rows);
+  return res.json(rows);
+});
+
+app.get('/api/events/upcoming', async (req, res) => {
+  const rows = await queryAll(
+    `
+    SELECT e.id, e.country_id, c.name_en AS country_name_en, c.code AS country_code,
+           e.title, e.occasion, e.deadline_date
+    FROM events e
+    JOIN countries c ON c.id = e.country_id
+    WHERE e.is_active = true
+    ORDER BY (e.deadline_date IS NULL) ASC, e.deadline_date ASC, e.id DESC
+    LIMIT 50
+    `,
+    []
+  );
+  return res.json(rows);
 });
 
 app.get('/api/events/:id', async (req, res) => {
@@ -971,71 +966,6 @@ app.get('/api/document-status', async (req, res) => {
   const countryId = Number(req.query.country_id);
   if (!Number.isFinite(eventId) || !Number.isFinite(countryId)) {
     return res.status(400).json({ error: 'event_id and country_id required' });
-
-// --- Talking Points helper endpoints (Supervisor dashboards etc.) ---
-// Status grid by event (country derived from event)
-app.get('/api/tp/status-grid', authRequired, attachUser, async (req, res) => {
-  const eventId = Number(req.query.event_id);
-  if (!Number.isFinite(eventId)) return res.status(400).json({ error: 'event_id required' });
-
-  const ev = await pool.query('SELECT id, country_id FROM events WHERE id = $1', [eventId]);
-  if (!ev.rows.length) return res.status(404).json({ error: 'Event not found' });
-  const countryId = Number(ev.rows[0].country_id);
-
-  const { rows } = await pool.query(
-    `SELECT s.id AS section_id, s.label AS section_label,
-            COALESCE(t.status, 'draft') AS status,
-            t.last_updated_at,
-            u.full_name AS last_updated_by
-     FROM event_required_sections ers
-     JOIN sections s ON s.id = ers.section_id
-     LEFT JOIN tp_content t
-       ON t.event_id = ers.event_id AND t.country_id = $2 AND t.section_id = s.id
-     LEFT JOIN users u ON u.id = t.last_updated_by_user_id
-     WHERE ers.event_id = $1
-     ORDER BY s.sort_order ASC, s.id ASC`,
-    [eventId, countryId]
-  );
-
-  res.json({ ok: true, rows });
-});
-
-// Document status by event (country derived from event)
-app.get('/api/tp/document-status', authRequired, attachUser, async (req, res) => {
-  const eventId = Number(req.query.event_id);
-  if (!Number.isFinite(eventId)) return res.status(400).json({ error: 'event_id required' });
-
-  const ev = await pool.query('SELECT id, country_id FROM events WHERE id = $1', [eventId]);
-  if (!ev.rows.length) return res.status(404).json({ error: 'Event not found' });
-  const countryId = Number(ev.rows[0].country_id);
-
-  const ds = await ensureDocumentStatus(eventId, countryId);
-  res.json({
-    ok: true,
-    status: ds.status,
-    updated_at: ds.updated_at,
-    chairman_comment: ds.chairman_comment
-  });
-});
-
-// Submit document to Deputy (Chairman role key)
-app.post('/api/tp/submit-document', authRequired, attachUser, async (req, res) => {
-  const eventId = Number(req.body.eventId);
-  if (!Number.isFinite(eventId)) return res.status(400).json({ error: 'eventId required' });
-
-  const ev = await pool.query('SELECT id, country_id FROM events WHERE id = $1', [eventId]);
-  if (!ev.rows.length) return res.status(404).json({ error: 'Event not found' });
-  const countryId = Number(ev.rows[0].country_id);
-
-  const doc = await ensureDocumentStatus(eventId, countryId);
-  await pool.query(
-    `UPDATE document_status
-     SET status = 'submitted_to_chairman', updated_at = NOW(), updated_by_user_id = $3
-     WHERE event_id = $1 AND country_id = $2`,
-    [eventId, countryId, req.user.id]
-  );
-  res.json({ ok: true });
-});
   }
 
   await ensureDocumentStatus(eventId, countryId);
@@ -1074,6 +1004,24 @@ app.post('/api/document/submit-to-chairman', requireRole('admin', 'supervisor'),
     [eid, cid]
   );
 
+  return res.json({ ok: true });
+});
+
+
+app.post('/api/tp/submit-document', requireRole('supervisor','admin'), async (req, res) => {
+  const eventId = Number(req.body.eventId);
+  const countryId = Number(req.body.countryId);
+  if (!Number.isFinite(eventId) || !Number.isFinite(countryId)) {
+    return res.status(400).json({ error: 'eventId and countryId required' });
+  }
+  await ensureDocumentStatus(eventId, countryId);
+  await queryOne(
+    `UPDATE document_status
+     SET status='pending_chairman', status_comment=NULL, last_updated_at=NOW(), last_updated_by_user_id=$3
+     WHERE event_id=$1 AND country_id=$2
+     RETURNING id`,
+    [eventId, countryId, req.user.id]
+  );
   return res.json({ ok: true });
 });
 
@@ -1161,14 +1109,8 @@ app.get('/api/library', requireRole('admin','chairman','minister','supervisor','
 
 app.get('/api/library/document', requireRole('admin','chairman','minister','supervisor','super_collaborator','protocol'), async (req, res) => {
   const eventId = Number(req.query.event_id);
-  const countryIdRaw = req.query.country_id;
-  let countryId = Number(countryIdRaw);
-  if (!Number.isFinite(eventId)) return res.status(400).json({ error: 'event_id required' });
-  if (!Number.isFinite(countryId)) {
-    const ev = await pool.query('SELECT country_id FROM events WHERE id = $1', [eventId]);
-    if (!ev.rows.length) return res.status(404).json({ error: 'Event not found' });
-    countryId = Number(ev.rows[0].country_id);
-  }
+  const countryId = Number(req.query.country_id);
+  if (!Number.isFinite(eventId) || !Number.isFinite(countryId)) return res.status(400).json({ error: 'event_id and country_id required' });
 
   const event = await getEventWithSections(eventId, null);
   if (!event) return res.status(404).json({ error: 'Event not found' });
@@ -1238,45 +1180,57 @@ app.use((err, req, res, next) => {
 });
 
 
-async function initBootstrap() {
-  // Ensure roles exist (non-breaking for existing DBs)
-  const roles = [
-    ['admin','Admin'],
-    ['chairman','Deputy'],
-    ['supervisor','Supervisor'],
-    ['collaborator','Collaborator'],
-    ['super_collaborator','Super-Collaborator'],
-    ['minister','Minister'],
-    ['protocol','Protocol'],
-    ['viewer','Viewer'],
-  ];
+(async () => {
+  try{
+    await ensureBaseData();
+  }catch(err){
+    console.error("BOOTSTRAP WARNING: base data setup failed:", err.message || err);
+  }
+})();
+app.listen(PORT, () => {
+  console.log(`GOV COLLAB PORTAL API listening on port ${PORT}`);
+});
 
-  // Create missing tables/constraints safely
-  await pool.query(`
-    CREATE TABLE IF NOT EXISTS user_country_assignments (
-      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-      country_id INTEGER NOT NULL REFERENCES countries(id) ON DELETE CASCADE,
-      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-      PRIMARY KEY (user_id, country_id)
-    );
-  `);
+/** 7.45 Country Assignments (Admin only) **/
+app.get('/api/country-assignments', requireRole('admin'), async (req, res) => {
+  const rows = await queryAll(
+    `
+    SELECT ca.id, ca.user_id, u.full_name, u.username, ca.country_id, c.name_en AS country_name_en, c.code AS country_code, ca.created_at
+    FROM country_assignments ca
+    JOIN users u ON u.id = ca.user_id
+    JOIN countries c ON c.id = ca.country_id
+    ORDER BY ca.id DESC
+    `,
+    []
+  );
+  return res.json(rows);
+});
 
-  for (const [key,label] of roles){
-    await pool.query(
-      `INSERT INTO roles (key,label) VALUES ($1,$2)
-       ON CONFLICT (key) DO UPDATE SET label = EXCLUDED.label`,
-      [key,label]
+app.post('/api/country-assignments', requireRole('admin'), async (req, res) => {
+  const userId = Number(req.body.userId);
+  const countryIdsRaw = req.body.countryIds ?? (req.body.countryId ? [req.body.countryId] : []);
+  const countryIds = Array.isArray(countryIdsRaw) ? countryIdsRaw.map(Number).filter(Number.isFinite) : [];
+  if (!Number.isFinite(userId) || countryIds.length === 0){
+    return res.status(400).json({ error: 'userId and countryIds required' });
+  }
+
+  for (const cid of countryIds){
+    await queryOne(
+      `INSERT INTO country_assignments (user_id, country_id, created_at)
+       VALUES ($1, $2, NOW())
+       ON CONFLICT (user_id, country_id) DO NOTHING
+       RETURNING id`,
+      [userId, cid]
     );
   }
-}
+  return res.json({ ok: true });
+});
 
-initBootstrap()
-  .then(() => {
-    app.listen(PORT, () => {
-      console.log(`Server listening on ${PORT}`);
-    });
-  })
-  .catch((err) => {
-    console.error('BOOTSTRAP FAILED:', err);
-    process.exit(1);
-  });
+app.delete('/api/country-assignments/:id', requireRole('admin'), async (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isFinite(id)) return res.status(400).json({ error: 'Invalid id' });
+  await queryOne(`DELETE FROM country_assignments WHERE id=$1`, [id]);
+  return res.json({ ok: true });
+});
+
+

@@ -6,26 +6,12 @@
   const role = String(me.role).toLowerCase();
   const qs = window.GCP.qs();
   const eventId = qs.eventId;
-  let countryId = qs.countryId;
+  const countryId = qs.countryId;
   const sectionId = qs.sectionId;
-
-  async function ensureCountryId(){
-    if (countryId) return countryId;
-    try{
-      const ev = await window.GCP.apiFetch(`/events/${encodeURIComponent(eventId)}`, { method:"GET" });
-      countryId = String(ev.country_id || "");
-      return countryId;
-    }catch(e){
-      return null;
-    }
-  }
 
   const msg = document.getElementById("msg");
   const meta = document.getElementById("meta");
   const statusEl = document.getElementById("statusEl");
-
-  await ensureCountryId();
-  if (!countryId){ msg.textContent = "Could not resolve country for this event."; return; }
 
   const btnSave = document.getElementById("btnSave");
   const btnSubmit = document.getElementById("btnSubmit");
@@ -36,7 +22,7 @@
     statusEl.innerHTML = `<span class="pill ${status}">${status.replaceAll("_"," ")}</span>`;
   }
 
-  if (!eventId || !sectionId) {
+  if (!eventId || !countryId || !sectionId){
     msg.textContent = "Missing eventId/countryId/sectionId in URL.";
     return;
   }

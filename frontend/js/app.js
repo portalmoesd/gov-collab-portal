@@ -120,48 +120,44 @@
     }
   }
 
-  
-  // Date/time formatting (DD/MM/YYYY and DD/MM/YYYY HH:mm) in Asia/Tbilisi (GMT+4)
-  function formatDateOnly(value){
-    if (!value) return "";
-    const d = new Date(value);
-    if (isNaN(d.getTime())) return String(value);
-    const fmt = new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Tbilisi", day: "2-digit", month: "2-digit", year: "numeric" });
-    return fmt.format(d);
-  }
-
-  function formatDateTime(value){
-    if (!value) return "";
-    const d = new Date(value);
-    if (isNaN(d.getTime())) return String(value);
-    const fmt = new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Tbilisi", day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit", hour12: false });
-    return fmt.format(d).replace(", ", " ");
-  }
-
-  // Status label mapping (Chairman renamed to Deputy in UI)
-  function statusLabel(statusKey){
-    const k = String(statusKey || "").trim().toLowerCase();
-    const map = {
-      draft: "Draft",
-      saved: "Saved",
-      submitted: "Submitted",
-      returned: "Returned",
-      approved_by_supervisor: "Approved by supervisor",
-      approved_by_chairman: "Approved by deputy",
-      submitted_to_chairman: "Submitted to deputy",
-      pending: "Pending",
-      approved: "Approved",
-    };
-    if (map[k]) return map[k];
-    // Default: Title Case from underscores
-    return k.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
-  }
-
-window.GCP = window.GCP || {};
+  window.GCP = window.GCP || {};
   window.GCP.requireAuth = requireAuth;
   window.GCP.escapeHtml = escapeHtml;
   window.GCP.roleToTitle = roleToTitle;
-  window.GCP.formatDateOnly = formatDateOnly;
-  window.GCP.formatDateTime = formatDateTime;
-  window.GCP.statusLabel = statusLabel;
 })();
+
+
+/* ===== Formatting helpers (DD/MM/YYYY HH:MM, Tbilisi time) ===== */
+window.GCP = window.GCP || {};
+
+window.GCP.formatDate = function(dateStr){
+  if (!dateStr) return '';
+  // If it already looks like YYYY-MM-DD, format without timezone surprises.
+  const m = String(dateStr).match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (m) return `${m[3]}/${m[2]}/${m[1]}`;
+  const d = new Date(dateStr);
+  if (isNaN(d)) return String(dateStr);
+  return new Intl.DateTimeFormat('en-GB', { timeZone:'Asia/Tbilisi', day:'2-digit', month:'2-digit', year:'numeric' }).format(d);
+};
+
+window.GCP.formatDateTime = function(dateStr){
+  if (!dateStr) return '';
+  const d = new Date(dateStr);
+  if (isNaN(d)) return String(dateStr);
+  const s = new Intl.DateTimeFormat('en-GB', {
+    timeZone:'Asia/Tbilisi',
+    day:'2-digit', month:'2-digit', year:'numeric',
+    hour:'2-digit', minute:'2-digit', hour12:false
+  }).format(d);
+  return s.replace(',', '');
+};
+
+window.GCP.prettyStatus = function(statusKey){
+  const k = String(statusKey || '').trim();
+  const map = {
+    pending_chairman: 'pending deputy approval',
+    approved_by_chairman: 'approved by deputy',
+    returned_by_chairman: 'returned by deputy',
+  };
+  return map[k] || k.replaceAll('_',' ');
+};
