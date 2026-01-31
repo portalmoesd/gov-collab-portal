@@ -245,3 +245,29 @@ textarea{min-height:120px; resize:vertical}
 }
 .checkitem:hover{ background:#f8fafc; }
 .checkitem input{ margin-top:2px; }
+
+
+/* Admin assignments layout */
+.grid2{ display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+@media(max-width:900px){ .grid2{ grid-template-columns:1fr; } }
+.cardSub{ background:#fff; border:1px solid #e6e6e6; border-radius:14px; padding:12px; }
+.checklist{ max-height:380px; overflow:auto; padding:4px; }
+.checklist .group{ margin:10px 0; }
+.checklist .group-title{ font-weight:800; margin:8px 0 6px; }
+.checklist label{ display:flex; gap:8px; align-items:center; padding:2px 0; }
+.btn.secondary{ background:#eef2f7; color:#233e57; border:1px solid #cdd7e2; }
+
+
+/* Grouped countries in admin assignments */
+.groupbox{
+  border:1px solid var(--border);
+  background:#fff;
+  border-radius:14px;
+  padding:10px;
+  margin:10px 0;
+}
+.grouphead{
+  font-weight:800;
+  color:var(--ink);
+  margin:0 0 8px;
+}

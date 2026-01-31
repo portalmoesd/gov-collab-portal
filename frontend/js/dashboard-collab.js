@@ -5,12 +5,13 @@
 
   const eventsTbody = document.getElementById("eventsTbody");
   const eventSelect = document.getElementById("eventSelect");
-  const eventsById = new Map();  const sectionSelect = document.getElementById("sectionSelect");
+  const countrySelect = document.getElementById("countrySelect");
+  const sectionSelect = document.getElementById("sectionSelect");
   const openBtn = document.getElementById("openEditorBtn");
   const msg = document.getElementById("msg");
 
   async function loadUpcoming(){
-    const events = await window.GCP.apiFetch("/events/upcoming-for-me", { method:"GET" });
+    const events = await window.GCP.apiFetch("/events/upcoming", { method:"GET" });
     eventsTbody.innerHTML = "";
     eventSelect.innerHTML = `<option value="">Select event...</option>`;
     for (const ev of events){
@@ -32,6 +33,16 @@
       eventSelect.appendChild(opt);
     }
   }
+
+  async function loadCountries(){
+    const countries = await window.GCP.apiFetch("/countries", { method:"GET" });
+    countrySelect.innerHTML = `<option value="">Select country...</option>`;
+    for (const c of countries){
+      const opt = document.createElement("option");
+      opt.value = c.id;
+      opt.textContent = c.name_en;
+      countrySelect.appendChild(opt);
+    }
   }
 
   async function loadMySections(){
@@ -48,7 +59,8 @@
   openBtn.addEventListener("click", () => {
     msg.textContent = "";
     const eventId = eventSelect.value;
-        const sectionId = sectionSelect.value;
+    const countryId = countrySelect.value;
+    const sectionId = sectionSelect.value;
     if (!eventId || !countryId || !sectionId){
       msg.textContent = "Please select event, country and section.";
       return;
@@ -57,7 +69,7 @@
   });
 
   try{
-    await Promise.all([loadUpcoming(), loadMySections()]);
+    await Promise.all([loadUpcoming(), loadCountries(), loadMySections()]);
   }catch(err){
     msg.textContent = err.message || "Failed to load data";
   }

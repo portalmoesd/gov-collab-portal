@@ -1,146 +1,169 @@
-
-
-async function loadEvents(){
-  const events = await window.GCP.apiFetch('/events?is_active=1');
-  eventSelect.innerHTML = `<option value="">Select event</option>` + events.map(ev => {
-    const deadline = window.GCP.formatDate(ev.deadline_date || '');
-    const c = ev.country_name_en ? ` — ${ev.country_name_en}` : '';
-    return `<option value="${ev.id}">${window.GCP.escapeHtml(ev.title)}${c}${deadline ? ' (deadline '+window.GCP.escapeHtml(deadline)+')' : ''}</option>`;
-  }).join('');
-}
 // dashboard-supervisor.js
 (async function(){
   const me = await window.GCP.requireAuth();
   if (!me) return;
 
-  const role = String(me.role).toLowerCase();
-  if (!["admin","supervisor"].includes(role)){
-    document.querySelector(".main").innerHTML = "<div class='card'>Access denied.</div>";
-    return;
-  }  const eventSelect = document.getElementById("eventSelect");
-  let currentEventCountryId = null;
-  const sectionsTbody = document.getElementById("sectionsTbody");
-  const docStatusBox = document.getElementById("docStatusBox");
-  const submitDocBtn = document.getElementById("submitDocBtn");
-  const previewFullBtn = document.getElementById("previewFullBtn");
-  const msg = document.getElementById("msg");
+  const eventSelect = document.getElementById('eventSelect');
+  const sectionsTbody = document.getElementById('sectionsTbody');
+  const openBtn = document.getElementById('openEditorBtn');
+  const submitDocBtn = document.getElementById('submitDocBtn');
+  const endEventBtn = document.createElement('button');
+  endEventBtn.className = 'btn danger';
+  endEventBtn.id = 'endEventBtn';
+  endEventBtn.textContent = 'End event';
+  endEventBtn.style.display = 'none';
+  // Insert before submit button
+  submitDocBtn.parentElement.insertBefore(endEventBtn, submitDocBtn);
+  const msg = document.getElementById('msg');
 
-  const modalBackdrop = document.getElementById("modalBackdrop");
-  const modalContent = document.getElementById("modalContent");
-  const modalCloseBtn = document.getElementById("modalCloseBtn");
+  let currentEventId = null;
+  let currentSections = [];
 
-  function openModal(html){
-    modalContent.innerHTML = html;
-    modalBackdrop.style.display = "flex";
-  }
-  function closeModal(){
-    modalBackdrop.style.display = "none";
-    modalContent.innerHTML = "";
-  }
-  if (modalCloseBtn) modalCloseBtn.addEventListener("click", closeModal);
-  if (modalBackdrop) modalBackdrop.addEventListener("click", (e) => { if (e.target === modalBackdrop) closeModal(); });
-    const events = await window.GCP.apiFetch(`/events?is_active=true&country_id=${encodeURIComponent(currentEventCountryId)}`, { method:"GET" });
-    eventSelect.innerHTML = `<option value="">Select event</option>` + events.map(ev => `<option value="${ev.id}">${window.GCP.escapeHtml(ev.title)}</option>`).join("");
+  function setMsg(text, isError=false){
+    msg.textContent = text || '';
+    msg.style.color = isError ? 'crimson' : '#2b445b';
   }
 
-  async function refresh(){
-    msg.textContent = "";
-    sectionsTbody.innerHTML = "";
-    docStatusBox.innerHTML = "";
+  function humanStatus(s){
+    const map = {
+      draft: 'Draft',
+      submitted_to_supervisor: 'Submitted',
+      returned_by_supervisor: 'Returned',
+      approved_by_supervisor: 'Approved (Supervisor)',
+      submitted_to_chairman: 'Submitted to Deputy',
+      returned_by_chairman: 'Returned (Deputy)',
+      approved_by_chairman: 'Approved (Deputy)',
+      locked: 'Locked'
+    };
+    return map[s] || (s || '');
+  }
 
-    const currentEventCountryId = null;
-    const eventId = eventSelect.value;
-
-    if (!eventId){
-      msg.textContent = "Please choose a country and an event.";
-      return;
+  async function loadUpcoming(){
+    const events = await window.GCP.apiFetch('/events/upcoming', { method:'GET' });
+    eventSelect.innerHTML = `<option value="">Select event...</option>`;
+    for (const ev of (events || [])){
+      const opt = document.createElement('option');
+      opt.value = ev.id;
+      opt.textContent = `${ev.title || 'Event'} (${ev.country_name_en || ''}${ev.deadline_date ? ', ' + window.GCP.formatDateTime(ev.deadline_date) : ''})`;
+      eventSelect.appendChild(opt);
     }
+  }
 
-    const data = await window.GCP.apiFetch(`/tp/status-grid?event_id=${encodeURIComponent(eventId)}&country_id=${encodeURIComponent(currentEventCountryId)}`, { method:"GET" });
+  async function refreshStatusGrid(){
+    if (!currentEventId) return;
+    const data = await window.GCP.apiFetch(`/tp/status-grid?event_id=${currentEventId}`, { method:'GET' });
+    currentSections = data.sections || [];
+    sectionsTbody.innerHTML = '';
 
-    sectionsTbody.innerHTML = "";
-    for (const row of data.rows){
-      const tr = document.createElement("tr");
+    for (const s of currentSections){
+      const tr = document.createElement('tr');
+      const last = s.lastUpdatedAt ? window.GCP.formatDateTime(s.lastUpdatedAt) : '';
       tr.innerHTML = `
-        <td>${window.GCP.escapeHtml(row.section_label)}</td>
-        <td><span class="pill ${row.status}">${row.status.replaceAll("_"," ")}</span></td>
-        <td>${row.last_updated_at ? window.GCP.escapeHtml(row.last_updated_at) : '<span class="muted">—</span>'}</td>
-        <td>${row.last_updated_by ? window.GCP.escapeHtml(row.last_updated_by) : '<span class="muted">—</span>'}</td>
-        <td><button class="btn" data-act="edit">Open</button></td>
+        <td>${s.sectionLabel}</td>
+        <td>${humanStatus(s.status)}</td>
+        <td>${last}</td>
+        <td class="actions"></td>
       `;
-      tr.querySelector('[data-act="edit"]').addEventListener("click", () => {
-        location.href = `editor.html?eventId=${encodeURIComponent(eventId)}&currentEventCountryId=${encodeURIComponent(currentEventCountryId)}&sectionId=${encodeURIComponent(row.section_id)}`;
+      const actionsTd = tr.querySelector('.actions');
+
+      const open = document.createElement('button');
+      open.className = 'btn';
+      open.textContent = 'Open';
+      open.addEventListener('click', () => {
+        window.location.href = `editor.html?event_id=${currentEventId}&section_id=${s.sectionId}`;
       });
-      sectionsTbody.appendChild(tr);
+      actionsTd.appendChild(open);
+
+      // Approve/Return for supervisor stage
+      if (s.status === 'submitted_to_supervisor' || s.status === 'returned_by_supervisor' || s.status === 'draft') {
+        const approve = document.createElement('button');
+        approve.className = 'btn secondary';
+        approve.textContent = 'Approve';
+        approve.addEventListener('click', async () => {
+          setMsg('');
+          await window.GCP.apiFetch('/tp/approve-section', {
+            method:'POST',
+            body: JSON.stringify({ eventId: currentEventId, sectionId: s.sectionId })
+          });
+          await refreshStatusGrid();
+        });
+        actionsTd.appendChild(approve);
+
+        const ret = document.createElement('button');
+        ret.className = 'btn danger';
+        ret.textContent = 'Return';
+        ret.addEventListener('click', async () => {
+          const note = prompt('Return note (optional):', '');
+          await window.GCP.apiFetch('/tp/return', {
+            method:'POST',
+            body: JSON.stringify({ eventId: currentEventId, sectionId: s.sectionId, note })
+          });
+          await refreshStatusGrid();
+        });
+        actionsTd.appendChild(ret);
+      }
     }
 
-    const ds = await window.GCP.apiFetch(`/tp/document-status?event_id=${encodeURIComponent(eventId)}&country_id=${encodeURIComponent(currentEventCountryId)}`, { method:"GET" });
-    docStatusBox.innerHTML = `
-      <div class="row" style="justify-content:space-between;">
-        <div><b>Document status:</b> <span class="pill ${ds.documentStatus}">${ds.documentStatus.replaceAll("_"," ")}</span></div>
-        <div class="small muted">Last submitted: ${ds.lastSubmittedAt ? window.GCP.escapeHtml(ds.lastSubmittedAt) : '—'}</div>
-      </div>
-      ${ds.chairmanComment ? `<div class="small"><b>Deputy comment:</b> ${window.GCP.escapeHtml(ds.chairmanComment)}</div>` : ''}
-    `;
+    // Enable submit to deputy when all sections approved by supervisor
+    const ok = currentSections.length > 0 && currentSections.every(s => ['approved_by_supervisor','approved_by_chairman'].includes(s.status));
+    submitDocBtn.disabled = !ok;
   }
 
-  async function previewFull(){
-    const currentEventCountryId = null;
-    const eventId = eventSelect.value;
-    if (!eventId){
-      msg.textContent = "Choose a country and event first.";
+  eventSelect.addEventListener('change', async () => {
+    setMsg('');
+    currentEventId = Number(eventSelect.value);
+    if (!Number.isFinite(currentEventId)) {
+      currentEventId = null;
+      sectionsTbody.innerHTML = '';
+      submitDocBtn.disabled = true;
+      endEventBtn.style.display = 'none';
       return;
     }
+    endEventBtn.style.display = 'inline-block';
     try{
-      const doc = await window.GCP.apiFetch(`/library/document?event_id=${encodeURIComponent(eventId)}&country_id=${encodeURIComponent(currentEventCountryId)}`, { method:"GET" });
-      openModal(`
-        <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:12px;">
-          <div>
-            <h2 style="margin:0 0 6px;">${window.GCP.escapeHtml(doc.eventTitle)}</h2>
-            <div class="small muted">${window.GCP.escapeHtml(doc.countryName)}</div>
-          </div>
-          <div class="small muted">Generated at ${window.GCP.formatDateTime(new Date())}</div>
-        </div>
-        <hr style="margin:12px 0; border:none; border-top:1px solid var(--border);" />
-        <div>${doc.html || ""}</div>
-      `);
-    }catch(err){
-      msg.textContent = err.message || "Preview failed";
+      await refreshStatusGrid();
+    }catch(e){
+      setMsg(e.message || 'Failed to load sections', true);
+      sectionsTbody.innerHTML = '';
+      submitDocBtn.disabled = true;
     }
-  }
-
-  previewFullBtn.addEventListener("click", previewFull);
-
-  submitDocBtn.addEventListener("click", async () => {
-    const currentEventCountryId = null;
-    const eventId = eventSelect.value;
-    if (!eventId){
-      msg.textContent = "Choose a country and event first.";
-      return;
-    }
-    if (!confirm("Submit the entire document to Deputy?")) return;
-    try{
-      await window.GCP.apiFetch("/tp/submit-document", {
-        method:"POST",
-        body: JSON.stringify({ eventId: Number(eventId), currentEventCountryId: Number(currentEventCountryId) })
-      });
-      await refresh();
-      msg.textContent = "Submitted to Deputy.";
-    }catch(err){
-      msg.textContent = err.message || "Submit failed";
-    }
-  });    eventSelect.value = "";
-    sectionsTbody.innerHTML = "";
-    docStatusBox.innerHTML = "";
-    msg.textContent = "";
   });
 
-  eventSelect.addEventListener("change", refresh);
+  endEventBtn.addEventListener('click', async () => {
+    setMsg('');
+    if (!currentEventId) return;
+    if (!confirm('End this event?')) return;
+    try{
+      await window.GCP.apiFetch(`/events/${currentEventId}/end`, { method:'POST' });
+      setMsg('Event ended.');
+      await loadUpcoming();
+      currentEventId = null;
+      sectionsTbody.innerHTML = '';
+      submitDocBtn.disabled = true;
+      endEventBtn.style.display = 'none';
+    }catch(e){
+      setMsg(e.message || 'Failed to end event', true);
+    }
+  });
 
-  try{
-    await loadCountries();
-  }catch(err){
-    msg.textContent = err.message || "Failed to load countries";
-    return;
-  }
+  openBtn.addEventListener('click', () => {
+    setMsg('Select a section from the table and click Open, or use Open buttons.', false);
+  });
+
+  submitDocBtn.addEventListener('click', async () => {
+    if (!currentEventId) return;
+    setMsg('');
+    try{
+      await window.GCP.apiFetch('/document/submit-to-chairman', {
+        method:'POST',
+        body: JSON.stringify({ eventId: currentEventId })
+      });
+      setMsg('Submitted to Deputy.');
+      await refreshStatusGrid();
+    }catch(e){
+      setMsg(e.message || 'Submit failed', true);
+    }
+  });
+
+  await loadUpcoming();
 })();

@@ -4,7 +4,8 @@
   if (!me) return;
 
   const role = String(me.role).toLowerCase();
-  const canEdit = ['admin','chairman','minister','supervisor','protocol'].includes(role);
+  const canManage = ['admin','chairman','supervisor','protocol'].includes(role);
+  const canEnd = ['admin','chairman','supervisor','protocol'].includes(role);
 
   const msg = document.getElementById("msg");
   const eventsTbody = document.getElementById("eventsTbody");
@@ -21,7 +22,7 @@
 
   let editEventId = null;
 
-  if (!canEdit){
+  if (!canManage){
     formCard.style.display = "none";
   }
 
@@ -53,11 +54,12 @@
       tr.innerHTML = `
         <td>${window.GCP.escapeHtml(ev.title)}</td>
         <td>${window.GCP.escapeHtml(ev.country_name_en)}</td>
-        <td>${ev.deadline_date ? window.GCP.escapeHtml(ev.deadline_date) : '<span class="muted">—</span>'}</td>
+        <td>${ev.deadline_date ? window.GCP.escapeHtml(window.GCP.formatDate(ev.deadline_date)) : '<span class="muted">—</span>'}</td>
         <td>${ev.is_active ? 'Yes' : 'No'}</td>
         <td class="row">
           <button class="btn" data-act="view">View</button>
-          ${canEdit ? `<button class="btn primary" data-act="edit">Edit</button>` : ''}
+          ${canManage ? `<button class="btn primary" data-act="edit">Edit</button>` : ''}
+          ${canEnd ? `<button class="btn danger" data-act="end">End event</button>` : ''}
         </td>
       `;
       tr.querySelector('[data-act="view"]').addEventListener("click", async () => {
@@ -65,7 +67,7 @@
         alert(`Required sections:\n\n${details.requiredSections.map(s => s.label).join("\n")}`);
       });
 
-      if (canEdit){
+      if (canManage){
         tr.querySelector('[data-act="edit"]').addEventListener("click", async () => {
           const details = await window.GCP.apiFetch(`/events/${ev.id}`, { method:"GET" });
           editEventId = ev.id;
@@ -82,6 +84,17 @@
           msg.textContent = `Editing event #${ev.id}`;
           window.scrollTo({ top: 0, behavior: "smooth" });
         });
+      }
+
+      if (canEnd){
+        const endBtn = tr.querySelector('[data-act="end"]');
+        if (endBtn){
+          endBtn.addEventListener('click', async () => {
+            if (!confirm('End this event?')) return;
+            await window.GCP.apiFetch(`/events/${ev.id}/end`, { method:'POST' });
+            await loadEvents();
+          });
+        }
       }
 
       eventsTbody.appendChild(tr);
@@ -102,7 +115,7 @@
 
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
-    if (!canEdit) return;
+    if (!canManage) return;
 
     const requiredSectionIds = Array.from(requiredBox.querySelectorAll('input[type=checkbox]:checked')).map(cb => Number(cb.value));
     const payload = {
@@ -137,4 +150,9 @@
   }catch(err){
     msg.textContent = err.message || "Failed to load";
   }
-})();
+})();async function endEvent(id){
+  if(!confirm('End this event?')) return;
+  await window.GCP.apiFetch(`/events/${id}/end`, { method: 'POST' });
+}
+
+

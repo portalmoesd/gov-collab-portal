@@ -53,7 +53,7 @@
         <td>${u.isActive ? 'Yes' : 'No'}</td>
         <td class="row">
           <button class="btn" data-act="edit">Edit</button>
-          <button class="btn danger" data-act="deactivate">Deactivate</button>
+          <button class="btn danger" data-act="deactivate">Delete</button>
         </td>
       `;
       tr.querySelector('[data-act="edit"]').addEventListener("click", async () => {
@@ -73,7 +73,7 @@
         }catch(err){ alert(err.message || "Failed"); }
       });
       tr.querySelector('[data-act="deactivate"]').addEventListener("click", async () => {
-        if (!confirm("Deactivate this user?")) return;
+        if (!confirm("Delete this user? (soft delete)")) return;
         try{
           await window.GCP.apiFetch(`/users/${u.id}`, { method:"DELETE" });
           await loadUsers();
@@ -135,7 +135,7 @@
         try{
           await window.GCP.apiFetch(`/sections/${s.id}`, { method:"PUT", body: JSON.stringify({ label: newLabel }) });
           await loadSections();
-          await loadAssignmentsPicklists();
+          await loadAssignmentsMeta();
         }catch(err){ alert(err.message || 'Failed'); }
       });
 
@@ -145,7 +145,7 @@
         try{
           await window.GCP.apiFetch(`/sections/${s.id}`, { method:"PUT", body: JSON.stringify({ orderIndex: val }) });
           await loadSections();
-          await loadAssignmentsPicklists();
+          await loadAssignmentsMeta();
         }catch(err){ alert(err.message || 'Failed'); }
       });
 
@@ -165,7 +165,7 @@
             await window.GCP.apiFetch(`/sections/${s.id}`, { method:"PUT", body: JSON.stringify({ isActive: true }) });
           }
           await loadSections();
-          await loadAssignmentsPicklists();
+          await loadAssignmentsMeta();
         }catch(err){ alert(err.message || 'Failed'); }
       });
 
@@ -184,518 +184,192 @@
       await window.GCP.apiFetch("/sections", { method:"POST", body: JSON.stringify({ key, label, orderIndex }) });
       createSectionForm.reset();
       await loadSections();
-      await loadAssignmentsPicklists();
+      await loadAssignmentsMeta();
     }catch(err){
       msgSections.textContent = err.message || "Failed";
     }
   });
 
   /** ASSIGNMENTS **/
-  const assignmentTbody = document.getElementById("assignmentTbody");
-  const assignForm = document.getElementById("assignForm");
-  const assignUser = document.getElementById("assignUser");
-  const assignSection = document.getElementById("assignSection");
-  const msgAssign = document.getElementById("msgAssign");
+  const assignUserSelect = document.getElementById("assignUserSelect");
+  const assignUserRole = document.getElementById("assignUserRole");
+  const saveAssignmentsBtn = document.getElementById("saveAssignmentsBtn");
+  const assignmentsMsg = document.getElementById("assignmentsMsg");
+  const sectionsChecklist = document.getElementById("sectionsChecklist");
+  const countriesChecklist = document.getElementById("countriesChecklist");
 
-const assignCountriesForm = document.getElementById('assignCountriesForm');
-const assignUserCountries = document.getElementById('assignUserCountries');
-const countryChecklist = document.getElementById('countryChecklist');
-const msgAssignCountries = document.getElementById('msgAssignCountries');
-const countryAssignTbody = document.getElementById('countryAssignTbody');
+  let sectionsCache = [];
+  let countriesCache = [];
+  let assignableUsersCache = [];
 
-const COUNTRY_GROUP_BY_CODE = {
-    "AD": "Other European countries",
-    "AE": "Asia",
-    "AF": "Asia",
-    "AG": "Central America & Caribbean",
-    "AI": "Central America & Caribbean",
-    "AL": "Other European countries",
-    "AM": "Neighboring countries",
-    "AO": "Africa",
-    "AQ": "Antarctica & Territories",
-    "AR": "South America",
-    "AS": "Australia & Oceania",
-    "AT": "European Union",
-    "AU": "Australia & Oceania",
-    "AW": "Central America & Caribbean",
-    "AX": "Other European countries",
-    "AZ": "Neighboring countries",
-    "BA": "Other European countries",
-    "BB": "Central America & Caribbean",
-    "BD": "Asia",
-    "BE": "European Union",
-    "BF": "Africa",
-    "BG": "European Union",
-    "BH": "Asia",
-    "BI": "Africa",
-    "BJ": "Africa",
-    "BL": "Central America & Caribbean",
-    "BM": "North America",
-    "BN": "Asia",
-    "BO": "South America",
-    "BQ": "Central America & Caribbean",
-    "BR": "South America",
-    "BS": "Central America & Caribbean",
-    "BT": "Asia",
-    "BV": "Antarctica & Territories",
-    "BW": "Africa",
-    "BY": "Neighboring countries",
-    "BZ": "Central America & Caribbean",
-    "CA": "North America",
-    "CC": "Australia & Oceania",
-    "CD": "Africa",
-    "CF": "Africa",
-    "CG": "Africa",
-    "CH": "Other European countries",
-    "CI": "Africa",
-    "CK": "Australia & Oceania",
-    "CL": "South America",
-    "CM": "Africa",
-    "CN": "Asia",
-    "CO": "South America",
-    "CR": "Central America & Caribbean",
-    "CU": "Central America & Caribbean",
-    "CV": "Africa",
-    "CW": "Central America & Caribbean",
-    "CX": "Australia & Oceania",
-    "CY": "European Union",
-    "CZ": "European Union",
-    "DE": "European Union",
-    "DJ": "Africa",
-    "DK": "European Union",
-    "DM": "Central America & Caribbean",
-    "DO": "Central America & Caribbean",
-    "DZ": "Africa",
-    "EC": "South America",
-    "EE": "European Union",
-    "EG": "Africa",
-    "EH": "Africa",
-    "ER": "Africa",
-    "ES": "European Union",
-    "ET": "Africa",
-    "FI": "European Union",
-    "FJ": "Australia & Oceania",
-    "FK": "South America",
-    "FM": "Australia & Oceania",
-    "FO": "Other European countries",
-    "FR": "European Union",
-    "GA": "Africa",
-    "GB": "Other European countries",
-    "GD": "Central America & Caribbean",
-    "GE": "Asia",
-    "GF": "South America",
-    "GG": "Other European countries",
-    "GH": "Africa",
-    "GI": "Other European countries",
-    "GL": "North America",
-    "GM": "Africa",
-    "GN": "Africa",
-    "GP": "Central America & Caribbean",
-    "GQ": "Africa",
-    "GR": "European Union",
-    "GS": "South America",
-    "GT": "Central America & Caribbean",
-    "GU": "Australia & Oceania",
-    "GW": "Africa",
-    "GY": "South America",
-    "HK": "Asia",
-    "HM": "Antarctica & Territories",
-    "HN": "Central America & Caribbean",
-    "HR": "European Union",
-    "HT": "Central America & Caribbean",
-    "HU": "European Union",
-    "ID": "Asia",
-    "IE": "European Union",
-    "IL": "Asia",
-    "IM": "Other European countries",
-    "IN": "Asia",
-    "IO": "Africa",
-    "IQ": "Asia",
-    "IR": "Asia",
-    "IS": "Other European countries",
-    "IT": "European Union",
-    "JE": "Other European countries",
-    "JM": "Central America & Caribbean",
-    "JO": "Asia",
-    "JP": "Asia",
-    "KE": "Africa",
-    "KG": "Neighboring countries",
-    "KH": "Asia",
-    "KI": "Australia & Oceania",
-    "KM": "Africa",
-    "KN": "Central America & Caribbean",
-    "KP": "Asia",
-    "KR": "Asia",
-    "KW": "Asia",
-    "KY": "Central America & Caribbean",
-    "KZ": "Neighboring countries",
-    "LA": "Asia",
-    "LB": "Asia",
-    "LC": "Central America & Caribbean",
-    "LI": "Other European countries",
-    "LK": "Asia",
-    "LR": "Africa",
-    "LS": "Africa",
-    "LT": "European Union",
-    "LU": "European Union",
-    "LV": "European Union",
-    "LY": "Africa",
-    "MA": "Africa",
-    "MC": "Other European countries",
-    "MD": "Neighboring countries",
-    "ME": "Other European countries",
-    "MF": "Central America & Caribbean",
-    "MG": "Africa",
-    "MH": "Australia & Oceania",
-    "MK": "Other European countries",
-    "ML": "Africa",
-    "MM": "Asia",
-    "MN": "Asia",
-    "MO": "Asia",
-    "MP": "Australia & Oceania",
-    "MQ": "Central America & Caribbean",
-    "MR": "Africa",
-    "MS": "Central America & Caribbean",
-    "MT": "European Union",
-    "MU": "Africa",
-    "MV": "Asia",
-    "MW": "Africa",
-    "MX": "Central America & Caribbean",
-    "MY": "Asia",
-    "MZ": "Africa",
-    "NA": "Africa",
-    "NC": "Australia & Oceania",
-    "NE": "Africa",
-    "NF": "Australia & Oceania",
-    "NG": "Africa",
-    "NI": "Central America & Caribbean",
-    "NL": "European Union",
-    "NO": "Other European countries",
-    "NP": "Asia",
-    "NR": "Australia & Oceania",
-    "NU": "Australia & Oceania",
-    "NZ": "Australia & Oceania",
-    "OM": "Asia",
-    "PA": "Central America & Caribbean",
-    "PE": "South America",
-    "PF": "Australia & Oceania",
-    "PG": "Australia & Oceania",
-    "PH": "Asia",
-    "PK": "Asia",
-    "PL": "European Union",
-    "PM": "North America",
-    "PN": "Australia & Oceania",
-    "PR": "Central America & Caribbean",
-    "PS": "Asia",
-    "PT": "European Union",
-    "PW": "Australia & Oceania",
-    "PY": "South America",
-    "QA": "Asia",
-    "RE": "Africa",
-    "RO": "European Union",
-    "RS": "Other European countries",
-    "RU": "Neighboring countries",
-    "RW": "Africa",
-    "SA": "Asia",
-    "SB": "Australia & Oceania",
-    "SC": "Africa",
-    "SD": "Africa",
-    "SE": "European Union",
-    "SG": "Asia",
-    "SH": "Africa",
-    "SI": "European Union",
-    "SJ": "Other European countries",
-    "SK": "European Union",
-    "SL": "Africa",
-    "SM": "Other European countries",
-    "SN": "Africa",
-    "SO": "Africa",
-    "SR": "South America",
-    "SS": "Africa",
-    "ST": "Africa",
-    "SV": "Central America & Caribbean",
-    "SX": "Central America & Caribbean",
-    "SY": "Asia",
-    "SZ": "Africa",
-    "TC": "Central America & Caribbean",
-    "TD": "Africa",
-    "TF": "Antarctica & Territories",
-    "TG": "Africa",
-    "TH": "Asia",
-    "TJ": "Neighboring countries",
-    "TK": "Australia & Oceania",
-    "TL": "Asia",
-    "TM": "Neighboring countries",
-    "TN": "Africa",
-    "TO": "Australia & Oceania",
-    "TR": "Asia",
-    "TT": "Central America & Caribbean",
-    "TV": "Australia & Oceania",
-    "TW": "Asia",
-    "TZ": "Africa",
-    "UA": "Neighboring countries",
-    "UG": "Africa",
-    "UM": "Australia & Oceania",
-    "US": "North America",
-    "UY": "South America",
-    "UZ": "Neighboring countries",
-    "VA": "Other European countries",
-    "VC": "Central America & Caribbean",
-    "VE": "South America",
-    "VG": "Central America & Caribbean",
-    "VI": "Central America & Caribbean",
-    "VN": "Asia",
-    "VU": "Australia & Oceania",
-    "WF": "Australia & Oceania",
-    "WS": "Australia & Oceania",
-    "YE": "Asia",
-    "YT": "Africa",
-    "ZA": "Africa",
-    "ZM": "Africa",
-    "ZW": "Africa"
-  };
-
-const COUNTRY_GROUP_ORDER = [
-  "European Union",
-  "Other European countries",
-  "North America",
-  "Central America & Caribbean",
-  "South America",
-  "Africa",
-  "Asia",
-  "Australia & Oceania",
-  "Neighboring countries",
-  "Antarctica & Territories",
-  "Americas (Other)",
-  "Other"
-];
-
-  async function loadAssignmentsPicklists(){
-    const users = await window.GCP.apiFetch("/users", { method:"GET" });
-    const sections = await window.GCP.apiFetch("/sections", { method:"GET" });
-
-    const collaborators = users.filter(u => ['collaborator','super_collaborator'].includes(String(u.role).toLowerCase()) && u.isActive);
-
-    assignUser.innerHTML = collaborators.map(u => `<option value="${u.id}">${window.GCP.escapeHtml(u.fullName)} (${window.GCP.escapeHtml(u.username)})</option>`).join("");
-    assignSection.innerHTML = sections.filter(s => s.is_active).map(s => `<option value="${s.id}">${window.GCP.escapeHtml(s.label)}</option>`).join("");
+  function setAssignMsg(text, isError=false){
+    assignmentsMsg.textContent = text || '';
+    assignmentsMsg.style.color = isError ? 'crimson' : '#2b445b';
   }
 
-  async function loadAssignments(){
-    const rows = await window.GCP.apiFetch("/section-assignments", { method:"GET" });
-    assignmentTbody.innerHTML = "";
-    for (const a of rows){
-      const tr = document.createElement("tr");
-      tr.innerHTML = `
-        <td>${window.GCP.escapeHtml(a.full_name)} (${window.GCP.escapeHtml(a.username)})</td>
-        <td>${window.GCP.escapeHtml(a.section_label)}</td>
-        <td>${window.GCP.escapeHtml(a.created_at)}</td>
-        <td><button class="btn danger">Remove</button></td>
-      `;
-      tr.querySelector("button").addEventListener("click", async () => {
-        if (!confirm("Remove assignment?")) return;
-        try{
-          await window.GCP.apiFetch(`/section-assignments/${a.id}`, { method:"DELETE" });
-          await loadAssignments();
-
-    await loadCountryAssignmentsPicklist();
-    await loadCountriesChecklist();
-    await loadCountryAssignments();
-        }catch(err){ alert(err.message || "Failed"); }
-      });
-      assignmentTbody.appendChild(tr);
+  function renderCheckboxList(container, items, selectedSet){
+    container.innerHTML = "";
+    for (const it of items){
+      const id = String(it.id);
+      const label = it.label || it.name || it.name_en || it.nameEn || it.code || String(it.id);
+      const wrap = document.createElement("label");
+      wrap.className = "checkitem";
+      wrap.innerHTML = `<input type="checkbox" value="${window.GCP.escapeHtml(id)}" ${selectedSet.has(id) ? "checked" : ""}/> <span>${window.GCP.escapeHtml(label)}</span>`;
+      container.appendChild(wrap);
     }
   }
 
-  assignForm.addEventListener("submit", async (e) => {
-    e.preventDefault();
-    msgAssign.textContent = "";
-    try{
-      await window.GCP.apiFetch("/section-assignments", {
-        method:"POST",
-        body: JSON.stringify({ userId: assignUser.value, sectionId: assignSection.value })
-      });
-      await loadAssignments();
+  function getCheckedIds(container){
+    return Array.from(container.querySelectorAll('input[type="checkbox"]:checked')).map(el => Number(el.value)).filter(Number.isFinite);
+  }
 
-    await loadCountryAssignmentsPicklist();
-    await loadCountriesChecklist();
-    await loadCountryAssignments();
+  // Region grouping by ISO-2 country code
+  const NEIGHBORS = new Set(['BY','UA','MD','RU','AZ','AM','KZ','TJ','KG','UZ','TM']);
+  const EU = new Set(['EU','AT','BE','BG','HR','CY','CZ','DK','EE','FI','FR','DE','GR','HU','IE','IT','LV','LT','LU','MT','NL','PL','PT','RO','SK','SI','ES','SE']);
+
+  const OTHER_EUROPE = new Set([
+    'AL','AD','BA','CH','IS','LI','MC','ME','MK','NO','RS','SM','TR','GB','VA','GE','MD','UA','BY','RU','XK'
+  ]);
+
+  const NORTH_AMERICA = new Set(['US','CA','MX','GL','BM']);
+  const CENTRAL_CARIBBEAN = new Set([
+    'BZ','CR','SV','GT','HN','NI','PA',
+    'AG','BS','BB','CU','DM','DO','GD','HT','JM','KN','LC','VC','TT','PR','BS','AI','AW','BQ','CW','GP','KY','MF','MQ','MS','SX','TC','VG','VI','BL','BQ','CW'
+  ]);
+  const SOUTH_AMERICA = new Set(['AR','BO','BR','CL','CO','EC','GY','PY','PE','SR','UY','VE','FK','GF']);
+  const AFRICA = new Set([
+    'DZ','AO','BJ','BW','BF','BI','CV','CM','CF','TD','KM','CG','CD','CI','DJ','EG','GQ','ER','SZ','ET','GA','GM','GH','GN','GW','KE','LS','LR','LY','MG','MW','ML','MR','MU','MA','MZ','NA','NE','NG','RW','ST','SN','SC','SL','SO','ZA','SS','SD','TZ','TG','TN','UG','ZM','ZW','EH'
+  ]);
+  const ASIA = new Set([
+    'AF','BH','BD','BT','BN','KH','CN','TL','IN','ID','IR','IQ','IL','JP','JO','KW','LA','LB','MY','MV','MN','MM','NP','KP','OM','PK','PS','PH','QA','SA','SG','KR','LK','SY','TW','TH','AE','VN','YE','HK','MO'
+  ]);
+  const OCEANIA = new Set([
+    'AU','NZ','FJ','FM','KI','MH','NR','PW','PG','WS','SB','TO','TV','VU','CK','NC','PF','GU','MP','AS'
+  ]);
+
+  function countryGroup(code){
+    const c = String(code || '').toUpperCase();
+    if (!c) return 'Other/Uncategorized';
+    if (NEIGHBORS.has(c)) return 'Neighbors';
+    if (EU.has(c)) return 'EU + EU countries';
+    if (OTHER_EUROPE.has(c)) return 'Other Europe';
+    if (NORTH_AMERICA.has(c)) return 'North America';
+    if (CENTRAL_CARIBBEAN.has(c)) return 'Central America & Caribbean';
+    if (SOUTH_AMERICA.has(c)) return 'South America';
+    if (AFRICA.has(c)) return 'Africa';
+    if (ASIA.has(c)) return 'Asia';
+    if (OCEANIA.has(c)) return 'Australia & Oceania';
+    return 'Other/Uncategorized';
+  }
+
+  function renderCountriesGrouped(selectedSet){
+    countriesChecklist.innerHTML = "";
+
+    const groupsOrder = [
+      'EU + EU countries',
+      'Other Europe',
+      'North America',
+      'Central America & Caribbean',
+      'South America',
+      'Africa',
+      'Asia',
+      'Australia & Oceania',
+      'Neighbors',
+      'Other/Uncategorized'
+    ];
+
+    const groups = new Map();
+    for (const c of countriesCache){
+      const g = countryGroup(c.code);
+      if (!groups.has(g)) groups.set(g, []);
+      groups.get(g).push(c);
+    }
+    for (const g of groupsOrder){
+      const items = groups.get(g) || [];
+      if (!items.length) continue;
+
+      items.sort((a,b) => String(a.name_en || a.nameEn || '').localeCompare(String(b.name_en || b.nameEn || ''), 'en'));
+      const box = document.createElement("div");
+      box.className = "groupbox";
+      box.innerHTML = `<div class="grouphead">${window.GCP.escapeHtml(g)}</div>`;
+      const inner = document.createElement("div");
+      inner.className = "checklist";
+      renderCheckboxList(inner, items.map(x => ({ id:x.id, label:x.name_en || x.nameEn || x.code })), selectedSet);
+      box.appendChild(inner);
+      countriesChecklist.appendChild(box);
+    }
+  }
+
+  async function loadAssignmentsMeta(){
+    sectionsCache = await window.GCP.apiFetch("/sections", { method:"GET" });
+    countriesCache = await window.GCP.apiFetch("/countries", { method:"GET" });
+
+    // Users eligible for assignment
+    const users = await window.GCP.apiFetch("/users", { method:"GET" });
+    assignableUsersCache = (users || []).filter(u => {
+      const rk = String(u.role || '').toLowerCase();
+      return (rk === 'collaborator' || rk === 'super_collaborator') && u.isActive;
+    });
+
+    assignUserSelect.innerHTML = `<option value="">Select…</option>` + assignableUsersCache.map(u => {
+      return `<option value="${u.id}">${window.GCP.escapeHtml(u.fullName)} (${window.GCP.escapeHtml(u.username)})</option>`;
+    }).join("");
+
+    // Default empty UI
+    renderCheckboxList(sectionsChecklist, sectionsCache.map(s => ({ id:s.id, label:s.label })), new Set());
+    renderCountriesGrouped(new Set());
+  }
+
+  async function loadUserAssignments(){
+    setAssignMsg("");
+    const userId = Number(assignUserSelect.value);
+    if (!Number.isFinite(userId)){
+      assignUserRole.value = "";
+      renderCheckboxList(sectionsChecklist, sectionsCache.map(s => ({ id:s.id, label:s.label })), new Set());
+      renderCountriesGrouped(new Set());
+      saveAssignmentsBtn.disabled = true;
+      return;
+    }
+
+    const u = assignableUsersCache.find(x => x.id === userId);
+    assignUserRole.value = u ? window.GCP.roleToTitle(u.role) : "";
+    saveAssignmentsBtn.disabled = false;
+
+    const a = await window.GCP.apiFetch(`/admin/assignments/${userId}`, { method:"GET" });
+    const secSet = new Set((a.sectionIds || []).map(String));
+    const cSet = new Set((a.countryIds || []).map(String));
+
+    renderCheckboxList(sectionsChecklist, sectionsCache.map(s => ({ id:s.id, label:s.label })), secSet);
+    renderCountriesGrouped(cSet);
+  }
+
+  assignUserSelect.addEventListener("change", loadUserAssignments);
+
+  saveAssignmentsBtn.addEventListener("click", async () => {
+    setAssignMsg("");
+    const userId = Number(assignUserSelect.value);
+    if (!Number.isFinite(userId)) return;
+
+    const sectionIds = getCheckedIds(sectionsChecklist);
+    const countryIds = getCheckedIds(countriesChecklist);
+
+    try{
+      await window.GCP.apiFetch("/admin/assignments", {
+        method:"POST",
+        body: JSON.stringify({ userId, sectionIds, countryIds })
+      });
+      setAssignMsg("Saved.");
     }catch(err){
-      msgAssign.textContent = err.message || "Failed";
+      setAssignMsg(err.message || "Failed to save", true);
     }
   });
 
 
-  // ------------------------------
-  // Country assignments (collaborator/super_collaborator -> countries)
-  // ------------------------------
-  function groupForCountryCode(code){
-    return COUNTRY_GROUP_BY_CODE[String(code || "").toUpperCase()] || "Other";
-  }
-
-  function buildCountryChecklist(countries){
-    // countries: [{id,name_en,code}]
-    const byGroup = {};
-    for (const c of countries){
-      const group = groupForCountryCode(c.code);
-      (byGroup[group] = byGroup[group] || []).push(c);
-    }
-    // order groups
-    const groups = Object.keys(byGroup).sort((a,b) => {
-      const ia = COUNTRY_GROUP_ORDER.indexOf(a);
-      const ib = COUNTRY_GROUP_ORDER.indexOf(b);
-      const ra = ia === -1 ? 999 : ia;
-      const rb = ib === -1 ? 999 : ib;
-      if (ra !== rb) return ra - rb;
-      return a.localeCompare(b);
-    });
-
-    countryChecklist.innerHTML = "";
-
-    for (const group of groups){
-      byGroup[group].sort((a,b) => String(a.name_en).localeCompare(String(b.name_en)));
-
-      const groupId = "grp_" + group.replace(/[^a-z0-9]+/gi, "_");
-      const groupWrap = document.createElement("div");
-      groupWrap.className = "checklist-group";
-
-      const header = document.createElement("div");
-      header.className = "checklist-group-header";
-      header.innerHTML = `
-        <label class="chk">
-          <input type="checkbox" data-group="${window.GCP.escapeHtml(group)}" id="${groupId}">
-          <span><b>${window.GCP.escapeHtml(group)}</b></span>
-        </label>
-      `;
-      groupWrap.appendChild(header);
-
-      const items = document.createElement("div");
-      items.className = "checklist-items";
-
-      for (const c of byGroup[group]){
-        const id = `c_${c.id}`;
-        const item = document.createElement("label");
-        item.className = "chk";
-        item.innerHTML = `
-          <input type="checkbox" data-country-id="${c.id}" data-group="${window.GCP.escapeHtml(group)}" id="${id}">
-          <span>${window.GCP.escapeHtml(c.name_en)} <span class="muted">(${window.GCP.escapeHtml(c.code)})</span></span>
-        `;
-        items.appendChild(item);
-      }
-
-      groupWrap.appendChild(items);
-      countryChecklist.appendChild(groupWrap);
-    }
-
-    // group checkbox behaviour
-    countryChecklist.addEventListener("change", (e) => {
-      const t = e.target;
-      if (!(t instanceof HTMLInputElement)) return;
-
-      // group toggle
-      if (t.dataset && t.dataset.group && !t.dataset.countryId){
-        const g = t.dataset.group;
-        const checked = t.checked;
-        const boxes = countryChecklist.querySelectorAll(`input[data-country-id][data-group="${CSS.escape(g)}"]`);
-        boxes.forEach(b => { b.checked = checked; });
-      }
-
-      // country toggle updates group header
-      if (t.dataset && t.dataset.countryId){
-        const g = t.dataset.group;
-        const boxes = countryChecklist.querySelectorAll(`input[data-country-id][data-group="${CSS.escape(g)}"]`);
-        const header = countryChecklist.querySelector(`input[data-group="${CSS.escape(g)}"]:not([data-country-id])`);
-        if (header){
-          const allChecked = Array.from(boxes).every(b => b.checked);
-          const noneChecked = Array.from(boxes).every(b => !b.checked);
-          header.indeterminate = !allChecked && !noneChecked;
-          header.checked = allChecked;
-        }
-      }
-    });
-  }
-
-  function selectedCountryIds(){
-    const boxes = countryChecklist.querySelectorAll("input[data-country-id]:checked");
-    return Array.from(boxes).map(b => Number(b.dataset.countryId)).filter(Number.isFinite);
-  }
-
-  async function loadCountryAssignmentsPicklist(){
-    const users = await window.GCP.apiFetch("/users", { method:"GET" });
-    const pick = users.filter(u => ["collaborator","super_collaborator"].includes(String(u.role).toLowerCase()) && u.isActive);
-    assignUserCountries.innerHTML = pick
-      .map(u => `<option value="${u.id}">${window.GCP.escapeHtml(u.fullName)} (${window.GCP.escapeHtml(u.username)})</option>`)
-      .join("");
-  }
-
-  async function loadCountriesChecklist(){
-    const countries = await window.GCP.apiFetch("/countries", { method:"GET" });
-    buildCountryChecklist(countries);
-  }
-
-  async function loadCountryAssignments(){
-    const rows = await window.GCP.apiFetch("/country-assignments", { method:"GET" });
-    countryAssignTbody.innerHTML = "";
-    for (const r of rows){
-      const tr = document.createElement("tr");
-      const group = groupForCountryCode(r.country_code);
-      const created = window.GCP.formatDateTime ? window.GCP.formatDateTime(r.created_at) : r.created_at;
-
-      tr.innerHTML = `
-        <td>${window.GCP.escapeHtml(r.full_name)} (${window.GCP.escapeHtml(r.username)})</td>
-        <td>${window.GCP.escapeHtml(r.country_name_en)} <span class="muted">(${window.GCP.escapeHtml(r.country_code)})</span></td>
-        <td>${window.GCP.escapeHtml(group)}</td>
-        <td>${window.GCP.escapeHtml(created)}</td>
-        <td><button class="btn small danger" data-del="${r.id}">Remove</button></td>
-      `;
-      countryAssignTbody.appendChild(tr);
-    }
-
-    // wire delete
-    countryAssignTbody.querySelectorAll("button[data-del]").forEach(btn => {
-      btn.addEventListener("click", async () => {
-        try{
-          const id = Number(btn.dataset.del);
-          await window.GCP.apiFetch(`/country-assignments/${id}`, { method:"DELETE" });
-          await loadCountryAssignments();
-        }catch(err){
-          msgAssignCountries.textContent = err.message || "Failed";
-        }
-      });
-    });
-  }
-
-  if (assignCountriesForm){
-    assignCountriesForm.addEventListener("submit", async (e) => {
-      e.preventDefault();
-      msgAssignCountries.textContent = "";
-      try{
-        const userId = Number(assignUserCountries.value);
-        const countryIds = selectedCountryIds();
-        if (!Number.isFinite(userId)) throw new Error("Choose a collaborator");
-        if (!countryIds.length) throw new Error("Select at least one country");
-
-        await window.GCP.apiFetch("/country-assignments", {
-          method:"POST",
-          body: JSON.stringify({ userId, countryIds })
-        });
-
-        msgAssignCountries.textContent = "Saved.";
-        await loadCountryAssignments();
-      }catch(err){
-        msgAssignCountries.textContent = err.message || "Failed";
-      }
-    });
-  }
-
-  try{
+try{
     await loadUsers();
     await loadSections();
-    await loadAssignmentsPicklists();
-    await loadAssignments();
-
-    await loadCountryAssignmentsPicklist();
-    await loadCountriesChecklist();
-    await loadCountryAssignments();
+    await loadAssignmentsMeta();
+    saveAssignmentsBtn.disabled = true;
   }catch(err){
     msgUsers.textContent = err.message || "Failed to load admin data";
   }

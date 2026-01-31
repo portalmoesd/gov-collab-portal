@@ -125,39 +125,3 @@
   window.GCP.escapeHtml = escapeHtml;
   window.GCP.roleToTitle = roleToTitle;
 })();
-
-
-/* ===== Formatting helpers (DD/MM/YYYY HH:MM, Tbilisi time) ===== */
-window.GCP = window.GCP || {};
-
-window.GCP.formatDate = function(dateStr){
-  if (!dateStr) return '';
-  // If it already looks like YYYY-MM-DD, format without timezone surprises.
-  const m = String(dateStr).match(/^(\d{4})-(\d{2})-(\d{2})/);
-  if (m) return `${m[3]}/${m[2]}/${m[1]}`;
-  const d = new Date(dateStr);
-  if (isNaN(d)) return String(dateStr);
-  return new Intl.DateTimeFormat('en-GB', { timeZone:'Asia/Tbilisi', day:'2-digit', month:'2-digit', year:'numeric' }).format(d);
-};
-
-window.GCP.formatDateTime = function(dateStr){
-  if (!dateStr) return '';
-  const d = new Date(dateStr);
-  if (isNaN(d)) return String(dateStr);
-  const s = new Intl.DateTimeFormat('en-GB', {
-    timeZone:'Asia/Tbilisi',
-    day:'2-digit', month:'2-digit', year:'numeric',
-    hour:'2-digit', minute:'2-digit', hour12:false
-  }).format(d);
-  return s.replace(',', '');
-};
-
-window.GCP.prettyStatus = function(statusKey){
-  const k = String(statusKey || '').trim();
-  const map = {
-    pending_chairman: 'pending deputy approval',
-    approved_by_chairman: 'approved by deputy',
-    returned_by_chairman: 'returned by deputy',
-  };
-  return map[k] || k.replaceAll('_',' ');
-};

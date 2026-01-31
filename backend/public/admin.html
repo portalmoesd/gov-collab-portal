@@ -83,59 +83,37 @@
   </div>
 
   <div id="assignmentsPanel" style="display:none;">
-    <div class="grid">
-      <div class="col-12">
-        <div style="font-weight:900; margin-bottom:10px;">Assign collaborator to section</div>
-        <form id="assignForm" class="row">
-          <div class="field"><label>Collaborator</label><select id="assignUser"></select></div>
-          <div class="field"><label>Section</label><select id="assignSection"></select></div>
-          <div style="align-self:flex-end;"><button class="btn primary" type="submit">Assign</button></div>
-          <div id="msgAssign" class="small" style="color:var(--danger); font-weight:800;"></div>
-        </form>
-      </div>
+        <h2>Assignments</h2>
+        <p class="muted">Only <b>Collaborator</b> and <b>Super-collaborator</b> roles can be assigned to sections and countries. Other roles do not need assignments.</p>
 
-      <div class="col-12" style="margin-top:8px;">
-        
-    <div style="font-weight:900; margin:22px 0 10px 0;">Assign collaborator to countries</div>
-    <form id="assignCountriesForm" class="row">
-      <div class="field">
-        <label>Collaborator</label>
-        <select id="assignUserCountries"></select>
-      </div>
+        <div class="row">
+          <div class="field" style="min-width:260px;">
+            <label>User</label>
+            <select id="assignUserSelect"></select>
+          </div>
+          <div class="field" style="min-width:260px;">
+            <label>Role</label>
+            <input id="assignUserRole" disabled />
+          </div>
+          <div class="field" style="align-self:flex-end;">
+            <button class="btn" id="saveAssignmentsBtn">Save assignments</button>
+          </div>
+        </div>
 
-      <div class="field" style="flex:1 1 520px; min-width:320px;">
-        <label>Countries (choose one or many)</label>
-        <div id="countryChecklist" class="checklist"></div>
-      </div>
+        <div id="assignStatus" class="muted" style="margin:8px 0;"></div>
 
-      <div style="align-self:flex-end;">
-        <button class="btn primary" type="submit">Assign countries</button>
-      </div>
-      <div id="msgAssignCountries" style="margin-left:10px; align-self:flex-end; font-size:12px; color:#2b445b;"></div>
-    </form>
+        <div class="grid2">
+          <div class="cardSub">
+            <h3>Sections</h3>
+            <div id="sectionsChecklist" class="checklist"></div>
+          </div>
 
-    <div style="font-weight:900; margin:18px 0 10px 0;">Current country assignments</div>
-    <table class="table">
-      <thead>
-        <tr>
-          <th>User</th>
-          <th>Country</th>
-          <th>Group</th>
-          <th>Created</th>
-          <th></th>
-        </tr>
-      </thead>
-      <tbody id="countryAssignTbody"></tbody>
-    </table>
-
-<div style="font-weight:900; margin-bottom:10px;">Current assignments</div>
-        <table class="table">
-          <thead><tr><th>User</th><th>Section</th><th>Created</th><th></th></tr></thead>
-          <tbody id="assignmentTbody"></tbody>
-        </table>
+          <div class="cardSub">
+            <h3>Countries</h3>
+            <div id="countriesChecklist" class="checklist"></div>
+          </div>
+        </div>
       </div>
-    </div>
-  </div>
 </section>
 
   </main>

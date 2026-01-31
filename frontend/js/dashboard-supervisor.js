@@ -1,13 +1,3 @@
-
-
-async function loadEvents(){
-  const events = await window.GCP.apiFetch('/events?is_active=1');
-  eventSelect.innerHTML = `<option value="">Select event</option>` + events.map(ev => {
-    const deadline = window.GCP.formatDate(ev.deadline_date || '');
-    const c = ev.country_name_en ? ` — ${ev.country_name_en}` : '';
-    return `<option value="${ev.id}">${window.GCP.escapeHtml(ev.title)}${c}${deadline ? ' (deadline '+window.GCP.escapeHtml(deadline)+')' : ''}</option>`;
-  }).join('');
-}
 // dashboard-supervisor.js
 (async function(){
   const me = await window.GCP.requireAuth();
@@ -17,8 +7,10 @@ async function loadEvents(){
   if (!["admin","supervisor"].includes(role)){
     document.querySelector(".main").innerHTML = "<div class='card'>Access denied.</div>";
     return;
-  }  const eventSelect = document.getElementById("eventSelect");
-  let currentEventCountryId = null;
+  }
+
+  const countrySelect = document.getElementById("countrySelect");
+  const eventSelect = document.getElementById("eventSelect");
   const sectionsTbody = document.getElementById("sectionsTbody");
   const docStatusBox = document.getElementById("docStatusBox");
   const submitDocBtn = document.getElementById("submitDocBtn");
@@ -39,7 +31,18 @@ async function loadEvents(){
   }
   if (modalCloseBtn) modalCloseBtn.addEventListener("click", closeModal);
   if (modalBackdrop) modalBackdrop.addEventListener("click", (e) => { if (e.target === modalBackdrop) closeModal(); });
-    const events = await window.GCP.apiFetch(`/events?is_active=true&country_id=${encodeURIComponent(currentEventCountryId)}`, { method:"GET" });
+
+  async function loadCountries(){
+    const countries = await window.GCP.apiFetch("/countries", { method:"GET" });
+    countrySelect.innerHTML = `<option value="">Select country</option>` + countries.map(c => `<option value="${c.id}">${window.GCP.escapeHtml(c.name_en)}</option>`).join("");
+  }
+
+  async function loadEventsForCountry(countryId){
+    if (!countryId){
+      eventSelect.innerHTML = `<option value="">Select event</option>`;
+      return;
+    }
+    const events = await window.GCP.apiFetch(`/events?is_active=true&country_id=${encodeURIComponent(countryId)}`, { method:"GET" });
     eventSelect.innerHTML = `<option value="">Select event</option>` + events.map(ev => `<option value="${ev.id}">${window.GCP.escapeHtml(ev.title)}</option>`).join("");
   }
 
@@ -48,15 +51,15 @@ async function loadEvents(){
     sectionsTbody.innerHTML = "";
     docStatusBox.innerHTML = "";
 
-    const currentEventCountryId = null;
+    const countryId = countrySelect.value;
     const eventId = eventSelect.value;
 
-    if (!eventId){
+    if (!countryId || !eventId){
       msg.textContent = "Please choose a country and an event.";
       return;
     }
 
-    const data = await window.GCP.apiFetch(`/tp/status-grid?event_id=${encodeURIComponent(eventId)}&country_id=${encodeURIComponent(currentEventCountryId)}`, { method:"GET" });
+    const data = await window.GCP.apiFetch(`/tp/status-grid?event_id=${encodeURIComponent(eventId)}&country_id=${encodeURIComponent(countryId)}`, { method:"GET" });
 
     sectionsTbody.innerHTML = "";
     for (const row of data.rows){
@@ -69,12 +72,12 @@ async function loadEvents(){
         <td><button class="btn" data-act="edit">Open</button></td>
       `;
       tr.querySelector('[data-act="edit"]').addEventListener("click", () => {
-        location.href = `editor.html?eventId=${encodeURIComponent(eventId)}&currentEventCountryId=${encodeURIComponent(currentEventCountryId)}&sectionId=${encodeURIComponent(row.section_id)}`;
+        location.href = `editor.html?eventId=${encodeURIComponent(eventId)}&countryId=${encodeURIComponent(countryId)}&sectionId=${encodeURIComponent(row.section_id)}`;
       });
       sectionsTbody.appendChild(tr);
     }
 
-    const ds = await window.GCP.apiFetch(`/tp/document-status?event_id=${encodeURIComponent(eventId)}&country_id=${encodeURIComponent(currentEventCountryId)}`, { method:"GET" });
+    const ds = await window.GCP.apiFetch(`/tp/document-status?event_id=${encodeURIComponent(eventId)}&country_id=${encodeURIComponent(countryId)}`, { method:"GET" });
     docStatusBox.innerHTML = `
       <div class="row" style="justify-content:space-between;">
         <div><b>Document status:</b> <span class="pill ${ds.documentStatus}">${ds.documentStatus.replaceAll("_"," ")}</span></div>
@@ -85,21 +88,21 @@ async function loadEvents(){
   }
 
   async function previewFull(){
-    const currentEventCountryId = null;
+    const countryId = countrySelect.value;
     const eventId = eventSelect.value;
-    if (!eventId){
+    if (!countryId || !eventId){
       msg.textContent = "Choose a country and event first.";
       return;
     }
     try{
-      const doc = await window.GCP.apiFetch(`/library/document?event_id=${encodeURIComponent(eventId)}&country_id=${encodeURIComponent(currentEventCountryId)}`, { method:"GET" });
+      const doc = await window.GCP.apiFetch(`/library/document?event_id=${encodeURIComponent(eventId)}&country_id=${encodeURIComponent(countryId)}`, { method:"GET" });
       openModal(`
         <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:12px;">
           <div>
             <h2 style="margin:0 0 6px;">${window.GCP.escapeHtml(doc.eventTitle)}</h2>
             <div class="small muted">${window.GCP.escapeHtml(doc.countryName)}</div>
           </div>
-          <div class="small muted">Generated at ${window.GCP.formatDateTime(new Date())}</div>
+          <div class="small muted">Generated at ${new Date().toLocaleString()}</div>
         </div>
         <hr style="margin:12px 0; border:none; border-top:1px solid var(--border);" />
         <div>${doc.html || ""}</div>
@@ -112,9 +115,9 @@ async function loadEvents(){
   previewFullBtn.addEventListener("click", previewFull);
 
   submitDocBtn.addEventListener("click", async () => {
-    const currentEventCountryId = null;
+    const countryId = countrySelect.value;
     const eventId = eventSelect.value;
-    if (!eventId){
+    if (!countryId || !eventId){
       msg.textContent = "Choose a country and event first.";
       return;
     }
@@ -122,14 +125,18 @@ async function loadEvents(){
     try{
       await window.GCP.apiFetch("/tp/submit-document", {
         method:"POST",
-        body: JSON.stringify({ eventId: Number(eventId), currentEventCountryId: Number(currentEventCountryId) })
+        body: JSON.stringify({ eventId: Number(eventId), countryId: Number(countryId) })
       });
       await refresh();
       msg.textContent = "Submitted to Deputy.";
     }catch(err){
       msg.textContent = err.message || "Submit failed";
     }
-  });    eventSelect.value = "";
+  });
+
+  countrySelect.addEventListener("change", async () => {
+    await loadEventsForCountry(countrySelect.value);
+    eventSelect.value = "";
     sectionsTbody.innerHTML = "";
     docStatusBox.innerHTML = "";
     msg.textContent = "";

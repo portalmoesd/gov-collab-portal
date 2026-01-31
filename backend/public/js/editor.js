@@ -5,9 +5,8 @@
 
   const role = String(me.role).toLowerCase();
   const qs = window.GCP.qs();
-  const eventId = qs.eventId;
-  const countryId = qs.countryId;
-  const sectionId = qs.sectionId;
+  const eventId = Number(qs.event_id || qs.eventId);
+  const sectionId = Number(qs.section_id || qs.sectionId);
 
   const msg = document.getElementById("msg");
   const meta = document.getElementById("meta");
@@ -22,8 +21,8 @@
     statusEl.innerHTML = `<span class="pill ${status}">${status.replaceAll("_"," ")}</span>`;
   }
 
-  if (!eventId || !countryId || !sectionId){
-    msg.textContent = "Missing eventId/countryId/sectionId in URL.";
+  if (!Number.isFinite(eventId) || !Number.isFinite(sectionId)){
+    msg.textContent = "Missing event_id and/or section_id in URL.";
     return;
   }
 
@@ -54,7 +53,7 @@
 
   async function load(){
     msg.textContent = "";
-    const tp = await window.GCP.apiFetch(`/tp?event_id=${encodeURIComponent(eventId)}&country_id=${encodeURIComponent(countryId)}&section_id=${encodeURIComponent(sectionId)}`, { method:"GET" });
+    const tp = await window.GCP.apiFetch(`/tp?event_id=${encodeURIComponent(eventId)}&section_id=${encodeURIComponent(sectionId)}`, { method:"GET" });
 
     meta.innerHTML = `
       <div><b>Event:</b> ${window.GCP.escapeHtml(tp.eventTitle)}</div>
@@ -87,7 +86,7 @@
     try{
       await window.GCP.apiFetch("/tp/save", {
         method:"POST",
-        body: JSON.stringify({ eventId, countryId, sectionId, htmlContent: getHtml() })
+        body: JSON.stringify({ eventId, sectionId, htmlContent: getHtml() })
       });
       await load();
       msg.textContent = "Saved.";
@@ -100,7 +99,7 @@
     try{
       await window.GCP.apiFetch("/tp/submit", {
         method:"POST",
-        body: JSON.stringify({ eventId, countryId, sectionId, htmlContent: getHtml() })
+        body: JSON.stringify({ eventId, sectionId, htmlContent: getHtml() })
       });
       await load();
       msg.textContent = "Submitted.";
@@ -114,12 +113,12 @@
       if (role === "chairman"){
         await window.GCP.apiFetch("/tp/approve-section-chairman", {
           method:"POST",
-          body: JSON.stringify({ eventId, countryId, sectionId, htmlContent: getHtml() })
+          body: JSON.stringify({ eventId, sectionId, htmlContent: getHtml() })
         });
       } else {
         await window.GCP.apiFetch("/tp/approve-section", {
           method:"POST",
-          body: JSON.stringify({ eventId, countryId, sectionId, htmlContent: getHtml() })
+          body: JSON.stringify({ eventId, sectionId, htmlContent: getHtml() })
         });
       }
       await load();
@@ -135,7 +134,7 @@
     try{
       await window.GCP.apiFetch("/tp/return", {
         method:"POST",
-        body: JSON.stringify({ eventId, countryId, sectionId, comment })
+        body: JSON.stringify({ eventId, sectionId, comment })
       });
       await load();
       msg.textContent = "Returned.";

@@ -36,11 +36,11 @@
 
   function fmtDate(s){
     if (!s) return "—";
-    try{ return window.GCP.formatDate(s); }catch{ return String(s); }
+    try{ return new Date(s).toLocaleDateString(); }catch{ return String(s); }
   }
   function fmtDateTime(s){
     if (!s) return "—";
-    try{ return window.GCP.formatDateTime(s); }catch{ return String(s); }
+    try{ return new Date(s).toLocaleString(); }catch{ return String(s); }
   }
 
   async function loadDocs(){
@@ -86,7 +86,7 @@
           <h2 style="margin:0 0 6px;">${window.GCP.escapeHtml(doc.event.title)}</h2>
           <div class="small muted">${window.GCP.escapeHtml(doc.event.countryName)}</div>
         </div>
-        <div class="small muted">Last updated: ${doc.documentStatus?.updatedAt ? window.GCP.escapeHtml(window.GCP.formatDateTime(doc.documentStatus.updatedAt)) : '—'}</div>
+        <div class="small muted">Last updated: ${doc.documentStatus?.updatedAt ? window.GCP.escapeHtml(new Date(doc.documentStatus.updatedAt).toLocaleString()) : '—'}</div>
       </div>
       <hr style="margin:12px 0; border:none; border-top:1px solid var(--border);" />`);
 
