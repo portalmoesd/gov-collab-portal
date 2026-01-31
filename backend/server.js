@@ -130,7 +130,8 @@ async function assertUserCanAccessEventSection(user, eventId, sectionId){
 
 
 function normalizeRoleKey(roleKey) {
-  const k = String(roleKey || '').trim().toLowerCase();
+  const k0 = String(roleKey || '').trim().toLowerCase();
+  const k = k0.replace(/-/g, '_');
   return k === 'deputy' ? 'chairman' : k;
 }
 
@@ -379,46 +380,54 @@ app.get('/api/users', requireRole('admin'), async (req, res) => {
 });
 
 app.post('/api/users', requireRole('admin'), async (req, res) => {
-  const { username, password, fullName, email, role, isActive } = req.body || {};
-  if (!username || !password || !fullName || !role) {
-    return res.status(400).json({ error: 'username, password, fullName, role required' });
+  try {
+    const { username, password, fullName, email, role, isActive } = req.body || {};
+    if (!username || !password || !fullName || !role) {
+      return res.status(400).json({ error: 'username, password, fullName, role required' });
+    }
+
+    const roleKey = normalizeRoleKey(role);
+    const roleRow = await queryOne(`SELECT id, key FROM roles WHERE key=$1`, [roleKey]);
+    if (!roleRow) return res.status(400).json({ error: 'Invalid role' });
+
+    const passwordHash = await bcrypt.hash(String(password), 10);
+
+    const created = await queryOne(
+      `
+      INSERT INTO users (username, password_hash, full_name, email, role_id, is_active, created_at, updated_at)
+      VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())
+      RETURNING id
+      `,
+      [String(username).trim(), passwordHash, String(fullName).trim(), email ? String(email).trim() : null, roleRow.id, isActive !== false]
+    );
+
+    const out = await queryOne(
+      `
+      SELECT u.*, r.key AS role_key
+      FROM users u
+      JOIN roles r ON r.id = u.role_id
+      WHERE u.id = $1
+      `,
+      [created.id]
+    );
+
+    return res.status(201).json(pickUserPayload(out));
+  } catch (e) {
+    // Handle common Postgres errors safely (prevent process crash / 502 on Render)
+    if (e && e.code === '23505') {
+      return res.status(409).json({ error: 'Username or email already exists' });
+    }
+    if (e && e.code === '23502') {
+      return res.status(400).json({ error: 'Missing required field' });
+    }
+    console.error('Create user failed:', e);
+    return res.status(500).json({ error: 'Failed to create user' });
   }
-
-  const roleRow = await queryOne(`SELECT id, key FROM roles WHERE key=$1`, [normalizeRoleKey(role)]);
-  if (!roleRow) return res.status(400).json({ error: 'Invalid role' });
-
-  const passwordHash = await bcrypt.hash(String(password), 10);
-
-  const created = await queryOne(
-    `
-    INSERT INTO users (username, password_hash, full_name, email, role_id, is_active, created_at, updated_at)
-    VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())
-    RETURNING id
-    `,
-    [
-      String(username),
-      passwordHash,
-      String(fullName),
-      email ? String(email) : null,
-      roleRow.id,
-      (isActive === false) ? false : true
-    ]
-  );
-
-  const out = await queryOne(
-    `
-    SELECT u.*, r.key AS role_key
-    FROM users u
-    JOIN roles r ON r.id = u.role_id
-    WHERE u.id = $1
-    `,
-    [created.id]
-  );
-
-  return res.status(201).json(pickUserPayload(out));
 });
 
+
 app.put('/api/users/:id', requireRole('admin'), async (req, res) => {
+  try {
   const id = Number(req.params.id);
   if (!Number.isFinite(id)) return res.status(400).json({ error: 'Invalid id' });
 
@@ -477,9 +486,15 @@ app.put('/api/users/:id', requireRole('admin'), async (req, res) => {
     await pool.query(`DELETE FROM country_assignments WHERE user_id=$1`, [userId]);
   }
 return res.json(pickUserPayload(out));
+  } catch (e) {
+    if (e && e.code === '23505') return res.status(409).json({ error: 'Username or email already exists' });
+    console.error('User update failed:', e);
+    return res.status(500).json({ error: 'Failed to update user' });
+  }
 });
 
 app.delete('/api/users/:id', requireRole('admin'), async (req, res) => {
+  try {
   const id = Number(req.params.id);
   if (!Number.isFinite(id)) return res.status(400).json({ error: 'Invalid id' });
 
@@ -499,6 +514,11 @@ app.delete('/api/users/:id', requireRole('admin'), async (req, res) => {
   );
 
   return res.json({ ok: true });
+  } catch (e) {
+    if (e && e.code === '23505') return res.status(409).json({ error: 'Username or email already exists' });
+    console.error('User update failed:', e);
+    return res.status(500).json({ error: 'Failed to update user' });
+  }
 });
 
 /** 7.3 Sections **/
