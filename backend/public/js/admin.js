@@ -46,8 +46,8 @@
     for (const u of users){
       const tr = document.createElement("tr");
       tr.innerHTML = `
-        <td>${window.GCP.escapeHtml(u.username)}</td>
-        <td>${window.GCP.escapeHtml(u.fullName)}</td>
+        <td>${window.GCP.escapeHtml(u.username || u.email || "")}</td>
+        <td>${window.GCP.escapeHtml(u.fullName || u.full_name || "")}</td>
         <td>${window.GCP.escapeHtml(u.email || "")}</td>
         <td>${window.GCP.escapeHtml(window.GCP.roleToTitle(u.role))}</td>
         <td>${u.isActive ? 'Yes' : 'No'}</td>
@@ -194,7 +194,7 @@
   const assignUserSelect = document.getElementById("assignUserSelect");
   const assignUserRole = document.getElementById("assignUserRole");
   const saveAssignmentsBtn = document.getElementById("saveAssignmentsBtn");
-  const assignmentsMsg = document.getElementById("assignmentsMsg");
+  const assignmentsMsg = document.getElementById("assignStatus") || document.getElementById("assignmentsMsg");
   const sectionsChecklist = document.getElementById("sectionsChecklist");
   const countriesChecklist = document.getElementById("countriesChecklist");
 
@@ -203,8 +203,9 @@
   let assignableUsersCache = [];
 
   function setAssignMsg(text, isError=false){
-    assignmentsMsg.textContent = text || '';
-    assignmentsMsg.style.color = isError ? 'crimson' : '#2b445b';
+    if (!assignmentsMsg) return;
+    assignmentsMsg.textContent = text || "";
+    assignmentsMsg.style.color = isError ? "crimson" : "#2b445b";
   }
 
   function renderCheckboxList(container, items, selectedSet){
@@ -312,7 +313,7 @@
     });
 
     assignUserSelect.innerHTML = `<option value="">Select…</option>` + assignableUsersCache.map(u => {
-      return `<option value="${u.id}">${window.GCP.escapeHtml(u.fullName)} (${window.GCP.escapeHtml(u.username)})</option>`;
+      return `<option value="${u.id}">${window.GCP.escapeHtml(u.fullName || u.full_name || "")} (${window.GCP.escapeHtml(u.username || u.email || "")})</option>`;
     }).join("");
 
     // Default empty UI
@@ -331,7 +332,7 @@
       return;
     }
 
-    const u = assignableUsersCache.find(x => x.id === userId);
+    const u = assignableUsersCache.find(x => Number(x.id) === userId);
     assignUserRole.value = u ? window.GCP.roleToTitle(u.role) : "";
     saveAssignmentsBtn.disabled = false;
 
