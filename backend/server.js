@@ -228,7 +228,7 @@ async function ensureDocumentStatus(eventId, countryId) {
 async function ensureTpRow(eventId, countryId, sectionId, userId) {
   await pool.query(
     `
-    INSERT INTO tp_content (event_id, country_id, section_id, html_content, status, last_last_updated_by_user_id, last_updated_at)
+    INSERT INTO tp_content (event_id, country_id, section_id, html_content, status, last_updated_by_user_id, last_updated_at)
     VALUES ($1, $2, $3, '', 'draft', $4, NOW())
     ON CONFLICT (event_id, country_id, section_id) DO NOTHING
     `,
@@ -280,7 +280,7 @@ async function getEventWithSections(eventId, countryIdForStatuses = null) {
       SELECT t.section_id, t.status, t.status_comment, COALESCE(t.last_updated_at, t.updated_at) AS last_updated_at,
              u.full_name AS last_updated_by
       FROM tp_content t
-      LEFT JOIN users u ON u.id = t.last_last_updated_by_user_id
+      LEFT JOIN users u ON u.id = COALESCE(t.last_updated_by_user_id, t.updated_by_user_id)
       WHERE t.event_id = $1 AND t.country_id = $2
       `,
       [eventId, countryIdForStatuses]
@@ -297,7 +297,7 @@ async function getEventWithSections(eventId, countryIdForStatuses = null) {
     deadlineDate: event.deadline_date,
     isActive: event.is_active,
     createdAt: event.created_at,
-    updatedAt: evenCOALESCE(t.last_updated_at, t.updated_at) AS last_updated_at,
+    updatedAt: event.updated_at,
     requiredSections,
     sectionStatuses,
   };
