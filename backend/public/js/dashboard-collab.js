@@ -43,12 +43,12 @@
     sectionSelect.disabled = true;
 
     const ev = await window.GCP.apiFetch(`/events/${eventId}`, { method:'GET' });
-        const sections = (ev.required_sections || ev.requiredSections || []).slice().sort((a,b)=> (a.order_index||0)-(b.order_index||0));
+        const sections = (ev.required_sections || ev.requiredSections || []).slice().sort((a,b)=> ((a.order_index||a.sort_order||0) - (b.order_index||b.sort_order||0)));
 
     sectionSelect.innerHTML = `<option value="">Select section...</option>`;
     for (const s of sections){
       const opt = document.createElement('option');
-      opt.value = s.id;
+      opt.value = (s.id != null ? s.id : s.section_id);
       opt.textContent = s.label;
       sectionSelect.appendChild(opt);
     }
@@ -56,7 +56,7 @@
   }
 
   eventSelect.addEventListener('change', async () => {
-    setMsg('', false);
+    setMsg('');
     setMsg('');
     const eventId = Number(eventSelect.value);
     if (!Number.isFinite(eventId)) {

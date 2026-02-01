@@ -920,7 +920,7 @@ app.get('/api/events/:id', authRequired, attachUser, async (req, res) => {
 
   const required = await queryAll(
     `
-    SELECT ers.section_id, s.label
+    SELECT ers.section_id AS id, s.label, s.order_index
     FROM event_required_sections ers
     JOIN sections s ON s.id = ers.section_id
     WHERE ers.event_id=$1
@@ -1319,7 +1319,7 @@ app.get('/api/tp/status-grid', async (req, res) => {
   if (!countryId) return res.status(404).json({ error: 'Event not found' });
 
   const required = await queryAll(
-    `SELECT ers.section_id, s.label
+    `SELECT ers.section_id AS id, s.label, s.order_index
      FROM event_required_sections ers
      JOIN sections s ON s.id=ers.section_id
      WHERE ers.event_id=$1
