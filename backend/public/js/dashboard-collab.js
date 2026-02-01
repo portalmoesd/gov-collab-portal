@@ -43,7 +43,7 @@
     sectionSelect.disabled = true;
 
     const ev = await window.GCP.apiFetch(`/events/${eventId}`, { method:'GET' });
-    const sections = (ev.requiredSections || []).slice().sort((a,b)=> (a.order_index||0)-(b.order_index||0));
+        const sections = (ev.required_sections || ev.requiredSections || []).slice().sort((a,b)=> (a.order_index||0)-(b.order_index||0));
 
     sectionSelect.innerHTML = `<option value="">Select section...</option>`;
     for (const s of sections){

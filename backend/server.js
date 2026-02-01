@@ -831,7 +831,7 @@ app.get('/api/countries', async (req, res) => {
 });
 
 /** 7.6 Events and Calendar **/
-app.get('/api/events', async (req, res) => {
+app.get('/api/events', authRequired, attachUser, async (req, res) => {
   const { country_id, is_active, include_ended } = req.query || {};
   const roleKey = normalizeRoleKey(req.user.role_key);
 
@@ -866,7 +866,7 @@ app.get('/api/events', async (req, res) => {
   return res.json(rows);
 });
 
-app.get('/api/events/upcoming', async (req, res) => {
+app.get('/api/events/upcoming', authRequired, attachUser, async (req, res) => {
   const roleKey = normalizeRoleKey(req.user.role_key);
   const includeEnded = String(req.query.include_ended) === '1';
 
@@ -899,7 +899,7 @@ app.get('/api/events/upcoming', async (req, res) => {
   return res.json(rows);
 });
 
-app.get('/api/events/:id', async (req, res) => {
+app.get('/api/events/:id', authRequired, attachUser, async (req, res) => {
   const eventId = Number(req.params.id);
   if (!Number.isFinite(eventId)) return res.status(400).json({ error: 'Invalid id' });
 
