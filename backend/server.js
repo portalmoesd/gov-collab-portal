@@ -1312,45 +1312,54 @@ app.get('/api/tp/document-status', async (req, res) => {
 });
 
 // Spec v2: per-section status grid
-app.get('/api/tp/status-grid', async (req, res) => {
-  const eventId = Number(req.query.event_id);
-  if (!Number.isFinite(eventId)) return res.status(400).json({ error: 'event_id required' });
 
-  const roleKey = normalizeRoleKey(req.user.role_key);
-  if (!['supervisor','chairman','admin'].includes(roleKey)) return res.status(403).json({ error: 'Forbidden' });
+app.get('/api/tp/status-grid', authRequired, async (req, res) => {
+  try {
+    const eventId = parseInt(req.query.event_id, 10);
+    if (!eventId) return res.status(400).json({ error: 'event_id required' });
 
-  const countryId = await resolveCountryIdForEvent(eventId);
-  if (!countryId) return res.status(404).json({ error: 'Event not found' });
+    // Resolve the event's country_id (tp_content is keyed by event_id + country_id + section_id)
+    const countryId = await resolveCountryIdForEvent(eventId);
+    if (!countryId) return res.status(404).json({ error: 'event not found' });
 
-  const required = await queryAll(
-    `SELECT ers.section_id AS id, s.label, s.order_index
-     FROM event_required_sections ers
-     JOIN sections s ON s.id=ers.section_id
-     WHERE ers.event_id=$1
-     ORDER BY s.order_index ASC, s.id ASC`,
-    [eventId, countryId]
-  );
+    // Build status grid for required sections for this event
+    const q = `
+      SELECT
+        ers.section_id AS id,
+        s.label,
+        s.order_index,
+        COALESCE(t.status::text, 'draft') AS status,
+        t.last_updated_at,
+        u.full_name AS last_updated_by
+      FROM event_required_sections ers
+      JOIN sections s ON s.id = ers.section_id
+      LEFT JOIN tp_content t
+        ON t.event_id = ers.event_id
+       AND t.country_id = $2
+       AND t.section_id = ers.section_id
+      LEFT JOIN users u ON u.id = t.last_updated_by_user_id
+      WHERE ers.event_id = $1
+      ORDER BY s.order_index ASC, s.id ASC
+    `;
+    const { rows } = await pool.query(q, [eventId, countryId]);
 
-  const statuses = await queryAll(
-    `SELECT section_id, status, COALESCE(last_updated_at, last_updated_at) AS last_updated_at
-     FROM tp_content
-     WHERE event_id=$1 AND country_id=$2`,
-    [eventId, countryId]
-  );
-  const map = new Map(statuses.map(r => [Number(r.section_id), r]));
-
-  const out = required.map(s => {
-    const r = map.get(Number(s.section_id));
-    return {
-      sectionId: s.section_id,
-      sectionLabel: s.label,
-      status: r?.status || 'draft',
-      lastUpdatedAt: r?.last_updated_at || null
-    };
-  });
-
-  return res.json(out);
+    res.json({
+      event_id: eventId,
+      country_id: countryId,
+      sections: rows.map(r => ({
+        id: r.id,
+        label: r.label,
+        status: r.status,
+        lastUpdatedAt: r.last_updated_at,
+        lastUpdatedBy: r.last_updated_by || null,
+      }))
+    });
+  } catch (e) {
+    console.error('status-grid error', e);
+    res.status(500).json({ error: 'server error' });
+  }
 });
+
 
 app.post('/api/document/submit-to-supervisor', requireRole('chairman','admin'), async (req, res) => {
   const eventId = Number(req.body?.eventId);
