@@ -924,7 +924,7 @@ app.get('/api/events/:id', authRequired, attachUser, async (req, res) => {
     FROM event_required_sections ers
     JOIN sections s ON s.id = ers.section_id
     WHERE ers.event_id=$1
-    ORDER BY s.sort_order ASC, s.id ASC
+    ORDER BY s.order_index ASC, s.id ASC
     `,
     [eventId]
   );
@@ -1323,7 +1323,7 @@ app.get('/api/tp/status-grid', async (req, res) => {
      FROM event_required_sections ers
      JOIN sections s ON s.id=ers.section_id
      WHERE ers.event_id=$1
-     ORDER BY s.sort_order ASC, s.id ASC`,
+     ORDER BY s.order_index ASC, s.id ASC`,
     [eventId]
   );
 
