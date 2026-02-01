@@ -259,7 +259,7 @@ async function ensureDocumentStatus(eventId, countryId) {
       `
       INSERT INTO document_status (event_id, country_id, status)
       VALUES ($1, $2, 'in_progress')
-      ON CONFLICT (event_id, country_id) DO NOTHING
+      ON CONFLICT DO NOTHING
       `,
       [eventId, countryId]
     );
@@ -268,7 +268,7 @@ async function ensureDocumentStatus(eventId, countryId) {
       `
       INSERT INTO document_status (event_id, status)
       VALUES ($1, 'in_progress')
-      ON CONFLICT (event_id) DO NOTHING
+      ON CONFLICT DO NOTHING
       `,
       [eventId]
     );
