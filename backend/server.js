@@ -900,6 +900,7 @@ app.get('/api/events/upcoming', authRequired, attachUser, async (req, res) => {
 });
 
 app.get('/api/events/:id', authRequired, attachUser, async (req, res) => {
+  try {
   const eventId = Number(req.params.id);
   if (!Number.isFinite(eventId)) return res.status(400).json({ error: 'Invalid id' });
 
@@ -940,6 +941,10 @@ app.get('/api/events/:id', authRequired, attachUser, async (req, res) => {
     ended_at: event.ended_at,
     required_sections: required
   });
+  } catch (e) {
+    console.error('GET /api/events/:id failed', e);
+    return res.status(500).json({ error: 'Server error' });
+  }
 });
 
 app.post('/api/events', requireRole('admin', 'chairman', 'minister', 'supervisor', 'protocol'), async (req, res) => {
@@ -1063,6 +1068,7 @@ app.post('/api/events/:id/end', requireRole('admin','supervisor','chairman','pro
 /** 7.7 Talking Points Content **/
 
 app.get('/api/tp', async (req, res) => {
+  try {
   const eventId = Number(req.query.event_id);
   const sectionId = Number(req.query.section_id);
 
@@ -1107,6 +1113,10 @@ app.get('/api/tp', async (req, res) => {
     lastUpdatedAt: row.updated_at,
     lastUpdatedBy: row.last_updated_by || null
   });
+  } catch (e) {
+    console.error('GET /api/tp failed', e);
+    return res.status(500).json({ error: 'Server error' });
+  }
 });
 
 app.post('/api/tp/save', async (req, res) => {
