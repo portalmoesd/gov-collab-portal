@@ -56,6 +56,7 @@
   }
 
   eventSelect.addEventListener('change', async () => {
+    setMsg('', false);
     setMsg('');
     const eventId = Number(eventSelect.value);
     if (!Number.isFinite(eventId)) {
