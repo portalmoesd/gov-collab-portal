@@ -5,7 +5,6 @@
 
   const eventSelect = document.getElementById('eventSelect');
   const sectionsTbody = document.getElementById('sectionsTbody');
-  const openBtn = document.getElementById('openEditorBtn');
   const submitDocBtn = document.getElementById('submitDocBtn');
   const endEventBtn = document.createElement('button');
   endEventBtn.className = 'btn danger';
@@ -145,10 +144,8 @@
       setMsg(e.message || 'Failed to end event', true);
     }
   });
-
-  openBtn.addEventListener('click', () => {
-    setMsg('Select a section from the table and click Open, or use Open buttons.', false);
-  });
+  // Supervisor dashboard does not use a single 'Open editor' button; per-section actions are in the table.
+  // (Kept intentionally blank.)
 
   submitDocBtn.addEventListener('click', async () => {
     if (!currentEventId) return;
