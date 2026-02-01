@@ -40,6 +40,14 @@ app.use(cors({
 /** Utilities **/
 
 async function ensureSchema() {
+
+  // Ensure tp_content columns exist for legacy databases
+  await pool.query(`
+    ALTER TABLE tp_content
+      ADD COLUMN IF NOT EXISTS last_updated_by_user_id INTEGER REFERENCES users(id),
+      ADD COLUMN IF NOT EXISTS last_updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW();
+  `).catch(()=>{});
+
   // Lightweight, idempotent DDL to keep Render deployments working
   await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMP`);
   await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS deleted_by_user_id INTEGER`);
@@ -269,7 +277,7 @@ async function getEventWithSections(eventId, countryIdForStatuses = null) {
 
     sectionStatuses = await queryAll(
       `
-      SELECT t.section_id, t.status, t.status_comment, t.last_updated_at,
+      SELECT t.section_id, t.status, t.status_comment, COALESCE(t.last_updated_at, t.updated_at) AS last_updated_at,
              u.full_name AS last_updated_by
       FROM tp_content t
       LEFT JOIN users u ON u.id = t.last_last_updated_by_user_id
@@ -289,7 +297,7 @@ async function getEventWithSections(eventId, countryIdForStatuses = null) {
     deadlineDate: event.deadline_date,
     isActive: event.is_active,
     createdAt: event.created_at,
-    updatedAt: event.last_updated_at,
+    updatedAt: evenCOALESCE(t.last_updated_at, t.updated_at) AS last_updated_at,
     requiredSections,
     sectionStatuses,
   };
@@ -1090,13 +1098,11 @@ app.get('/api/tp', async (req, res) => {
 
   const row = await queryOne(
     `
-    SELECT t.*, s.label AS section_label, e.title AS event_title, c.name_en AS country_name,
-           u.full_name AS last_updated_by
-    FROM tp_content t
+    SELECT t.html_content, t.status, t.status_comment, COALESCE(t.last_updated_at, t.updated_at) AS last_updated_at, COALESCE(t.last_updated_by_user_id, t.updated_by_user_id) AS last_updated_by_user_id FROM tp_content t
     JOIN sections s ON s.id = t.section_id
     JOIN events e ON e.id = t.event_id
     JOIN countries c ON c.id = t.country_id
-    LEFT JOIN users u ON u.id = t.last_last_updated_by_user_id
+    LEFT JOIN users u ON u.id = COALESCE(t.last_updated_by_user_id, t.updated_by_user_id)
     WHERE t.event_id=$1 AND t.country_id=$2 AND t.section_id=$3
     `,
     [eventId, countryId, sectionId]
@@ -1328,7 +1334,7 @@ app.get('/api/tp/status-grid', async (req, res) => {
   );
 
   const statuses = await queryAll(
-    `SELECT section_id, status, last_updated_at
+    `SELECT section_id, status, COALESCE(last_updated_at, updated_at) AS last_updated_at
      FROM tp_content
      WHERE event_id=$1 AND country_id=$2`,
     [eventId, countryId]
@@ -1456,7 +1462,7 @@ app.get('/api/library/document', requireRole('admin','chairman','minister','supe
   const sections = await queryAll(
     `
     SELECT s.id AS section_id, s.label AS section_label, s.order_index,
-           t.html_content, t.status, t.last_updated_at
+           t.html_content, t.status, COALESCE(t.last_updated_at, t.updated_at) AS last_updated_at
     FROM event_required_sections ers
     JOIN sections s ON s.id = ers.section_id
     LEFT JOIN tp_content t
