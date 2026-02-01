@@ -31,6 +31,15 @@ const pool = new Pool({
 });
 
 const app = express();
+
+// Avoid 304/ETag issues for fetch() on API endpoints
+app.set('etag', false);
+app.use('/api', (req, res, next) => {
+  res.set('Cache-Control', 'no-store');
+  res.set('Pragma', 'no-cache');
+  next();
+});
+
 app.use(express.json({ limit: '2mb' }));
 app.use(cors({
   origin: CORS_ORIGIN === '*' ? true : CORS_ORIGIN,
