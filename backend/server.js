@@ -220,7 +220,7 @@ async function ensureDocumentStatus(eventId, countryId) {
 async function ensureTpRow(eventId, countryId, sectionId, userId) {
   await pool.query(
     `
-    INSERT INTO tp_content (event_id, country_id, section_id, html_content, status, last_updated_by_user_id, last_updated_at)
+    INSERT INTO tp_content (event_id, country_id, section_id, html_content, status, last_last_updated_by_user_id, last_updated_at)
     VALUES ($1, $2, $3, '', 'draft', $4, NOW())
     ON CONFLICT (event_id, country_id, section_id) DO NOTHING
     `,
@@ -272,7 +272,7 @@ async function getEventWithSections(eventId, countryIdForStatuses = null) {
       SELECT t.section_id, t.status, t.status_comment, t.last_updated_at,
              u.full_name AS last_updated_by
       FROM tp_content t
-      LEFT JOIN users u ON u.id = t.last_updated_by_user_id
+      LEFT JOIN users u ON u.id = t.last_last_updated_by_user_id
       WHERE t.event_id = $1 AND t.country_id = $2
       `,
       [eventId, countryIdForStatuses]
@@ -289,7 +289,7 @@ async function getEventWithSections(eventId, countryIdForStatuses = null) {
     deadlineDate: event.deadline_date,
     isActive: event.is_active,
     createdAt: event.created_at,
-    updatedAt: event.updated_at,
+    updatedAt: event.last_updated_at,
     requiredSections,
     sectionStatuses,
   };
@@ -457,7 +457,7 @@ app.put('/api/users/:id', requireRole('admin'), async (req, res) => {
 
   if (fields.length === 0) return res.status(400).json({ error: 'No fields to update' });
 
-  fields.push(`updated_at=NOW()`);
+  fields.push(`last_updated_at=NOW()`);
 
   values.push(id);
 
@@ -508,7 +508,7 @@ app.delete('/api/users/:id', requireRole('admin'), async (req, res) => {
      SET is_active=false,
          deleted_at=NOW(),
          deleted_by_user_id=$2,
-         updated_at=NOW()
+         last_updated_at=NOW()
      WHERE id=$1`,
     [id, req.user.id]
   );
@@ -586,7 +586,7 @@ app.put('/api/sections/:id', requireRole('admin'), async (req, res) => {
   if (isActive !== undefined) { fields.push(`is_active=$${idx++}`); values.push(Boolean(isActive)); }
 
   if (fields.length === 0) return res.status(400).json({ error: 'No fields to update' });
-  fields.push(`updated_at=NOW()`);
+  fields.push(`last_updated_at=NOW()`);
 
   values.push(id);
   await pool.query(`UPDATE sections SET ${fields.join(', ')} WHERE id=$${idx}`, values);
@@ -600,7 +600,7 @@ app.delete('/api/sections/:id', requireRole('admin'), async (req, res) => {
   const id = Number(req.params.id);
   if (!Number.isFinite(id)) return res.status(400).json({ error: 'Invalid id' });
 
-  await pool.query(`UPDATE sections SET is_active=false, updated_at=NOW() WHERE id=$1`, [id]);
+  await pool.query(`UPDATE sections SET is_active=false, last_updated_at=NOW() WHERE id=$1`, [id]);
   return res.json({ ok: true });
 });
 
@@ -1017,7 +1017,7 @@ app.put('/api/events/:id', requireRole('admin', 'chairman', 'minister', 'supervi
     if (isActive !== undefined) { fields.push(`is_active=$${idx++}`); vals.push(Boolean(isActive)); }
 
     if (fields.length) {
-      fields.push(`updated_at=NOW()`);
+      fields.push(`last_updated_at=NOW()`);
       vals.push(eventId);
       await client.query(`UPDATE events SET ${fields.join(', ')} WHERE id=$${idx}`, vals);
     }
@@ -1096,7 +1096,7 @@ app.get('/api/tp', async (req, res) => {
     JOIN sections s ON s.id = t.section_id
     JOIN events e ON e.id = t.event_id
     JOIN countries c ON c.id = t.country_id
-    LEFT JOIN users u ON u.id = t.updated_by_user_id
+    LEFT JOIN users u ON u.id = t.last_last_updated_by_user_id
     WHERE t.event_id=$1 AND t.country_id=$2 AND t.section_id=$3
     `,
     [eventId, countryId, sectionId]
@@ -1110,7 +1110,7 @@ app.get('/api/tp', async (req, res) => {
     countryName: row.country_name,
     htmlContent: row.html_content || '',
     status: row.status || 'draft',
-    lastUpdatedAt: row.updated_at,
+    lastUpdatedAt: row.last_updated_at,
     lastUpdatedBy: row.last_updated_by || null
   });
   } catch (e) {
@@ -1143,7 +1143,7 @@ app.post('/api/tp/save', async (req, res) => {
   await pool.query(
     `
     UPDATE tp_content
-    SET html_content=$4, updated_at=NOW(), updated_by_user_id=$5, status='draft'
+    SET html_content=$4, last_updated_at=NOW(), last_updated_by_user_id=$5, status='draft'
     WHERE event_id=$1 AND country_id=$2 AND section_id=$3
     `,
     [eventId, countryId, sectionId, htmlContent, req.user.id]
@@ -1176,7 +1176,7 @@ app.post('/api/tp/submit', async (req, res) => {
   await pool.query(
     `
     UPDATE tp_content
-    SET html_content=$4, updated_at=NOW(), updated_by_user_id=$5, status='submitted'
+    SET html_content=$4, last_updated_at=NOW(), last_updated_by_user_id=$5, status='submitted'
     WHERE event_id=$1 AND country_id=$2 AND section_id=$3
     `,
     [eventId, countryId, sectionId, htmlContent, req.user.id]
@@ -1203,7 +1203,7 @@ app.post('/api/tp/return', requireRole('supervisor','chairman','admin'), async (
   await pool.query(
     `
     UPDATE tp_content
-    SET status='returned', return_note=$4, updated_at=NOW(), updated_by_user_id=$5
+    SET status='returned', return_note=$4, last_updated_at=NOW(), last_updated_by_user_id=$5
     WHERE event_id=$1 AND country_id=$2 AND section_id=$3
     `,
     [eventId, countryId, sectionId, note, req.user.id]
@@ -1228,7 +1228,7 @@ app.post('/api/tp/approve-section', requireRole('supervisor','admin'), async (re
   await pool.query(
     `
     UPDATE tp_content
-    SET status='approved_by_supervisor', updated_at=NOW(), updated_by_user_id=$4
+    SET status='approved_by_supervisor', last_updated_at=NOW(), last_updated_by_user_id=$4
     WHERE event_id=$1 AND country_id=$2 AND section_id=$3
     `,
     [eventId, countryId, sectionId, req.user.id]
@@ -1253,7 +1253,7 @@ app.post('/api/tp/approve-section-chairman', requireRole('chairman','admin'), as
   await pool.query(
     `
     UPDATE tp_content
-    SET status='approved_by_chairman', updated_at=NOW(), updated_by_user_id=$4
+    SET status='approved_by_chairman', last_updated_at=NOW(), last_updated_by_user_id=$4
     WHERE event_id=$1 AND country_id=$2 AND section_id=$3
     `,
     [eventId, countryId, sectionId, req.user.id]
@@ -1328,7 +1328,7 @@ app.get('/api/tp/status-grid', async (req, res) => {
   );
 
   const statuses = await queryAll(
-    `SELECT section_id, status, updated_at
+    `SELECT section_id, status, last_updated_at
      FROM tp_content
      WHERE event_id=$1 AND country_id=$2`,
     [eventId, countryId]
@@ -1341,7 +1341,7 @@ app.get('/api/tp/status-grid', async (req, res) => {
       sectionId: s.section_id,
       sectionLabel: s.label,
       status: r?.status || 'draft',
-      lastUpdatedAt: r?.updated_at || null
+      lastUpdatedAt: r?.last_updated_at || null
     };
   });
 
@@ -1358,7 +1358,7 @@ app.post('/api/document/submit-to-supervisor', requireRole('chairman','admin'), 
   await ensureDocumentStatus(eventId, countryId);
   await pool.query(
     `UPDATE document_status
-     SET status='submitted_to_supervisor', updated_at=NOW(), updated_by_user_id=$3
+     SET status='submitted_to_supervisor', last_updated_at=NOW(), last_updated_by_user_id=$3
      WHERE event_id=$1 AND country_id=$2`,
     [eventId, countryId, req.user.id]
   );
@@ -1375,7 +1375,7 @@ app.post('/api/document/submit-to-chairman', requireRole('supervisor','admin'), 
   await ensureDocumentStatus(eventId, countryId);
   await pool.query(
     `UPDATE document_status
-     SET status='submitted_to_chairman', updated_at=NOW(), updated_by_user_id=$3
+     SET status='submitted_to_chairman', last_updated_at=NOW(), last_updated_by_user_id=$3
      WHERE event_id=$1 AND country_id=$2`,
     [eventId, countryId, req.user.id]
   );
@@ -1392,7 +1392,7 @@ app.post('/api/document/approve', requireRole('chairman','admin'), async (req, r
   await ensureDocumentStatus(eventId, countryId);
   await pool.query(
     `UPDATE document_status
-     SET status='approved', updated_at=NOW(), updated_by_user_id=$3
+     SET status='approved', last_updated_at=NOW(), last_updated_by_user_id=$3
      WHERE event_id=$1 AND country_id=$2`,
     [eventId, countryId, req.user.id]
   );
@@ -1410,7 +1410,7 @@ app.post('/api/document/return', requireRole('chairman','admin'), async (req, re
   await ensureDocumentStatus(eventId, countryId);
   await pool.query(
     `UPDATE document_status
-     SET status='returned', chairman_comment=$3, updated_at=NOW(), updated_by_user_id=$4
+     SET status='returned', chairman_comment=$3, last_updated_at=NOW(), last_updated_by_user_id=$4
      WHERE event_id=$1 AND country_id=$2`,
     [eventId, countryId, comment, req.user.id]
   );
