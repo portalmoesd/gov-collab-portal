@@ -984,7 +984,7 @@ app.post('/api/events', requireRole('admin', 'chairman', 'minister', 'supervisor
         `
         INSERT INTO event_required_sections (event_id, section_id, created_at)
         VALUES ($1, $2, NOW())
-        ON CONFLICT (event_id, country_id, section_id) DO NOTHING
+        ON CONFLICT (event_id, section_id) DO NOTHING
         `,
         [eventId, sid]
       );
@@ -1038,7 +1038,7 @@ app.put('/api/events/:id', requireRole('admin', 'chairman', 'minister', 'supervi
           `
           INSERT INTO event_required_sections (event_id, section_id, created_at)
           VALUES ($1, $2, NOW())
-          ON CONFLICT (event_id, country_id, section_id) DO NOTHING
+          ON CONFLICT (event_id, section_id) DO NOTHING
           `,
           [eventId, sid]
         );
