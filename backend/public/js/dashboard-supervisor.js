@@ -101,6 +101,8 @@
         });
         actionsTd.appendChild(ret);
       }
+      sectionsTbody.appendChild(tr);
+
     }
 
     // Enable submit to deputy when all sections approved by supervisor
