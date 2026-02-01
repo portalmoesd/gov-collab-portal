@@ -1347,8 +1347,8 @@ app.get('/api/tp/status-grid', authRequired, async (req, res) => {
       event_id: eventId,
       country_id: countryId,
       sections: rows.map(r => ({
-        id: r.id,
-        label: r.label,
+        sectionId: r.id,
+        sectionLabel: r.label,
         status: r.status,
         lastUpdatedAt: r.last_updated_at,
         lastUpdatedBy: r.last_updated_by || null,
