@@ -1147,7 +1147,7 @@ app.post('/api/tp/save', async (req, res) => {
   await pool.query(
     `
     UPDATE tp_content
-    SET html_content=$4, last_last_updated_at=NOW(), last_last_updated_by_user_id=$5, status='draft'
+    SET html_content=$4, last_updated_at=NOW(), last_updated_by_user_id=$5, status='draft'
     WHERE event_id=$1 AND country_id=$2 AND section_id=$3
     `,
     [eventId, countryId, sectionId, htmlContent, req.user.id]
@@ -1180,7 +1180,7 @@ app.post('/api/tp/submit', async (req, res) => {
   await pool.query(
     `
     UPDATE tp_content
-    SET html_content=$4, last_last_updated_at=NOW(), last_last_updated_by_user_id=$5, status='submitted'
+    SET html_content=$4, last_updated_at=NOW(), last_updated_by_user_id=$5, status='submitted'
     WHERE event_id=$1 AND country_id=$2 AND section_id=$3
     `,
     [eventId, countryId, sectionId, htmlContent, req.user.id]
@@ -1207,7 +1207,7 @@ app.post('/api/tp/return', requireRole('supervisor','chairman','admin'), async (
   await pool.query(
     `
     UPDATE tp_content
-    SET status='returned', return_note=$4, last_last_updated_at=NOW(), last_last_updated_by_user_id=$5
+    SET status='returned', return_note=$4, last_updated_at=NOW(), last_updated_by_user_id=$5
     WHERE event_id=$1 AND country_id=$2 AND section_id=$3
     `,
     [eventId, countryId, sectionId, note, req.user.id]
@@ -1232,7 +1232,7 @@ app.post('/api/tp/approve-section', requireRole('supervisor','admin'), async (re
   await pool.query(
     `
     UPDATE tp_content
-    SET status='approved_by_supervisor', last_last_updated_at=NOW(), last_last_updated_by_user_id=$4
+    SET status='approved_by_supervisor', last_updated_at=NOW(), last_updated_by_user_id=$4
     WHERE event_id=$1 AND country_id=$2 AND section_id=$3
     `,
     [eventId, countryId, sectionId, req.user.id]
@@ -1257,7 +1257,7 @@ app.post('/api/tp/approve-section-chairman', requireRole('chairman','admin'), as
   await pool.query(
     `
     UPDATE tp_content
-    SET status='approved_by_chairman', last_last_updated_at=NOW(), last_last_updated_by_user_id=$4
+    SET status='approved_by_chairman', last_updated_at=NOW(), last_updated_by_user_id=$4
     WHERE event_id=$1 AND country_id=$2 AND section_id=$3
     `,
     [eventId, countryId, sectionId, req.user.id]
@@ -1332,7 +1332,7 @@ app.get('/api/tp/status-grid', async (req, res) => {
   );
 
   const statuses = await queryAll(
-    `SELECT section_id, status, COALESCE(last_last_updated_at, last_updated_at) AS last_last_updated_at
+    `SELECT section_id, status, COALESCE(last_updated_at, last_updated_at) AS last_updated_at
      FROM tp_content
      WHERE event_id=$1 AND country_id=$2`,
     [eventId, countryId]
@@ -1345,7 +1345,7 @@ app.get('/api/tp/status-grid', async (req, res) => {
       sectionId: s.section_id,
       sectionLabel: s.label,
       status: r?.status || 'draft',
-      lastUpdatedAt: r?.last_last_updated_at || null
+      lastUpdatedAt: r?.last_updated_at || null
     };
   });
 
