@@ -6,6 +6,10 @@
   const eventSelect = document.getElementById('eventSelect');
   const sectionsTbody = document.getElementById('sectionsTbody');
   const submitDocBtn = document.getElementById('submitDocBtn');
+  const previewFullBtn = document.getElementById('previewFullBtn');
+  const modalBackdrop = document.getElementById('modalBackdrop');
+  const modalContent = document.getElementById('modalContent');
+  const modalCloseBtn = document.getElementById('modalCloseBtn');
   const endEventBtn = document.createElement('button');
   endEventBtn.className = 'btn danger';
   endEventBtn.id = 'endEventBtn';
@@ -148,6 +152,34 @@
   });
   // Supervisor dashboard does not use a single 'Open editor' button; per-section actions are in the table.
   // (Kept intentionally blank.)
+
+previewFullBtn.addEventListener('click', async () => {
+  setMsg('');
+  if (!currentEventId) return;
+  try{
+    const parts = [];
+    for (const s of currentSections){
+      const tp = await window.GCP.apiFetch(`/tp?event_id=${encodeURIComponent(currentEventId)}&section_id=${encodeURIComponent(s.sectionId)}`, { method:'GET' });
+      parts.push(`<h2 style="margin:18px 0 8px;">${window.GCP.escapeHtml(tp.sectionLabel || s.sectionLabel || '')}</h2>`);
+      parts.push(tp.htmlContent || '<div class="muted">—</div>');
+    }
+    modalContent.innerHTML = `<div style="padding:8px 2px;">${parts.join('')}</div>`;
+    modalBackdrop.style.display = 'flex';
+  }catch(e){
+    setMsg(e.message || 'Failed to preview', true);
+  }
+});
+
+modalCloseBtn.addEventListener('click', () => {
+  modalBackdrop.style.display = 'none';
+  modalContent.innerHTML = '';
+});
+modalBackdrop.addEventListener('click', (e) => {
+  if (e.target === modalBackdrop) {
+    modalBackdrop.style.display = 'none';
+    modalContent.innerHTML = '';
+  }
+});
 
   submitDocBtn.addEventListener('click', async () => {
     if (!currentEventId) return;

@@ -213,6 +213,11 @@ async function attachUser(req, res, next) {
   next();
 }
 
+
+function asyncRoute(fn){
+  return (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
+}
+
 function requireRole(...allowed) {
   const allowedSet = new Set(allowed.map(normalizeRoleKey));
   return (req, res, next) => {
@@ -222,16 +227,52 @@ function requireRole(...allowed) {
   };
 }
 
-async function ensureDocumentStatus(eventId, countryId) {
-  // Create row if missing
-  await pool.query(
-    `
-    INSERT INTO document_status (event_id, country_id, status)
-    VALUES ($1, $2, 'in_progress')
-    ON CONFLICT (event_id, country_id) DO NOTHING
-    `,
-    [eventId, countryId]
+let __docStatusSchemaCache = null;
+async function getDocumentStatusSchema() {
+  if (__docStatusSchemaCache) return __docStatusSchemaCache;
+
+  const r = await pool.query(
+    `SELECT column_name FROM information_schema.columns
+     WHERE table_schema='public' AND table_name='document_status'`
   );
+  const set = new Set(r.rows.map(x => x.column_name));
+
+  const hasCountryId = set.has('country_id');
+  const tsCol = set.has('last_updated_at') ? 'last_updated_at'
+              : (set.has('updated_at') ? 'updated_at'
+              : (set.has('last_updated_on') ? 'last_updated_on' : null));
+  const byCol = set.has('last_updated_by_user_id') ? 'last_updated_by_user_id'
+              : (set.has('updated_by_user_id') ? 'updated_by_user_id'
+              : (set.has('updated_by') ? 'updated_by' : null));
+  const commentCol = set.has('chairman_comment') ? 'chairman_comment'
+                 : (set.has('comment') ? 'comment'
+                 : (set.has('return_comment') ? 'return_comment' : null));
+
+  __docStatusSchemaCache = { hasCountryId, tsCol, byCol, commentCol };
+  return __docStatusSchemaCache;
+}
+
+async function ensureDocumentStatus(eventId, countryId) {
+  const schema = await getDocumentStatusSchema();
+  if (schema.hasCountryId) {
+    await pool.query(
+      `
+      INSERT INTO document_status (event_id, country_id, status)
+      VALUES ($1, $2, 'in_progress')
+      ON CONFLICT (event_id, country_id) DO NOTHING
+      `,
+      [eventId, countryId]
+    );
+  } else {
+    await pool.query(
+      `
+      INSERT INTO document_status (event_id, status)
+      VALUES ($1, 'in_progress')
+      ON CONFLICT (event_id) DO NOTHING
+      `,
+      [eventId]
+    );
+  }
 }
 
 async function ensureTpRow(eventId, countryId, sectionId, userId){
@@ -1370,74 +1411,149 @@ app.get('/api/tp/status-grid', authRequired, async (req, res) => {
 });
 
 
-app.post('/api/document/submit-to-supervisor', requireRole('chairman','admin'), async (req, res) => {
+app.post('/api/document/submit-to-supervisor', requireRole('chairman','admin'), asyncRoute(async (req, res) => {
   const eventId = Number(req.body?.eventId);
   if (!Number.isFinite(eventId)) return res.status(400).json({ error: 'eventId required' });
 
   const countryId = await resolveCountryIdForEvent(eventId);
   if (!countryId) return res.status(404).json({ error: 'Event not found' });
 
+  const schema = await getDocumentStatusSchema();
   await ensureDocumentStatus(eventId, countryId);
-  await pool.query(
-    `UPDATE document_status
-     SET status='submitted_to_supervisor', last_updated_at=NOW(), last_updated_by_user_id=$3
-     WHERE event_id=$1 AND country_id=$2`,
-    [eventId, countryId, req.user.id]
-  );
-  return res.json({ success:true });
-});
 
-app.post('/api/document/submit-to-chairman', requireRole('supervisor','admin'), async (req, res) => {
+  const tsCol = schema.tsCol || 'updated_at';
+  const byCol = schema.byCol || 'updated_by_user_id';
+
+  if (schema.hasCountryId) {
+    await pool.query(
+      `UPDATE document_status
+       SET status='submitted_to_supervisor', ${tsCol}=NOW(), ${byCol}=$3
+       WHERE event_id=$1 AND country_id=$2`,
+      [eventId, countryId, req.user.id]
+    );
+  } else {
+    await pool.query(
+      `UPDATE document_status
+       SET status='submitted_to_supervisor', ${tsCol}=NOW(), ${byCol}=$2
+       WHERE event_id=$1`,
+      [eventId, req.user.id]
+    );
+  }
+  return res.json({ success:true });
+}));
+
+app.post('/api/document/submit-to-chairman', requireRole('supervisor','admin'), asyncRoute(async (req, res) => {
   const eventId = Number(req.body?.eventId);
   if (!Number.isFinite(eventId)) return res.status(400).json({ error: 'eventId required' });
 
   const countryId = await resolveCountryIdForEvent(eventId);
   if (!countryId) return res.status(404).json({ error: 'Event not found' });
 
+  const schema = await getDocumentStatusSchema();
   await ensureDocumentStatus(eventId, countryId);
-  await pool.query(
-    `UPDATE document_status
-     SET status='submitted_to_chairman', last_updated_at=NOW(), last_updated_by_user_id=$3
-     WHERE event_id=$1 AND country_id=$2`,
-    [eventId, countryId, req.user.id]
-  );
-  return res.json({ success:true });
-});
 
-app.post('/api/document/approve', requireRole('chairman','admin'), async (req, res) => {
+  const tsCol = schema.tsCol || 'updated_at';
+  const byCol = schema.byCol || 'updated_by_user_id';
+
+  if (schema.hasCountryId) {
+    await pool.query(
+      `UPDATE document_status
+       SET status='submitted_to_chairman', ${tsCol}=NOW(), ${byCol}=$3
+       WHERE event_id=$1 AND country_id=$2`,
+      [eventId, countryId, req.user.id]
+    );
+  } else {
+    await pool.query(
+      `UPDATE document_status
+       SET status='submitted_to_chairman', ${tsCol}=NOW(), ${byCol}=$2
+       WHERE event_id=$1`,
+      [eventId, req.user.id]
+    );
+  }
+  return res.json({ success:true });
+}));
+
+app.post('/api/document/approve', requireRole('chairman','admin'), asyncRoute(async (req, res) => {
   const eventId = Number(req.body?.eventId);
   if (!Number.isFinite(eventId)) return res.status(400).json({ error: 'eventId required' });
 
   const countryId = await resolveCountryIdForEvent(eventId);
   if (!countryId) return res.status(404).json({ error: 'Event not found' });
 
+  const schema = await getDocumentStatusSchema();
   await ensureDocumentStatus(eventId, countryId);
-  await pool.query(
-    `UPDATE document_status
-     SET status='approved', last_updated_at=NOW(), last_updated_by_user_id=$3
-     WHERE event_id=$1 AND country_id=$2`,
-    [eventId, countryId, req.user.id]
-  );
-  return res.json({ success:true });
-});
 
-app.post('/api/document/return', requireRole('chairman','admin'), async (req, res) => {
+  const tsCol = schema.tsCol || 'updated_at';
+  const byCol = schema.byCol || 'updated_by_user_id';
+
+  if (schema.hasCountryId) {
+    await pool.query(
+      `UPDATE document_status
+       SET status='approved_by_chairman', ${tsCol}=NOW(), ${byCol}=$3
+       WHERE event_id=$1 AND country_id=$2`,
+      [eventId, countryId, req.user.id]
+    );
+  } else {
+    await pool.query(
+      `UPDATE document_status
+       SET status='approved_by_chairman', ${tsCol}=NOW(), ${byCol}=$2
+       WHERE event_id=$1`,
+      [eventId, req.user.id]
+    );
+  }
+  return res.json({ success:true });
+}));
+
+app.post('/api/document/return', requireRole('chairman','admin'), asyncRoute(async (req, res) => {
   const eventId = Number(req.body?.eventId);
-  const comment = String(req.body?.comment || '');
+  const comment = (req.body?.comment ?? '').toString();
   if (!Number.isFinite(eventId)) return res.status(400).json({ error: 'eventId required' });
 
   const countryId = await resolveCountryIdForEvent(eventId);
   if (!countryId) return res.status(404).json({ error: 'Event not found' });
 
+  const schema = await getDocumentStatusSchema();
   await ensureDocumentStatus(eventId, countryId);
-  await pool.query(
-    `UPDATE document_status
-     SET status='returned', chairman_comment=$3, last_updated_at=NOW(), last_updated_by_user_id=$4
-     WHERE event_id=$1 AND country_id=$2`,
-    [eventId, countryId, comment, req.user.id]
-  );
+
+  const tsCol = schema.tsCol || 'updated_at';
+  const byCol = schema.byCol || 'updated_by_user_id';
+  const commentCol = schema.commentCol;
+
+  if (schema.hasCountryId) {
+    if (commentCol) {
+      await pool.query(
+        `UPDATE document_status
+         SET status='returned_by_chairman', ${commentCol}=$3, ${tsCol}=NOW(), ${byCol}=$4
+         WHERE event_id=$1 AND country_id=$2`,
+        [eventId, countryId, comment, req.user.id]
+      );
+    } else {
+      await pool.query(
+        `UPDATE document_status
+         SET status='returned_by_chairman', ${tsCol}=NOW(), ${byCol}=$3
+         WHERE event_id=$1 AND country_id=$2`,
+        [eventId, countryId, req.user.id]
+      );
+    }
+  } else {
+    if (commentCol) {
+      await pool.query(
+        `UPDATE document_status
+         SET status='returned_by_chairman', ${commentCol}=$2, ${tsCol}=NOW(), ${byCol}=$3
+         WHERE event_id=$1`,
+        [eventId, comment, req.user.id]
+      );
+    } else {
+      await pool.query(
+        `UPDATE document_status
+         SET status='returned_by_chairman', ${tsCol}=NOW(), ${byCol}=$2
+         WHERE event_id=$1`,
+        [eventId, req.user.id]
+      );
+    }
+  }
   return res.json({ success:true });
-});
+}));
 
 app.get('/api/library', requireRole('admin','chairman','minister','supervisor','super_collaborator','protocol'), async (req, res) => {
   // List approved documents for a country
