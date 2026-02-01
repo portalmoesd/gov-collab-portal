@@ -225,14 +225,13 @@ async function ensureDocumentStatus(eventId, countryId) {
   );
 }
 
-async function ensureTpRow(eventId, countryId, sectionId, userId) {
+async function ensureTpRow(eventId, countryId, sectionId, userId){
+  // tp_content is unique on (event_id, country_id, section_id) in the deployed DB
   await pool.query(
-    `
-    INSERT INTO tp_content (event_id, country_id, section_id, html_content, status, last_updated_by_user_id, last_updated_at)
-    VALUES ($1, $2, $3, '', 'draft', $4, NOW())
-    ON CONFLICT (event_id, country_id, section_id) DO NOTHING
-    `,
-    [eventId, countryId, sectionId, userId || null]
+    `INSERT INTO tp_content (event_id, country_id, section_id, html_content, status, status_comment, last_updated_by_user_id, last_updated_at)
+     VALUES ($1,$2,$3,'','draft',NULL,$4,NOW())
+     ON CONFLICT (event_id, country_id, section_id) DO NOTHING`,
+    [eventId, countryId, sectionId, userId]
   );
 }
 
@@ -985,7 +984,7 @@ app.post('/api/events', requireRole('admin', 'chairman', 'minister', 'supervisor
         `
         INSERT INTO event_required_sections (event_id, section_id, created_at)
         VALUES ($1, $2, NOW())
-        ON CONFLICT (event_id, section_id) DO NOTHING
+        ON CONFLICT (event_id, country_id, section_id) DO NOTHING
         `,
         [eventId, sid]
       );
@@ -1039,7 +1038,7 @@ app.put('/api/events/:id', requireRole('admin', 'chairman', 'minister', 'supervi
           `
           INSERT INTO event_required_sections (event_id, section_id, created_at)
           VALUES ($1, $2, NOW())
-          ON CONFLICT (event_id, section_id) DO NOTHING
+          ON CONFLICT (event_id, country_id, section_id) DO NOTHING
           `,
           [eventId, sid]
         );
@@ -1098,12 +1097,11 @@ app.get('/api/tp', async (req, res) => {
 
   const row = await queryOne(
     `
-    SELECT t.html_content, t.status, t.status_comment, COALESCE(t.last_updated_at, t.updated_at) AS last_updated_at, COALESCE(t.last_updated_by_user_id, t.updated_by_user_id) AS last_updated_by_user_id FROM tp_content t
-    JOIN sections s ON s.id = t.section_id
-    JOIN events e ON e.id = t.event_id
-    JOIN countries c ON c.id = t.country_id
-    LEFT JOIN users u ON u.id = COALESCE(t.last_updated_by_user_id, t.updated_by_user_id)
-    WHERE t.event_id=$1 AND t.country_id=$2 AND t.section_id=$3
+    SELECT t.html_content, t.status, t.status_comment,
+       t.last_updated_at, u.full_name AS last_updated_by
+FROM tp_content t
+LEFT JOIN users u ON u.id = t.last_updated_by_user_id
+WHERE t.event_id=$1 AND t.country_id=$2 AND t.section_id=$3
     `,
     [eventId, countryId, sectionId]
   );
@@ -1149,7 +1147,7 @@ app.post('/api/tp/save', async (req, res) => {
   await pool.query(
     `
     UPDATE tp_content
-    SET html_content=$4, last_updated_at=NOW(), last_updated_by_user_id=$5, status='draft'
+    SET html_content=$4, last_last_updated_at=NOW(), last_last_updated_by_user_id=$5, status='draft'
     WHERE event_id=$1 AND country_id=$2 AND section_id=$3
     `,
     [eventId, countryId, sectionId, htmlContent, req.user.id]
@@ -1182,7 +1180,7 @@ app.post('/api/tp/submit', async (req, res) => {
   await pool.query(
     `
     UPDATE tp_content
-    SET html_content=$4, last_updated_at=NOW(), last_updated_by_user_id=$5, status='submitted'
+    SET html_content=$4, last_last_updated_at=NOW(), last_last_updated_by_user_id=$5, status='submitted'
     WHERE event_id=$1 AND country_id=$2 AND section_id=$3
     `,
     [eventId, countryId, sectionId, htmlContent, req.user.id]
@@ -1209,7 +1207,7 @@ app.post('/api/tp/return', requireRole('supervisor','chairman','admin'), async (
   await pool.query(
     `
     UPDATE tp_content
-    SET status='returned', return_note=$4, last_updated_at=NOW(), last_updated_by_user_id=$5
+    SET status='returned', return_note=$4, last_last_updated_at=NOW(), last_last_updated_by_user_id=$5
     WHERE event_id=$1 AND country_id=$2 AND section_id=$3
     `,
     [eventId, countryId, sectionId, note, req.user.id]
@@ -1234,7 +1232,7 @@ app.post('/api/tp/approve-section', requireRole('supervisor','admin'), async (re
   await pool.query(
     `
     UPDATE tp_content
-    SET status='approved_by_supervisor', last_updated_at=NOW(), last_updated_by_user_id=$4
+    SET status='approved_by_supervisor', last_last_updated_at=NOW(), last_last_updated_by_user_id=$4
     WHERE event_id=$1 AND country_id=$2 AND section_id=$3
     `,
     [eventId, countryId, sectionId, req.user.id]
@@ -1259,7 +1257,7 @@ app.post('/api/tp/approve-section-chairman', requireRole('chairman','admin'), as
   await pool.query(
     `
     UPDATE tp_content
-    SET status='approved_by_chairman', last_updated_at=NOW(), last_updated_by_user_id=$4
+    SET status='approved_by_chairman', last_last_updated_at=NOW(), last_last_updated_by_user_id=$4
     WHERE event_id=$1 AND country_id=$2 AND section_id=$3
     `,
     [eventId, countryId, sectionId, req.user.id]
@@ -1330,11 +1328,11 @@ app.get('/api/tp/status-grid', async (req, res) => {
      JOIN sections s ON s.id=ers.section_id
      WHERE ers.event_id=$1
      ORDER BY s.order_index ASC, s.id ASC`,
-    [eventId]
+    [eventId, countryId]
   );
 
   const statuses = await queryAll(
-    `SELECT section_id, status, COALESCE(last_updated_at, updated_at) AS last_updated_at
+    `SELECT section_id, status, COALESCE(last_last_updated_at, last_updated_at) AS last_last_updated_at
      FROM tp_content
      WHERE event_id=$1 AND country_id=$2`,
     [eventId, countryId]
@@ -1347,7 +1345,7 @@ app.get('/api/tp/status-grid', async (req, res) => {
       sectionId: s.section_id,
       sectionLabel: s.label,
       status: r?.status || 'draft',
-      lastUpdatedAt: r?.last_updated_at || null
+      lastUpdatedAt: r?.last_last_updated_at || null
     };
   });
 
