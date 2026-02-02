@@ -410,14 +410,17 @@ app.get('/api/auth/me', authRequired, attachUser, async (req, res) => {
   });
 });
 
-// Alias endpoints (Spec v2)
-app.get('/api/me', async (req, res) => {
+// Alias endpoint (Spec v2 / older frontends).
+// NOTE: must be protected; otherwise `req.user` is undefined and the frontend
+// will bounce back to the login page.
+app.get('/api/me', authRequired, attachUser, async (req, res) => {
+  const u = req.user;
   return res.json({
-    id: req.user.id,
-    username: req.user.username,
-    fullName: req.user.full_name,
-    email: req.user.email,
-    role: req.user.role_key,
+    id: u.id,
+    username: u.username,
+    fullName: u.full_name,
+    email: u.email,
+    role: u.role_key,
   });
 });
 
