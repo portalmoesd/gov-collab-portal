@@ -122,35 +122,20 @@
       approveBtn.textContent = 'Approve section';
       approveBtn.style.marginLeft = '8px';
       approveBtn.addEventListener('click', async () => {
-        try{
+        msgEl.classList.add('hidden');
+        try {
           await window.GCP.apiFetch('/tp/approve-section-chairman', {
-            method:'POST',
+            method: 'POST',
             body: JSON.stringify({ eventId: currentEventId, sectionId: s.sectionId })
           });
           await refresh();
-        }catch(e){
-          setMsg(e.message || 'Failed to approve section', true);
+        } catch (e) {
+          console.error(e);
+          msgEl.textContent = 'Server error';
+          msgEl.classList.remove('hidden');
         }
       });
       actionsTd.appendChild(approveBtn);
-
-      const returnBtn = document.createElement('button');
-      returnBtn.className = 'btn danger';
-      returnBtn.textContent = 'Return section';
-      returnBtn.style.marginLeft = '8px';
-      returnBtn.addEventListener('click', async () => {
-        const note = prompt('Return note (optional):', '') || '';
-        try{
-          await window.GCP.apiFetch('/tp/return', {
-            method:'POST',
-            body: JSON.stringify({ eventId: currentEventId, sectionId: s.sectionId, note })
-          });
-          await refresh();
-        }catch(e){
-          setMsg(e.message || 'Failed to return section', true);
-        }
-      });
-      actionsTd.appendChild(returnBtn);
 
       sectionsTbody.appendChild(tr);
     }
@@ -175,10 +160,6 @@
     }
   });
 await refresh();
-    }catch(e){
-      setMsg(e.message || 'Failed to return document', true);
-    }
-  });
 
   previewBtn.addEventListener('click', async () => {
     setMsg('');
