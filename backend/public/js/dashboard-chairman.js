@@ -16,12 +16,8 @@
   const modalContent = document.getElementById("modalContent");
   const closeModalBtn = document.getElementById("closeModalBtn");
 
-  // Insert End Event button (admin/supervisor/chairman/protocol)
-  const canEndEvent = ['admin','supervisor','chairman','protocol'].includes(role);
-  if (canEndEvent) {
-    // place next to preview button
-    previewBtn.parentElement.insertBefore( previewBtn);
-  }
+  // NOTE: End-event controls are not shown on this dashboard.
+  // Keep the DOM manipulation minimal to avoid runtime errors.
 
   let currentEventId = null;
   let currentSections = [];
@@ -80,7 +76,7 @@
     }
     currentEventId = evId;
 
-    if (canEndEvent) endEventBtn.style.display = 'inline-block';
+    // End-event button intentionally not present on this dashboard.
 
     // Document status
     const ds = await window.GCP.apiFetch(`/tp/document-status?event_id=${encodeURIComponent(currentEventId)}`, { method:'GET' });
