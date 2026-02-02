@@ -187,6 +187,11 @@ await refresh();
   });
 eventSelect.addEventListener('change', refresh);
 
-  await loadEvents();
-  await refresh();
+  try {
+    await loadEvents();
+    await refresh();
+  } catch (e) {
+    setMsg((e && e.message) ? e.message : 'Failed to load events', true);
+    eventSelect.disabled = true;
+  }
 })();

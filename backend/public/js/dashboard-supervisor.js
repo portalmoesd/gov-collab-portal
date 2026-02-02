@@ -151,5 +151,10 @@ modalBackdrop.addEventListener('click', (e) => {
     modalContent.innerHTML = '';
   }
 });
-  await loadUpcoming();
+  try {
+    await loadUpcoming();
+  } catch (e) {
+    setMsg((e && e.message) ? e.message : 'Failed to load events', true);
+    try { eventSelect.disabled = true; } catch (_) {}
+  }
 })();
