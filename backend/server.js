@@ -31,6 +31,15 @@ const pool = new Pool({
 });
 
 const app = express();
+app.set('etag', false);
+
+// Prevent browsers/CDNs from caching API responses (avoids 304 with empty body)
+app.use('/api', (req, res, next) => {
+  res.set('Cache-Control', 'no-store');
+  res.set('Pragma', 'no-cache');
+  res.set('Expires', '0');
+  next();
+});
 
 // Avoid 304/ETag issues for fetch() on API endpoints
 app.set('etag', false);
