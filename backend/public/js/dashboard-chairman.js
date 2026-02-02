@@ -9,7 +9,6 @@
   const docStatusBox = document.getElementById("docStatusBox");
   const sectionsTbody = document.getElementById("sectionsTbody");
   const approveDocBtn = document.getElementById("approveDocBtn");
-  const returnDocBtn = document.getElementById("returnDocBtn");
   const previewBtn = document.getElementById("previewBtn");
   const msg = document.getElementById("msg");
 
@@ -19,7 +18,6 @@
 
   // Insert End Event button (admin/supervisor/chairman/protocol)
   const canEndEvent = ['admin','supervisor','chairman','protocol'].includes(role);
-  const endEventBtn = document.createElement('button');
   endEventBtn.className = 'btn danger';
   endEventBtn.textContent = 'End event';
   endEventBtn.style.display = 'none';
@@ -79,7 +77,7 @@
     if (!Number.isFinite(evId)) {
       currentEventId = null;
       approveDocBtn.disabled = true;
-      returnDocBtn.disabled = true;
+      
       previewBtn.disabled = true;
       endEventBtn.style.display = 'none';
       return;
@@ -158,7 +156,7 @@
     }
 
     approveDocBtn.disabled = false;
-    returnDocBtn.disabled = false;
+    
     previewBtn.disabled = false;
   }
 
@@ -176,18 +174,7 @@
       setMsg(e.message || 'Failed to approve document', true);
     }
   });
-
-  returnDocBtn.addEventListener('click', async () => {
-    setMsg('');
-    if (!currentEventId) return;
-    const note = prompt('Return note (optional):', '') || '';
-    if (!confirm('Return the full document?')) return;
-    try{
-      await window.GCP.apiFetch('/document/return', {
-        method:'POST',
-        body: JSON.stringify({ eventId: currentEventId, note })
-      });
-      await refresh();
+await refresh();
     }catch(e){
       setMsg(e.message || 'Failed to return document', true);
     }
@@ -221,23 +208,7 @@
       modalContent.innerHTML = '';
     }
   });
-
-  endEventBtn.addEventListener('click', async () => {
-    setMsg('');
-    if (!currentEventId) return;
-    if (!confirm('End this event?')) return;
-    try{
-      await window.GCP.apiFetch(`/events/${currentEventId}/end`, { method:'POST' });
-      setMsg('Event ended.');
-      await loadEvents();
-      eventSelect.value = '';
-      await refresh();
-    }catch(e){
-      setMsg(e.message || 'Failed to end event', true);
-    }
-  });
-
-  eventSelect.addEventListener('change', refresh);
+eventSelect.addEventListener('change', refresh);
 
   await loadEvents();
   await refresh();
