@@ -18,12 +18,9 @@
 
   // Insert End Event button (admin/supervisor/chairman/protocol)
   const canEndEvent = ['admin','supervisor','chairman','protocol'].includes(role);
-  endEventBtn.className = 'btn danger';
-  endEventBtn.textContent = 'End event';
-  endEventBtn.style.display = 'none';
   if (canEndEvent) {
     // place next to preview button
-    previewBtn.parentElement.insertBefore(endEventBtn, previewBtn);
+    previewBtn.parentElement.insertBefore( previewBtn);
   }
 
   let currentEventId = null;
@@ -79,7 +76,6 @@
       approveDocBtn.disabled = true;
       
       previewBtn.disabled = true;
-      endEventBtn.style.display = 'none';
       return;
     }
     currentEventId = evId;
