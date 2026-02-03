@@ -1261,7 +1261,7 @@ app.post('/api/tp/submit', async (req, res) => {
 app.post('/api/tp/return', requireRole('supervisor','chairman','admin'), async (req, res) => {
   const eventId = Number(req.body?.eventId);
   const sectionId = Number(req.body?.sectionId);
-  const note = String(req.body?.note || '');
+  const note = String((req.body?.note ?? req.body?.comment) || '');
 
   if (!Number.isFinite(eventId) || !Number.isFinite(sectionId)) {
     return res.status(400).json({ error: 'eventId and sectionId required' });

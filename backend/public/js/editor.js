@@ -154,7 +154,7 @@
     try{
       await window.GCP.apiFetch("/tp/return", {
         method:"POST",
-        body: JSON.stringify({ eventId, sectionId, comment })
+        body: JSON.stringify({ eventId, sectionId, note: comment })
       });
       await load();
       msg.textContent = "Returned.";
