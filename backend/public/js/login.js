@@ -21,7 +21,7 @@
     try { decoded = decodeURIComponent(raw); } catch { decoded = raw; }
     // allow only same-origin relative pages
     if (decoded.includes('://') || decoded.startsWith('//')) return null;
-    const allowed = /^(dashboard-[a-z-]+\.html|calendar\.html|library\.html|admin\.html|tp-editor\.html)([?#].*)?$/i;
+    const allowed = /^(dashboard-[a-z-]+\.html|calendar\.html|library\.html|admin\.html|tp-editor\.html|editor\.html)([?#].*)?$/i;
     return allowed.test(decoded) ? decoded : null;
   }
 

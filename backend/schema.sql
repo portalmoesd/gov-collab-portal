@@ -14,12 +14,6 @@ EXCEPTION
   WHEN duplicate_object THEN NULL;
 END $$;
 
-DO $$ BEGIN
-  CREATE TYPE document_overall_status AS ENUM ('in_progress', 'submitted_to_chairman', 'approved', 'returned');
-EXCEPTION
-  WHEN duplicate_object THEN NULL;
-END $$;
-
 -- Roles
 CREATE TABLE IF NOT EXISTS roles (
   id            SERIAL PRIMARY KEY,
@@ -137,7 +131,7 @@ CREATE TABLE IF NOT EXISTS document_status (
   id               SERIAL PRIMARY KEY,
   event_id          INTEGER NOT NULL REFERENCES events(id) ON DELETE CASCADE,
   country_id        INTEGER NOT NULL REFERENCES countries(id),
-  status            document_overall_status NOT NULL DEFAULT 'in_progress',
+  status            TEXT NOT NULL DEFAULT 'in_progress',
   chairman_comment  TEXT,
   updated_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   CONSTRAINT uq_document_status_event_country UNIQUE (event_id, country_id)

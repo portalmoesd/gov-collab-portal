@@ -69,6 +69,11 @@ async function ensureSchema() {
       PRIMARY KEY (user_id, country_id)
     )
   `);
+
+  // Document status: avoid enum mismatch and keep audit columns consistent
+  await pool.query(`ALTER TABLE document_status ADD COLUMN IF NOT EXISTS last_updated_by_user_id INTEGER`).catch(()=>{});
+  await pool.query(`ALTER TABLE document_status ADD COLUMN IF NOT EXISTS chairman_comment TEXT`).catch(()=>{});
+  await pool.query(`ALTER TABLE document_status ALTER COLUMN status TYPE TEXT USING status::text`).catch(()=>{});
 }
 
 async function ensureRolesExist() {
@@ -326,10 +331,10 @@ async function getEventWithSections(eventId, countryIdForStatuses = null) {
 
     sectionStatuses = await queryAll(
       `
-      SELECT t.section_id, t.status, t.status_comment, COALESCE(t.last_updated_at, t.updated_at) AS last_updated_at,
+      SELECT t.section_id, t.status, t.status_comment, t.last_updated_at AS last_updated_at,
              u.full_name AS last_updated_by
       FROM tp_content t
-      LEFT JOIN users u ON u.id = COALESCE(t.last_updated_by_user_id, t.updated_by_user_id)
+      LEFT JOIN users u ON u.id = t.last_updated_by_user_id
       WHERE t.event_id = $1 AND t.country_id = $2
       `,
       [eventId, countryIdForStatuses]
@@ -402,7 +407,7 @@ app.get('/api/auth/me', authRequired, attachUser, async (req, res) => {
 });
 
 // Alias endpoints (Spec v2)
-app.get('/api/me', async (req, res) => {
+app.get('/api/me', authRequired, attachUser, async (req, res) => {
   return res.json({
     id: req.user.id,
     username: req.user.username,
@@ -412,7 +417,7 @@ app.get('/api/me', async (req, res) => {
   });
 });
 
-app.get('/api/roles', requireRole('admin'), async (req, res) => {
+app.get('/api/roles', authRequired, attachUser, requireRole('admin'), async (req, res) => {
   const rows = await queryAll(`SELECT key, label FROM roles ORDER BY id`, []);
   return res.json(rows);
 });
@@ -514,7 +519,7 @@ app.put('/api/users/:id', requireRole('admin'), async (req, res) => {
 
   if (fields.length === 0) return res.status(400).json({ error: 'No fields to update' });
 
-  fields.push(`last_updated_at=NOW()`);
+  fields.push(`updated_at=NOW()`);
 
   values.push(id);
 
@@ -536,13 +541,14 @@ app.put('/api/users/:id', requireRole('admin'), async (req, res) => {
   if (!out) return res.status(404).json({ error: 'User not found' });
 
   
-  // If role is changed to a non-collaborator role, clear any assignments (Spec v2)
-  const finalRole = normalizeRoleKey(role || roleRow?.key || '');
+  // If user's final role is not collaborator/super-collaborator, clear assignments (Spec v2)
+  const finalRole = normalizeRoleKey(out.role_key);
   if (!['collaborator','super_collaborator'].includes(finalRole)) {
-    await pool.query(`DELETE FROM section_assignments WHERE user_id=$1`, [userId]);
-    await pool.query(`DELETE FROM country_assignments WHERE user_id=$1`, [userId]);
+    await pool.query(`DELETE FROM section_assignments WHERE user_id=$1`, [id]);
+    await pool.query(`DELETE FROM country_assignments WHERE user_id=$1`, [id]);
   }
-return res.json(pickUserPayload(out));
+
+  return res.json(pickUserPayload(out));
   } catch (e) {
     if (e && e.code === '23505') return res.status(409).json({ error: 'Username or email already exists' });
     console.error('User update failed:', e);
@@ -565,7 +571,7 @@ app.delete('/api/users/:id', requireRole('admin'), async (req, res) => {
      SET is_active=false,
          deleted_at=NOW(),
          deleted_by_user_id=$2,
-         last_updated_at=NOW()
+         updated_at=NOW()
      WHERE id=$1`,
     [id, req.user.id]
   );
@@ -643,7 +649,7 @@ app.put('/api/sections/:id', requireRole('admin'), async (req, res) => {
   if (isActive !== undefined) { fields.push(`is_active=$${idx++}`); values.push(Boolean(isActive)); }
 
   if (fields.length === 0) return res.status(400).json({ error: 'No fields to update' });
-  fields.push(`last_updated_at=NOW()`);
+  fields.push(`updated_at=NOW()`);
 
   values.push(id);
   await pool.query(`UPDATE sections SET ${fields.join(', ')} WHERE id=$${idx}`, values);
@@ -657,7 +663,7 @@ app.delete('/api/sections/:id', requireRole('admin'), async (req, res) => {
   const id = Number(req.params.id);
   if (!Number.isFinite(id)) return res.status(400).json({ error: 'Invalid id' });
 
-  await pool.query(`UPDATE sections SET is_active=false, last_updated_at=NOW() WHERE id=$1`, [id]);
+  await pool.query(`UPDATE sections SET is_active=false, updated_at=NOW() WHERE id=$1`, [id]);
   return res.json({ ok: true });
 });
 
@@ -1074,7 +1080,7 @@ app.put('/api/events/:id', requireRole('admin', 'chairman', 'minister', 'supervi
     if (isActive !== undefined) { fields.push(`is_active=$${idx++}`); vals.push(Boolean(isActive)); }
 
     if (fields.length) {
-      fields.push(`last_updated_at=NOW()`);
+      fields.push(`updated_at=NOW()`);
       vals.push(eventId);
       await client.query(`UPDATE events SET ${fields.join(', ')} WHERE id=$${idx}`, vals);
     }
@@ -1257,7 +1263,7 @@ app.post('/api/tp/return', requireRole('supervisor','chairman','admin'), async (
   await pool.query(
     `
     UPDATE tp_content
-    SET status='returned', return_note=$4, last_updated_at=NOW(), last_updated_by_user_id=$5
+    SET status='returned', status_comment=$4, last_updated_at=NOW(), last_updated_by_user_id=$5
     WHERE event_id=$1 AND country_id=$2 AND section_id=$3
     `,
     [eventId, countryId, sectionId, note, req.user.id]
@@ -1489,14 +1495,14 @@ app.post('/api/document/approve', requireRole('chairman','admin'), asyncRoute(as
   if (schema.hasCountryId) {
     await pool.query(
       `UPDATE document_status
-       SET status='approved_by_chairman', ${tsCol}=NOW(), ${byCol}=$3
+       SET status='approved', ${tsCol}=NOW(), ${byCol}=$3
        WHERE event_id=$1 AND country_id=$2`,
       [eventId, countryId, req.user.id]
     );
   } else {
     await pool.query(
       `UPDATE document_status
-       SET status='approved_by_chairman', ${tsCol}=NOW(), ${byCol}=$2
+       SET status='approved', ${tsCol}=NOW(), ${byCol}=$2
        WHERE event_id=$1`,
       [eventId, req.user.id]
     );
@@ -1523,14 +1529,14 @@ app.post('/api/document/return', requireRole('chairman','admin'), asyncRoute(asy
     if (commentCol) {
       await pool.query(
         `UPDATE document_status
-         SET status='returned_by_chairman', ${commentCol}=$3, ${tsCol}=NOW(), ${byCol}=$4
+         SET status='returned', ${commentCol}=$3, ${tsCol}=NOW(), ${byCol}=$4
          WHERE event_id=$1 AND country_id=$2`,
         [eventId, countryId, comment, req.user.id]
       );
     } else {
       await pool.query(
         `UPDATE document_status
-         SET status='returned_by_chairman', ${tsCol}=NOW(), ${byCol}=$3
+         SET status='returned', ${tsCol}=NOW(), ${byCol}=$3
          WHERE event_id=$1 AND country_id=$2`,
         [eventId, countryId, req.user.id]
       );
@@ -1539,14 +1545,14 @@ app.post('/api/document/return', requireRole('chairman','admin'), asyncRoute(asy
     if (commentCol) {
       await pool.query(
         `UPDATE document_status
-         SET status='returned_by_chairman', ${commentCol}=$2, ${tsCol}=NOW(), ${byCol}=$3
+         SET status='returned', ${commentCol}=$2, ${tsCol}=NOW(), ${byCol}=$3
          WHERE event_id=$1`,
         [eventId, comment, req.user.id]
       );
     } else {
       await pool.query(
         `UPDATE document_status
-         SET status='returned_by_chairman', ${tsCol}=NOW(), ${byCol}=$2
+         SET status='returned', ${tsCol}=NOW(), ${byCol}=$2
          WHERE event_id=$1`,
         [eventId, req.user.id]
       );
@@ -1594,7 +1600,7 @@ app.get('/api/library/document', requireRole('admin','chairman','minister','supe
   const sections = await queryAll(
     `
     SELECT s.id AS section_id, s.label AS section_label, s.order_index,
-           t.html_content, t.status, COALESCE(t.last_updated_at, t.updated_at) AS last_updated_at
+           t.html_content, t.status, t.last_updated_at AS last_updated_at
     FROM event_required_sections ers
     JOIN sections s ON s.id = ers.section_id
     LEFT JOIN tp_content t
