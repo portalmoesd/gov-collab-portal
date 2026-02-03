@@ -43,6 +43,11 @@
     btnApprove.style.display = "none";
     btnReturn.style.display = "none";
   }
+
+  // Submit is only for collaborators (they submit their draft for review)
+  if (!(role === "collaborator" || role === "super_collaborator")){
+    btnSubmit.style.display = "none";
+  }
   if (isViewer){
     btnSave.style.display = "none";
     btnSubmit.style.display = "none";

@@ -1140,7 +1140,10 @@ app.get('/api/tp', async (req, res) => {
   }
 
   const roleKey = normalizeRoleKey(req.user.role_key);
-  if (roleKey === 'protocol') return res.status(403).json({ error: 'Forbidden' });
+  if (!(roleKey === 'collaborator' || roleKey === 'super_collaborator')) {
+    return res.status(403).json({ error: 'Forbidden' });
+  }
+
 
   const ok = await assertUserCanAccessEventSection(req.user, eventId, sectionId);
   if (!ok) return res.status(403).json({ error: 'Forbidden' });
@@ -1202,7 +1205,10 @@ app.post('/api/tp/save', async (req, res) => {
   }
 
   const roleKey = normalizeRoleKey(req.user.role_key);
-  if (roleKey === 'protocol') return res.status(403).json({ error: 'Forbidden' });
+  if (!(roleKey === 'collaborator' || roleKey === 'super_collaborator')) {
+    return res.status(403).json({ error: 'Forbidden' });
+  }
+
 
   const ok = await assertUserCanAccessEventSection(req.user, eventId, sectionId);
   if (!ok) return res.status(403).json({ error: 'Forbidden' });
@@ -1235,7 +1241,10 @@ app.post('/api/tp/submit', async (req, res) => {
   }
 
   const roleKey = normalizeRoleKey(req.user.role_key);
-  if (roleKey === 'protocol') return res.status(403).json({ error: 'Forbidden' });
+  if (!(roleKey === 'collaborator' || roleKey === 'super_collaborator')) {
+    return res.status(403).json({ error: 'Forbidden' });
+  }
+
 
   const ok = await assertUserCanAccessEventSection(req.user, eventId, sectionId);
   if (!ok) return res.status(403).json({ error: 'Forbidden' });
