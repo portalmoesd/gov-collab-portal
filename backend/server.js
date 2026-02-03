@@ -1130,7 +1130,7 @@ app.post('/api/events/:id/end', requireRole('admin','supervisor','chairman','pro
 
 /** 7.7 Talking Points Content **/
 
-app.get('/api/tp', async (req, res) => {
+app.get('/api/tp', authRequired, async (req, res) => {
   try {
   const eventId = Number(req.query.event_id);
   const sectionId = Number(req.query.section_id);
@@ -1140,13 +1140,15 @@ app.get('/api/tp', async (req, res) => {
   }
 
   const roleKey = normalizeRoleKey(req.user.role_key);
-  if (!(roleKey === 'collaborator' || roleKey === 'super_collaborator')) {
-    return res.status(403).json({ error: 'Forbidden' });
+  const isCollab = (roleKey === 'collaborator' || roleKey === 'super_collaborator');
+  const isElevated = ['admin','supervisor','chairman','minister','protocol','viewer'].includes(roleKey);
+  if (!isCollab && !isElevated) return res.status(403).json({ error: 'Forbidden' });
+
+  // Collaborators may only access their assigned event/country + section.
+  if (isCollab) {
+    const ok = await assertUserCanAccessEventSection(req.user, eventId, sectionId);
+    if (!ok) return res.status(403).json({ error: 'Forbidden' });
   }
-
-
-  const ok = await assertUserCanAccessEventSection(req.user, eventId, sectionId);
-  if (!ok) return res.status(403).json({ error: 'Forbidden' });
 
   const countryId = await resolveCountryIdForEvent(eventId);
   if (!countryId) return res.status(404).json({ error: 'Event not found' });
@@ -1195,7 +1197,7 @@ return res.json({
   }
 });
 
-app.post('/api/tp/save', async (req, res) => {
+app.post('/api/tp/save', authRequired, async (req, res) => {
   const eventId = Number(req.body?.eventId);
   const sectionId = Number(req.body?.sectionId);
   const htmlContent = String(req.body?.htmlContent || '');
@@ -1205,13 +1207,15 @@ app.post('/api/tp/save', async (req, res) => {
   }
 
   const roleKey = normalizeRoleKey(req.user.role_key);
-  if (!(roleKey === 'collaborator' || roleKey === 'super_collaborator')) {
-    return res.status(403).json({ error: 'Forbidden' });
+  const isCollab = (roleKey === 'collaborator' || roleKey === 'super_collaborator');
+  const canEdit = ['collaborator','super_collaborator','supervisor','chairman','admin'].includes(roleKey);
+  if (!canEdit) return res.status(403).json({ error: 'Forbidden' });
+
+  // Collaborators may only edit their assigned event/country + section.
+  if (isCollab) {
+    const ok = await assertUserCanAccessEventSection(req.user, eventId, sectionId);
+    if (!ok) return res.status(403).json({ error: 'Forbidden' });
   }
-
-
-  const ok = await assertUserCanAccessEventSection(req.user, eventId, sectionId);
-  if (!ok) return res.status(403).json({ error: 'Forbidden' });
 
   const countryId = await resolveCountryIdForEvent(eventId);
   if (!countryId) return res.status(404).json({ error: 'Event not found' });
@@ -1219,14 +1223,28 @@ app.post('/api/tp/save', async (req, res) => {
   await ensureDocumentStatus(eventId, countryId);
   await ensureTpRow(eventId, countryId, sectionId, req.user.id);
 
-  await pool.query(
-    `
-    UPDATE tp_content
-    SET html_content=$4, last_updated_at=NOW(), last_updated_by_user_id=$5, status='draft'
-    WHERE event_id=$1 AND country_id=$2 AND section_id=$3
-    `,
-    [eventId, countryId, sectionId, htmlContent, req.user.id]
-  );
+  // Save behavior:
+  // - Collaborator save always moves to 'draft'
+  // - Supervisor/Deputy/Admin save does NOT change status (they use Approve/Return)
+  if (isCollab) {
+    await pool.query(
+      `
+      UPDATE tp_content
+      SET html_content=$4, last_updated_at=NOW(), last_updated_by_user_id=$5, status='draft'
+      WHERE event_id=$1 AND country_id=$2 AND section_id=$3
+      `,
+      [eventId, countryId, sectionId, htmlContent, req.user.id]
+    );
+  } else {
+    await pool.query(
+      `
+      UPDATE tp_content
+      SET html_content=$4, last_updated_at=NOW(), last_updated_by_user_id=$5
+      WHERE event_id=$1 AND country_id=$2 AND section_id=$3
+      `,
+      [eventId, countryId, sectionId, htmlContent, req.user.id]
+    );
+  }
 
   return res.json({ success:true });
 });
