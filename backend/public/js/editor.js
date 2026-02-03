@@ -11,6 +11,7 @@
   const msg = document.getElementById("msg");
   const meta = document.getElementById("meta");
   const statusEl = document.getElementById("statusEl");
+  const returnCommentBox = document.getElementById("returnCommentBox");
 
   const btnSave = document.getElementById("btnSave");
   const btnSubmit = document.getElementById("btnSubmit");
@@ -68,8 +69,19 @@
       <div><b>Country:</b> ${window.GCP.escapeHtml(tp.countryName)}</div>
       <div><b>Section:</b> ${window.GCP.escapeHtml(tp.sectionLabel)}</div>
       <div class="small muted">Last updated: ${tp.lastUpdatedAt ? window.GCP.escapeHtml(tp.lastUpdatedAt) : '—'} ${tp.lastUpdatedBy ? '• ' + window.GCP.escapeHtml(tp.lastUpdatedBy) : ''}</div>
-      ${tp.statusComment ? `<div class="small"><b>Return comment:</b> ${window.GCP.escapeHtml(tp.statusComment)}</div>` : ''}
     `;
+
+    // Show supervisor/deputy return comment prominently (if any)
+    if (returnCommentBox){
+      const note = (tp.statusComment || '').trim();
+      if (note){
+        returnCommentBox.style.display = 'block';
+        returnCommentBox.innerHTML = `<b>Supervisor/Deputy comment:</b> ${window.GCP.escapeHtml(note)}`;
+      } else {
+        returnCommentBox.style.display = 'none';
+        returnCommentBox.textContent = '';
+      }
+    }
     setStatus(tp.status || "draft");
 
     const textarea = document.getElementById("editor");

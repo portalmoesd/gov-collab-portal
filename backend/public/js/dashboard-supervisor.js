@@ -61,9 +61,10 @@
     for (const s of currentSections){
       const tr = document.createElement('tr');
       const last = s.lastUpdatedAt ? window.GCP.formatDateTime(s.lastUpdatedAt) : '';
+      const note = (s.statusComment || '').trim();
       tr.innerHTML = `
         <td>${s.sectionLabel}</td>
-        <td>${humanStatus(s.status)}</td>
+        <td>${humanStatus(s.status)}${note ? `<div class="small" style="margin-top:4px; padding:6px 8px; border-radius:10px; border:1px solid rgba(220,38,38,.25); background: rgba(254,226,226,.55);"><b>Comment:</b> ${window.GCP.escapeHtml(note)}</div>` : ''}</td>
         <td>${last}</td>
         <td class="actions"></td>
       `;

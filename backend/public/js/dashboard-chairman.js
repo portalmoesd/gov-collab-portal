@@ -103,9 +103,10 @@
     for (const s of currentSections){
       const tr = document.createElement('tr');
       const lastUpdate = s.lastUpdatedAt ? window.GCP.formatDateTime(s.lastUpdatedAt) : '';
+      const note = (s.statusComment || '').trim();
       tr.innerHTML = `
         <td>${window.GCP.escapeHtml(s.sectionLabel || '')}</td>
-        <td>${pill(s.status)}</td>
+        <td>${pill(s.status)}${note ? `<div class="small" style="margin-top:4px; padding:6px 8px; border-radius:10px; border:1px solid rgba(220,38,38,.25); background: rgba(254,226,226,.55);"><b>Comment:</b> ${window.GCP.escapeHtml(note)}</div>` : ''}</td>
         <td>${window.GCP.escapeHtml(lastUpdate)}</td>
         <td class="actions"></td>
       `;

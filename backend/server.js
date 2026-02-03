@@ -1398,6 +1398,7 @@ app.get('/api/tp/status-grid', authRequired, async (req, res) => {
         s.label,
         s.order_index,
         COALESCE(t.status::text, 'draft') AS status,
+        t.status_comment,
         t.last_updated_at,
         u.full_name AS last_updated_by
       FROM event_required_sections ers
@@ -1419,6 +1420,7 @@ app.get('/api/tp/status-grid', authRequired, async (req, res) => {
         sectionId: r.id,
         sectionLabel: r.label,
         status: r.status,
+        statusComment: r.status_comment || null,
         lastUpdatedAt: r.last_updated_at,
         lastUpdatedBy: r.last_updated_by || null,
       }))

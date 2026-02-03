@@ -8,6 +8,35 @@
   const sectionSelect = document.getElementById('sectionSelect');
   const openBtn = document.getElementById('openEditorBtn');
   const msg = document.getElementById('msg');
+  const sectionStatusBox = document.getElementById('sectionStatusBox');
+
+  function humanStatus(s){
+    const map = {
+      draft: 'Draft',
+      submitted: 'Submitted',
+      returned: 'Returned',
+      approved_by_supervisor: 'Approved (Supervisor)',
+      approved_by_chairman: 'Approved (Deputy)'
+    };
+    return map[s] || (s || '');
+  }
+
+  function showSectionStatus(tp){
+    if (!sectionStatusBox) return;
+    if (!tp){
+      sectionStatusBox.style.display = 'none';
+      sectionStatusBox.textContent = '';
+      return;
+    }
+    const note = (tp.statusComment || '').trim();
+    const last = tp.lastUpdatedAt ? window.GCP.formatDateTime(tp.lastUpdatedAt) : '';
+    sectionStatusBox.style.display = 'block';
+    sectionStatusBox.innerHTML = `
+      <div><b>Status:</b> ${window.GCP.escapeHtml(humanStatus(tp.status))}</div>
+      ${last ? `<div class="small muted" style="margin-top:4px;">Last updated: ${window.GCP.escapeHtml(last)}${tp.lastUpdatedBy ? ' • ' + window.GCP.escapeHtml(tp.lastUpdatedBy) : ''}</div>` : ''}
+      ${note ? `<div style="margin-top:8px; padding:8px 10px; border-radius:10px; border:1px solid rgba(220,38,38,.25); background: rgba(254,226,226,.55);"><b>Supervisor/Deputy comment:</b> ${window.GCP.escapeHtml(note)}</div>` : ''}
+    `;
+  }
 
   function setMsg(text, isError=false){
     msg.textContent = text || '';
@@ -53,6 +82,9 @@
       sectionSelect.appendChild(opt);
     }
     sectionSelect.disabled = false;
+
+    // reset status box
+    showSectionStatus(null);
   }
 
   eventSelect.addEventListener('change', async () => {
@@ -70,6 +102,22 @@
       setMsg(e.message || 'Failed to load event', true);
       sectionSelect.innerHTML = `<option value="">Select section...</option>`;
       sectionSelect.disabled = true;
+    }
+  });
+
+  sectionSelect.addEventListener('change', async () => {
+    setMsg('');
+    const eventId = Number(eventSelect.value);
+    const sectionId = Number(sectionSelect.value);
+    if (!Number.isFinite(eventId) || !Number.isFinite(sectionId)) {
+      showSectionStatus(null);
+      return;
+    }
+    try{
+      const tp = await window.GCP.apiFetch(`/tp?event_id=${encodeURIComponent(eventId)}&section_id=${encodeURIComponent(sectionId)}`, { method:'GET' });
+      showSectionStatus(tp);
+    }catch(e){
+      showSectionStatus(null);
     }
   });
 
