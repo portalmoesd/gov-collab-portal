@@ -31,15 +31,6 @@ const pool = new Pool({
 });
 
 const app = express();
-app.set('etag', false);
-
-// Prevent browsers/CDNs from caching API responses (avoids 304 with empty body)
-app.use('/api', (req, res, next) => {
-  res.set('Cache-Control', 'no-store');
-  res.set('Pragma', 'no-cache');
-  res.set('Expires', '0');
-  next();
-});
 
 // Avoid 304/ETag issues for fetch() on API endpoints
 app.set('etag', false);
@@ -410,17 +401,14 @@ app.get('/api/auth/me', authRequired, attachUser, async (req, res) => {
   });
 });
 
-// Alias endpoint (Spec v2 / older frontends).
-// NOTE: must be protected; otherwise `req.user` is undefined and the frontend
-// will bounce back to the login page.
-app.get('/api/me', authRequired, attachUser, async (req, res) => {
-  const u = req.user;
+// Alias endpoints (Spec v2)
+app.get('/api/me', async (req, res) => {
   return res.json({
-    id: u.id,
-    username: u.username,
-    fullName: u.full_name,
-    email: u.email,
-    role: u.role_key,
+    id: req.user.id,
+    username: req.user.username,
+    fullName: req.user.full_name,
+    email: req.user.email,
+    role: req.user.role_key,
   });
 });
 

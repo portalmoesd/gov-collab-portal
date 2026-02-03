@@ -9,6 +9,7 @@
   const docStatusBox = document.getElementById("docStatusBox");
   const sectionsTbody = document.getElementById("sectionsTbody");
   const approveDocBtn = document.getElementById("approveDocBtn");
+  const returnDocBtn = document.getElementById("returnDocBtn");
   const previewBtn = document.getElementById("previewBtn");
   const msg = document.getElementById("msg");
 
@@ -16,8 +17,16 @@
   const modalContent = document.getElementById("modalContent");
   const closeModalBtn = document.getElementById("closeModalBtn");
 
-  // NOTE: End-event controls are not shown on this dashboard.
-  // Keep the DOM manipulation minimal to avoid runtime errors.
+  // Insert End Event button (admin/supervisor/chairman/protocol)
+  const canEndEvent = ['admin','supervisor','chairman','protocol'].includes(role);
+  const endEventBtn = document.createElement('button');
+  endEventBtn.className = 'btn danger';
+  endEventBtn.textContent = 'End event';
+  endEventBtn.style.display = 'none';
+  if (canEndEvent) {
+    // place next to preview button
+    previewBtn.parentElement.insertBefore(endEventBtn, previewBtn);
+  }
 
   let currentEventId = null;
   let currentSections = [];
@@ -70,13 +79,14 @@
     if (!Number.isFinite(evId)) {
       currentEventId = null;
       approveDocBtn.disabled = true;
-      
+      returnDocBtn.disabled = true;
       previewBtn.disabled = true;
+      endEventBtn.style.display = 'none';
       return;
     }
     currentEventId = evId;
 
-    // End-event button intentionally not present on this dashboard.
+    if (canEndEvent) endEventBtn.style.display = 'inline-block';
 
     // Document status
     const ds = await window.GCP.apiFetch(`/tp/document-status?event_id=${encodeURIComponent(currentEventId)}`, { method:'GET' });
@@ -114,26 +124,41 @@
       approveBtn.textContent = 'Approve section';
       approveBtn.style.marginLeft = '8px';
       approveBtn.addEventListener('click', async () => {
-        msgEl.classList.add('hidden');
-        try {
+        try{
           await window.GCP.apiFetch('/tp/approve-section-chairman', {
-            method: 'POST',
+            method:'POST',
             body: JSON.stringify({ eventId: currentEventId, sectionId: s.sectionId })
           });
           await refresh();
-        } catch (e) {
-          console.error(e);
-          msgEl.textContent = 'Server error';
-          msgEl.classList.remove('hidden');
+        }catch(e){
+          setMsg(e.message || 'Failed to approve section', true);
         }
       });
       actionsTd.appendChild(approveBtn);
+
+      const returnBtn = document.createElement('button');
+      returnBtn.className = 'btn danger';
+      returnBtn.textContent = 'Return section';
+      returnBtn.style.marginLeft = '8px';
+      returnBtn.addEventListener('click', async () => {
+        const note = prompt('Return note (optional):', '') || '';
+        try{
+          await window.GCP.apiFetch('/tp/return', {
+            method:'POST',
+            body: JSON.stringify({ eventId: currentEventId, sectionId: s.sectionId, note })
+          });
+          await refresh();
+        }catch(e){
+          setMsg(e.message || 'Failed to return section', true);
+        }
+      });
+      actionsTd.appendChild(returnBtn);
 
       sectionsTbody.appendChild(tr);
     }
 
     approveDocBtn.disabled = false;
-    
+    returnDocBtn.disabled = false;
     previewBtn.disabled = false;
   }
 
@@ -151,7 +176,22 @@
       setMsg(e.message || 'Failed to approve document', true);
     }
   });
-await refresh();
+
+  returnDocBtn.addEventListener('click', async () => {
+    setMsg('');
+    if (!currentEventId) return;
+    const note = prompt('Return note (optional):', '') || '';
+    if (!confirm('Return the full document?')) return;
+    try{
+      await window.GCP.apiFetch('/document/return', {
+        method:'POST',
+        body: JSON.stringify({ eventId: currentEventId, note })
+      });
+      await refresh();
+    }catch(e){
+      setMsg(e.message || 'Failed to return document', true);
+    }
+  });
 
   previewBtn.addEventListener('click', async () => {
     setMsg('');
@@ -181,13 +221,24 @@ await refresh();
       modalContent.innerHTML = '';
     }
   });
-eventSelect.addEventListener('change', refresh);
 
-  try {
-    await loadEvents();
-    await refresh();
-  } catch (e) {
-    setMsg((e && e.message) ? e.message : 'Failed to load events', true);
-    eventSelect.disabled = true;
-  }
+  endEventBtn.addEventListener('click', async () => {
+    setMsg('');
+    if (!currentEventId) return;
+    if (!confirm('End this event?')) return;
+    try{
+      await window.GCP.apiFetch(`/events/${currentEventId}/end`, { method:'POST' });
+      setMsg('Event ended.');
+      await loadEvents();
+      eventSelect.value = '';
+      await refresh();
+    }catch(e){
+      setMsg(e.message || 'Failed to end event', true);
+    }
+  });
+
+  eventSelect.addEventListener('change', refresh);
+
+  await loadEvents();
+  await refresh();
 })();

@@ -5,11 +5,18 @@
 
   const eventSelect = document.getElementById('eventSelect');
   const sectionsTbody = document.getElementById('sectionsTbody');
+  const submitDocBtn = document.getElementById('submitDocBtn');
   const previewFullBtn = document.getElementById('previewFullBtn');
   const modalBackdrop = document.getElementById('modalBackdrop');
   const modalContent = document.getElementById('modalContent');
   const modalCloseBtn = document.getElementById('modalCloseBtn');
+  const endEventBtn = document.createElement('button');
+  endEventBtn.className = 'btn danger';
+  endEventBtn.id = 'endEventBtn';
+  endEventBtn.textContent = 'End event';
+  endEventBtn.style.display = 'none';
   // Insert before submit button
+  submitDocBtn.parentElement.insertBefore(endEventBtn, submitDocBtn);
   const msg = document.getElementById('msg');
 
   let currentEventId = null;
@@ -104,6 +111,7 @@
 
     // Enable submit to deputy when all sections approved by supervisor
     const ok = currentSections.length > 0 && currentSections.every(s => ['approved_by_supervisor','approved_by_chairman'].includes(s.status));
+    submitDocBtn.disabled = !ok;
   }
 
   eventSelect.addEventListener('change', async () => {
@@ -112,16 +120,37 @@
     if (!Number.isFinite(currentEventId)) {
       currentEventId = null;
       sectionsTbody.innerHTML = '';
+      submitDocBtn.disabled = true;
+      endEventBtn.style.display = 'none';
       return;
     }
+    endEventBtn.style.display = 'inline-block';
     try{
       await refreshStatusGrid();
     }catch(e){
       setMsg(e.message || 'Failed to load sections', true);
       sectionsTbody.innerHTML = '';
+      submitDocBtn.disabled = true;
     }
   });
-// Supervisor dashboard does not use a single 'Open editor' button; per-section actions are in the table.
+
+  endEventBtn.addEventListener('click', async () => {
+    setMsg('');
+    if (!currentEventId) return;
+    if (!confirm('End this event?')) return;
+    try{
+      await window.GCP.apiFetch(`/events/${currentEventId}/end`, { method:'POST' });
+      setMsg('Event ended.');
+      await loadUpcoming();
+      currentEventId = null;
+      sectionsTbody.innerHTML = '';
+      submitDocBtn.disabled = true;
+      endEventBtn.style.display = 'none';
+    }catch(e){
+      setMsg(e.message || 'Failed to end event', true);
+    }
+  });
+  // Supervisor dashboard does not use a single 'Open editor' button; per-section actions are in the table.
   // (Kept intentionally blank.)
 
 previewFullBtn.addEventListener('click', async () => {
@@ -151,10 +180,21 @@ modalBackdrop.addEventListener('click', (e) => {
     modalContent.innerHTML = '';
   }
 });
-  try {
-    await loadUpcoming();
-  } catch (e) {
-    setMsg((e && e.message) ? e.message : 'Failed to load events', true);
-    try { eventSelect.disabled = true; } catch (_) {}
-  }
+
+  submitDocBtn.addEventListener('click', async () => {
+    if (!currentEventId) return;
+    setMsg('');
+    try{
+      await window.GCP.apiFetch('/document/submit-to-chairman', {
+        method:'POST',
+        body: JSON.stringify({ eventId: currentEventId })
+      });
+      setMsg('Submitted to Deputy.');
+      await refreshStatusGrid();
+    }catch(e){
+      setMsg(e.message || 'Submit failed', true);
+    }
+  });
+
+  await loadUpcoming();
 })();
