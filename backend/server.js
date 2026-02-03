@@ -1152,28 +1152,41 @@ app.get('/api/tp', async (req, res) => {
   await ensureTpRow(eventId, countryId, sectionId, req.user.id);
 
   const row = await queryOne(
-    `
-    SELECT t.html_content, t.status, t.status_comment,
-       t.last_updated_at, u.full_name AS last_updated_by
-FROM tp_content t
-LEFT JOIN users u ON u.id = t.last_updated_by_user_id
-WHERE t.event_id=$1 AND t.country_id=$2 AND t.section_id=$3
-    `,
-    [eventId, countryId, sectionId]
-  );
+  `
+  SELECT
+    e.id AS event_id,
+    e.title AS event_title,
+    c.name_en AS country_name,
+    s.id AS section_id,
+    s.label AS section_label,
+    t.html_content,
+    t.status,
+    t.status_comment,
+    t.last_updated_at,
+    u.full_name AS last_updated_by
+  FROM tp_content t
+  JOIN events e ON e.id = t.event_id
+  JOIN countries c ON c.id = t.country_id
+  JOIN sections s ON s.id = t.section_id
+  LEFT JOIN users u ON u.id = t.last_updated_by_user_id
+  WHERE t.event_id=$1 AND t.country_id=$2 AND t.section_id=$3
+  `,
+  [eventId, countryId, sectionId]
+);
 
-  return res.json({
-    eventId: row.event_id,
-    sectionId: row.section_id,
-    sectionLabel: row.section_label,
-    eventTitle: row.event_title,
-    countryName: row.country_name,
-    htmlContent: row.html_content || '',
-    status: row.status || 'draft',
-    lastUpdatedAt: row.last_updated_at,
-    lastUpdatedBy: row.last_updated_by || null
-  });
-  } catch (e) {
+return res.json({
+  eventId: row.event_id,
+  sectionId: row.section_id,
+  sectionLabel: row.section_label,
+  eventTitle: row.event_title,
+  countryName: row.country_name,
+  htmlContent: row.html_content || '',
+  status: row.status || 'draft',
+  statusComment: row.status_comment || null,
+  lastUpdatedAt: row.last_updated_at,
+  lastUpdatedBy: row.last_updated_by || null
+});
+} catch (e) {
     console.error('GET /api/tp failed', e);
     return res.status(500).json({ error: 'Server error' });
   }

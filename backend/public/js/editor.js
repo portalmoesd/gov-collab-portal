@@ -18,8 +18,16 @@
   const btnReturn = document.getElementById("btnReturn");
 
   function setStatus(status){
-    statusEl.innerHTML = `<span class="pill ${status}">${status.replaceAll("_"," ")}</span>`;
-  }
+  const map = {
+    draft: "draft",
+    submitted: "submitted",
+    returned: "returned",
+    approved_by_supervisor: "approved by supervisor",
+    approved_by_chairman: "approved by deputy"
+  };
+  const label = map[status] || String(status).replaceAll("_"," ");
+  statusEl.innerHTML = `<span class="pill ${status}">${window.GCP.escapeHtml(label)}</span>`;
+}
 
   if (!Number.isFinite(eventId) || !Number.isFinite(sectionId)){
     msg.textContent = "Missing event_id and/or section_id in URL.";
