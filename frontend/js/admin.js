@@ -46,14 +46,14 @@
     for (const u of users){
       const tr = document.createElement("tr");
       tr.innerHTML = `
-        <td>${window.GCP.escapeHtml(u.username)}</td>
-        <td>${window.GCP.escapeHtml(u.fullName)}</td>
+        <td>${window.GCP.escapeHtml(u.username || u.email || "")}</td>
+        <td>${window.GCP.escapeHtml(u.fullName || u.full_name || "")}</td>
         <td>${window.GCP.escapeHtml(u.email || "")}</td>
         <td>${window.GCP.escapeHtml(window.GCP.roleToTitle(u.role))}</td>
         <td>${u.isActive ? 'Yes' : 'No'}</td>
         <td class="row">
           <button class="btn" data-act="edit">Edit</button>
-          <button class="btn danger" data-act="deactivate">Deactivate</button>
+          <button class="btn danger" data-act="deactivate">Delete</button>
         </td>
       `;
       tr.querySelector('[data-act="edit"]').addEventListener("click", async () => {
@@ -73,7 +73,7 @@
         }catch(err){ alert(err.message || "Failed"); }
       });
       tr.querySelector('[data-act="deactivate"]').addEventListener("click", async () => {
-        if (!confirm("Deactivate this user?")) return;
+        if (!confirm("Delete this user? (soft delete)")) return;
         try{
           await window.GCP.apiFetch(`/users/${u.id}`, { method:"DELETE" });
           await loadUsers();
@@ -135,7 +135,7 @@
         try{
           await window.GCP.apiFetch(`/sections/${s.id}`, { method:"PUT", body: JSON.stringify({ label: newLabel }) });
           await loadSections();
-          await loadAssignmentsPicklists();
+          await loadAssignmentsMeta();
         }catch(err){ alert(err.message || 'Failed'); }
       });
 
@@ -145,7 +145,7 @@
         try{
           await window.GCP.apiFetch(`/sections/${s.id}`, { method:"PUT", body: JSON.stringify({ orderIndex: val }) });
           await loadSections();
-          await loadAssignmentsPicklists();
+          await loadAssignmentsMeta();
         }catch(err){ alert(err.message || 'Failed'); }
       });
 
@@ -165,7 +165,7 @@
             await window.GCP.apiFetch(`/sections/${s.id}`, { method:"PUT", body: JSON.stringify({ isActive: true }) });
           }
           await loadSections();
-          await loadAssignmentsPicklists();
+          await loadAssignmentsMeta();
         }catch(err){ alert(err.message || 'Failed'); }
       });
 
@@ -184,70 +184,231 @@
       await window.GCP.apiFetch("/sections", { method:"POST", body: JSON.stringify({ key, label, orderIndex }) });
       createSectionForm.reset();
       await loadSections();
-      await loadAssignmentsPicklists();
+      await loadAssignmentsMeta();
     }catch(err){
       msgSections.textContent = err.message || "Failed";
     }
   });
 
   /** ASSIGNMENTS **/
-  const assignmentTbody = document.getElementById("assignmentTbody");
-  const assignForm = document.getElementById("assignForm");
-  const assignUser = document.getElementById("assignUser");
-  const assignSection = document.getElementById("assignSection");
-  const msgAssign = document.getElementById("msgAssign");
+  const assignUserSelect = document.getElementById("assignUserSelect");
+  const assignUserRole = document.getElementById("assignUserRole");
+  const saveAssignmentsBtn = document.getElementById("saveAssignmentsBtn");
+  const assignmentsMsg = document.getElementById("assignStatus") || document.getElementById("assignmentsMsg");
+  const sectionsChecklist = document.getElementById("sectionsChecklist");
+  const countriesChecklist = document.getElementById("countriesChecklist");
 
-  async function loadAssignmentsPicklists(){
-    const users = await window.GCP.apiFetch("/users", { method:"GET" });
-    const sections = await window.GCP.apiFetch("/sections", { method:"GET" });
+  let sectionsCache = [];
+  let countriesCache = [];
+  let assignableUsersCache = [];
 
-    const collaborators = users.filter(u => ['collaborator','super_collaborator'].includes(String(u.role).toLowerCase()) && u.isActive);
-
-    assignUser.innerHTML = collaborators.map(u => `<option value="${u.id}">${window.GCP.escapeHtml(u.fullName)} (${window.GCP.escapeHtml(u.username)})</option>`).join("");
-    assignSection.innerHTML = sections.filter(s => s.is_active).map(s => `<option value="${s.id}">${window.GCP.escapeHtml(s.label)}</option>`).join("");
+  function setAssignMsg(text, isError=false){
+    if (!assignmentsMsg) return;
+    assignmentsMsg.textContent = text || "";
+    assignmentsMsg.style.color = isError ? "crimson" : "#2b445b";
   }
 
-  async function loadAssignments(){
-    const rows = await window.GCP.apiFetch("/section-assignments", { method:"GET" });
-    assignmentTbody.innerHTML = "";
-    for (const a of rows){
-      const tr = document.createElement("tr");
-      tr.innerHTML = `
-        <td>${window.GCP.escapeHtml(a.full_name)} (${window.GCP.escapeHtml(a.username)})</td>
-        <td>${window.GCP.escapeHtml(a.section_label)}</td>
-        <td>${window.GCP.escapeHtml(a.created_at)}</td>
-        <td><button class="btn danger">Remove</button></td>
-      `;
-      tr.querySelector("button").addEventListener("click", async () => {
-        if (!confirm("Remove assignment?")) return;
-        try{
-          await window.GCP.apiFetch(`/section-assignments/${a.id}`, { method:"DELETE" });
-          await loadAssignments();
-        }catch(err){ alert(err.message || "Failed"); }
-      });
-      assignmentTbody.appendChild(tr);
+  function renderCheckboxList(container, items, selectedSet){
+    container.innerHTML = "";
+    for (const it of items){
+      const id = String(it.id);
+      const label = it.label || it.name || it.name_en || it.nameEn || it.code || String(it.id);
+      const wrap = document.createElement("label");
+      wrap.className = "checkitem";
+      wrap.innerHTML = `<input type="checkbox" value="${window.GCP.escapeHtml(id)}" ${selectedSet.has(id) ? "checked" : ""}/> <span>${window.GCP.escapeHtml(label)}</span>`;
+      container.appendChild(wrap);
     }
   }
 
-  assignForm.addEventListener("submit", async (e) => {
-    e.preventDefault();
-    msgAssign.textContent = "";
-    try{
-      await window.GCP.apiFetch("/section-assignments", {
-        method:"POST",
-        body: JSON.stringify({ userId: assignUser.value, sectionId: assignSection.value })
+  function getCheckedIds(container){
+    return Array.from(container.querySelectorAll('input[type="checkbox"]:checked')).map(el => Number(el.value)).filter(Number.isFinite);
+  }
+
+  // Region grouping by ISO-2 country code
+  const NEIGHBORS = new Set(['BY','UA','MD','RU','AZ','AM','KZ','TJ','KG','UZ','TM']);
+  const EU = new Set(['EU','AT','BE','BG','HR','CY','CZ','DK','EE','FI','FR','DE','GR','HU','IE','IT','LV','LT','LU','MT','NL','PL','PT','RO','SK','SI','ES','SE']);
+
+  const OTHER_EUROPE = new Set([
+    'AL','AD','BA','CH','IS','LI','MC','ME','MK','NO','RS','SM','TR','GB','VA','GE','MD','UA','BY','RU','XK'
+  ]);
+
+  const NORTH_AMERICA = new Set(['US','CA','MX','GL','BM']);
+  const CENTRAL_CARIBBEAN = new Set([
+    'BZ','CR','SV','GT','HN','NI','PA',
+    'AG','BS','BB','CU','DM','DO','GD','HT','JM','KN','LC','VC','TT','PR','BS','AI','AW','BQ','CW','GP','KY','MF','MQ','MS','SX','TC','VG','VI','BL','BQ','CW'
+  ]);
+  const SOUTH_AMERICA = new Set(['AR','BO','BR','CL','CO','EC','GY','PY','PE','SR','UY','VE','FK','GF']);
+  const AFRICA = new Set([
+    'DZ','AO','BJ','BW','BF','BI','CV','CM','CF','TD','KM','CG','CD','CI','DJ','EG','GQ','ER','SZ','ET','GA','GM','GH','GN','GW','KE','LS','LR','LY','MG','MW','ML','MR','MU','MA','MZ','NA','NE','NG','RW','ST','SN','SC','SL','SO','ZA','SS','SD','TZ','TG','TN','UG','ZM','ZW','EH'
+  ]);
+  const ASIA = new Set([
+    'AF','BH','BD','BT','BN','KH','CN','TL','IN','ID','IR','IQ','IL','JP','JO','KW','LA','LB','MY','MV','MN','MM','NP','KP','OM','PK','PS','PH','QA','SA','SG','KR','LK','SY','TW','TH','AE','VN','YE','HK','MO'
+  ]);
+  const OCEANIA = new Set([
+    'AU','NZ','FJ','FM','KI','MH','NR','PW','PG','WS','SB','TO','TV','VU','CK','NC','PF','GU','MP','AS'
+  ]);
+
+  function countryGroup(code){
+    const c = String(code || '').toUpperCase();
+    if (!c) return 'Other/Uncategorized';
+    if (NEIGHBORS.has(c)) return 'Neighbors';
+    if (EU.has(c)) return 'EU + EU countries';
+    if (OTHER_EUROPE.has(c)) return 'Other Europe';
+    if (NORTH_AMERICA.has(c)) return 'North America';
+    if (CENTRAL_CARIBBEAN.has(c)) return 'Central America & Caribbean';
+    if (SOUTH_AMERICA.has(c)) return 'South America';
+    if (AFRICA.has(c)) return 'Africa';
+    if (ASIA.has(c)) return 'Asia';
+    if (OCEANIA.has(c)) return 'Australia & Oceania';
+    return 'Other/Uncategorized';
+  }
+
+  function renderCountriesGrouped(selectedSet){
+    countriesChecklist.innerHTML = "";
+
+    const groupsOrder = [
+      'EU + EU countries',
+      'Other Europe',
+      'North America',
+      'Central America & Caribbean',
+      'South America',
+      'Africa',
+      'Asia',
+      'Australia & Oceania',
+      'Neighbors',
+      'Other/Uncategorized'
+    ];
+
+    const groups = new Map();
+    for (const c of countriesCache){
+      const g = countryGroup(c.code);
+      if (!groups.has(g)) groups.set(g, []);
+      groups.get(g).push(c);
+    }
+
+    function syncGroupCheckbox(groupCb, countryCbs){
+      const total = countryCbs.length;
+      const checked = countryCbs.reduce((acc, cb) => acc + (cb.checked ? 1 : 0), 0);
+      groupCb.indeterminate = checked > 0 && checked < total;
+      groupCb.checked = (total > 0 && checked === total);
+    }
+
+    for (const g of groupsOrder){
+      const items = groups.get(g) || [];
+      if (!items.length) continue;
+
+      items.sort((a,b) => String(a.name_en || a.nameEn || '').localeCompare(String(b.name_en || b.nameEn || ''), 'en'));
+
+      const box = document.createElement("div");
+      box.className = "groupbox";
+
+      // Region-level checkbox (toggles all countries in this region)
+      const head = document.createElement('label');
+      head.className = 'checkitem grouphead';
+      head.style.alignItems = 'center';
+      head.style.margin = '0 0 8px';
+      head.innerHTML = `
+        <input type="checkbox" value="group:${window.GCP.escapeHtml(g)}" data-group="${window.GCP.escapeHtml(g)}" />
+        <span>${window.GCP.escapeHtml(g)}</span>
+      `;
+
+      const inner = document.createElement("div");
+      inner.className = "checklist";
+      renderCheckboxList(inner, items.map(x => ({ id:x.id, label:x.name_en || x.nameEn || x.code })), selectedSet);
+
+      box.appendChild(head);
+      box.appendChild(inner);
+      countriesChecklist.appendChild(box);
+
+      const groupCb = head.querySelector('input[type="checkbox"]');
+      const countryCbs = Array.from(inner.querySelectorAll('input[type="checkbox"]'));
+
+      // Initial state
+      syncGroupCheckbox(groupCb, countryCbs);
+
+      // When region checkbox toggled -> toggle all countries
+      groupCb.addEventListener('change', () => {
+        for (const cb of countryCbs) cb.checked = groupCb.checked;
+        syncGroupCheckbox(groupCb, countryCbs);
       });
-      await loadAssignments();
+
+      // When any country toggled -> update region checkbox state
+      for (const cb of countryCbs){
+        cb.addEventListener('change', () => syncGroupCheckbox(groupCb, countryCbs));
+      }
+    }
+  }
+
+  async function loadAssignmentsMeta(){
+    sectionsCache = await window.GCP.apiFetch("/sections", { method:"GET" });
+    countriesCache = await window.GCP.apiFetch("/countries", { method:"GET" });
+
+    // Users eligible for assignment
+    const users = await window.GCP.apiFetch("/users", { method:"GET" });
+    assignableUsersCache = (users || []).filter(u => {
+      const rk = String(u.role || '').toLowerCase();
+      return (rk === 'collaborator' || rk === 'super_collaborator') && u.isActive;
+    });
+
+    assignUserSelect.innerHTML = `<option value="">Select…</option>` + assignableUsersCache.map(u => {
+      return `<option value="${u.id}">${window.GCP.escapeHtml(u.fullName || u.full_name || "")} (${window.GCP.escapeHtml(u.username || u.email || "")})</option>`;
+    }).join("");
+
+    // Default empty UI
+    renderCheckboxList(sectionsChecklist, sectionsCache.map(s => ({ id:s.id, label:s.label })), new Set());
+    renderCountriesGrouped(new Set());
+  }
+
+  async function loadUserAssignments(){
+    setAssignMsg("");
+    const userId = Number(assignUserSelect.value);
+    if (!Number.isFinite(userId)){
+      assignUserRole.value = "";
+      renderCheckboxList(sectionsChecklist, sectionsCache.map(s => ({ id:s.id, label:s.label })), new Set());
+      renderCountriesGrouped(new Set());
+      saveAssignmentsBtn.disabled = true;
+      return;
+    }
+
+    const u = assignableUsersCache.find(x => Number(x.id) === userId);
+    assignUserRole.value = u ? window.GCP.roleToTitle(u.role) : "";
+    saveAssignmentsBtn.disabled = false;
+
+    const a = await window.GCP.apiFetch(`/admin/assignments/${userId}`, { method:"GET" });
+    const secSet = new Set((a.sectionIds || []).map(String));
+    const cSet = new Set((a.countryIds || []).map(String));
+
+    renderCheckboxList(sectionsChecklist, sectionsCache.map(s => ({ id:s.id, label:s.label })), secSet);
+    renderCountriesGrouped(cSet);
+  }
+
+  assignUserSelect.addEventListener("change", loadUserAssignments);
+
+  saveAssignmentsBtn.addEventListener("click", async () => {
+    setAssignMsg("");
+    const userId = Number(assignUserSelect.value);
+    if (!Number.isFinite(userId)) return;
+
+    const sectionIds = getCheckedIds(sectionsChecklist);
+    const countryIds = getCheckedIds(countriesChecklist);
+
+    try{
+      await window.GCP.apiFetch("/admin/assignments", {
+        method:"POST",
+        body: JSON.stringify({ userId, sectionIds, countryIds })
+      });
+      setAssignMsg("Saved.");
     }catch(err){
-      msgAssign.textContent = err.message || "Failed";
+      setAssignMsg(err.message || "Failed to save", true);
     }
   });
 
-  try{
+
+try{
     await loadUsers();
     await loadSections();
-    await loadAssignmentsPicklists();
-    await loadAssignments();
+    await loadAssignmentsMeta();
+    saveAssignmentsBtn.disabled = true;
   }catch(err){
     msgUsers.textContent = err.message || "Failed to load admin data";
   }

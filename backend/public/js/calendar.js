@@ -64,19 +64,24 @@
       `;
       tr.querySelector('[data-act="view"]').addEventListener("click", async () => {
         const details = await window.GCP.apiFetch(`/events/${ev.id}`, { method:"GET" });
-        alert(`Required sections:\n\n${details.requiredSections.map(s => s.label).join("\n")}`);
+        const req = (details.required_sections || details.requiredSections || []);
+        const labels = Array.isArray(req) ? req.map(s => s.label).filter(Boolean) : [];
+        alert(`Required sections:
+
+${(labels.length ? labels.join('\n') : '—')}`);
       });
 
       if (canManage){
         tr.querySelector('[data-act="edit"]').addEventListener("click", async () => {
           const details = await window.GCP.apiFetch(`/events/${ev.id}`, { method:"GET" });
           editEventId = ev.id;
-          countrySelect.value = String(details.countryId);
+          countrySelect.value = String(details.country_id);
           titleInput.value = details.title || "";
           occasionInput.value = details.occasion || "";
-          deadlineInput.value = formatDate(details.deadlineDate);
+          deadlineInput.value = formatDate(details.deadline_date);
           // select required sections
-          const reqIds = new Set((details.requiredSections || []).map(s => String(s.id)));
+          const req = (details.required_sections || details.requiredSections || []);
+          const reqIds = new Set((Array.isArray(req) ? req : []).map(s => String(s.id)));
           for (const cb of requiredBox.querySelectorAll('input[type=checkbox]')){
             cb.checked = reqIds.has(String(cb.value));
           }

@@ -285,19 +285,57 @@
       if (!groups.has(g)) groups.set(g, []);
       groups.get(g).push(c);
     }
+
+    function syncGroupCheckbox(groupCb, countryCbs){
+      const total = countryCbs.length;
+      const checked = countryCbs.reduce((acc, cb) => acc + (cb.checked ? 1 : 0), 0);
+      groupCb.indeterminate = checked > 0 && checked < total;
+      groupCb.checked = (total > 0 && checked === total);
+    }
+
     for (const g of groupsOrder){
       const items = groups.get(g) || [];
       if (!items.length) continue;
 
       items.sort((a,b) => String(a.name_en || a.nameEn || '').localeCompare(String(b.name_en || b.nameEn || ''), 'en'));
+
       const box = document.createElement("div");
       box.className = "groupbox";
-      box.innerHTML = `<div class="grouphead">${window.GCP.escapeHtml(g)}</div>`;
+
+      // Region-level checkbox (toggles all countries in this region)
+      const head = document.createElement('label');
+      head.className = 'checkitem grouphead';
+      head.style.alignItems = 'center';
+      head.style.margin = '0 0 8px';
+      head.innerHTML = `
+        <input type="checkbox" value="group:${window.GCP.escapeHtml(g)}" data-group="${window.GCP.escapeHtml(g)}" />
+        <span>${window.GCP.escapeHtml(g)}</span>
+      `;
+
       const inner = document.createElement("div");
       inner.className = "checklist";
       renderCheckboxList(inner, items.map(x => ({ id:x.id, label:x.name_en || x.nameEn || x.code })), selectedSet);
+
+      box.appendChild(head);
       box.appendChild(inner);
       countriesChecklist.appendChild(box);
+
+      const groupCb = head.querySelector('input[type="checkbox"]');
+      const countryCbs = Array.from(inner.querySelectorAll('input[type="checkbox"]'));
+
+      // Initial state
+      syncGroupCheckbox(groupCb, countryCbs);
+
+      // When region checkbox toggled -> toggle all countries
+      groupCb.addEventListener('change', () => {
+        for (const cb of countryCbs) cb.checked = groupCb.checked;
+        syncGroupCheckbox(groupCb, countryCbs);
+      });
+
+      // When any country toggled -> update region checkbox state
+      for (const cb of countryCbs){
+        cb.addEventListener('change', () => syncGroupCheckbox(groupCb, countryCbs));
+      }
     }
   }
 
