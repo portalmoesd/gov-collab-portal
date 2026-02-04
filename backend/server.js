@@ -1328,7 +1328,7 @@ app.post('/api/tp/approve-section', requireRole('supervisor','admin'), async (re
   await pool.query(
     `
     UPDATE tp_content
-    SET status='approved_by_supervisor', last_updated_at=NOW(), last_updated_by_user_id=$4
+    SET status='approved_by_supervisor', status_comment=NULL, last_updated_at=NOW(), last_updated_by_user_id=$4
     WHERE event_id=$1 AND country_id=$2 AND section_id=$3
     `,
     [eventId, countryId, sectionId, req.user.id]
@@ -1353,7 +1353,7 @@ app.post('/api/tp/approve-section-chairman', requireRole('chairman','admin'), as
   await pool.query(
     `
     UPDATE tp_content
-    SET status='approved_by_chairman', last_updated_at=NOW(), last_updated_by_user_id=$4
+    SET status='approved_by_chairman', status_comment=NULL, last_updated_at=NOW(), last_updated_by_user_id=$4
     WHERE event_id=$1 AND country_id=$2 AND section_id=$3
     `,
     [eventId, countryId, sectionId, req.user.id]
