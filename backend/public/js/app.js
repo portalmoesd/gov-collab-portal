@@ -73,13 +73,13 @@ function formatTbilisiDate(value) {
     ],
     super_collaborator: [
       { href: "dashboard-collab.html", label: "Dashboard" },
-      { href: "calendar.html", label: "Calendar (Read)" },
+      { href: "calendar.html", label: "Calendar" },
       { href: "library.html", label: "Library" },
       { href: "statistics.html", label: "Statistics" },
     ],
     collaborator: [
       { href: "dashboard-collab.html", label: "Dashboard" },
-      { href: "calendar.html", label: "Calendar (Read)" },
+      { href: "calendar.html", label: "Calendar" },
       { href: "statistics.html", label: "Statistics" },
     ],
     viewer: [

@@ -34,7 +34,10 @@
   </section>
 
   <section class="card col-12">
-    <div style="font-weight:900; margin-bottom:10px;">Required sections</div>
+    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:10px;">
+      <div style="font-weight:900;">Required sections</div>
+      <button class="btn success" id="approveAllSectionsBtn">Approve all sections</button>
+    </div>
     <table class="table">
       <thead><tr><th>Section</th><th>Status</th><th>Last update</th><th>Actions</th></tr></thead>
       <tbody id="sectionsTbody"></tbody>

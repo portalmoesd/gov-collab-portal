@@ -1007,6 +1007,47 @@ app.get('/api/events/:id', authRequired, attachUser, async (req, res) => {
   } catch (e) {
     console.error('GET /api/events/:id failed', e);
     return res.status(500).json({ error: 'Server error' });
+
+app.get('/api/events/:id/my-sections', authRequired, attachUser, async (req, res) => {
+  try {
+    const eventId = Number(req.params.id);
+    if (!Number.isFinite(eventId)) return res.status(400).json({ error: 'Invalid id' });
+
+    const event = await queryOne(
+      `SELECT e.*, c.name_en AS country_name_en, c.code AS country_code
+       FROM events e
+       JOIN countries c ON c.id = e.country_id
+       WHERE e.id = $1`,
+      [eventId]
+    );
+    if (!event) return res.status(404).json({ error: 'Not found' });
+
+    const canSee = await userCanSeeEvent(req.user, event);
+    if (!canSee) return res.status(403).json({ error: 'Forbidden' });
+
+    const required = await queryAll(
+      `SELECT ers.section_id AS id, s.label, s.order_index
+       FROM event_required_sections ers
+       JOIN sections s ON s.id = ers.section_id
+       WHERE ers.event_id=$1
+       ORDER BY s.order_index ASC, s.id ASC`,
+      [eventId]
+    );
+
+    const role = String(req.user.role || '').toLowerCase();
+    if (role === 'collaborator' || role === 'super_collaborator') {
+      const assignedSectionIds = new Set((await getAssignedSectionIds(req.user.id)).map(Number));
+      const filtered = required.filter(r => assignedSectionIds.has(Number(r.id)));
+      return res.json({ required_sections: filtered });
+    }
+
+    return res.json({ required_sections: required });
+  } catch (e) {
+    console.error('GET /api/events/:id/my-sections failed', e);
+    return res.status(500).json({ error: 'Server error' });
+  }
+});
+
   }
 });
 
@@ -1335,6 +1376,48 @@ app.post('/api/tp/approve-section', requireRole('supervisor','admin'), async (re
   );
 
   return res.json({ success:true });
+
+app.post('/api/tp/approve-all-sections', requireRole('supervisor','chairman','admin'), async (req, res) => {
+  try {
+    const eventId = Number(req.body?.eventId);
+    if (!Number.isFinite(eventId)) return res.status(400).json({ error: 'eventId required' });
+
+    const countryId = await resolveCountryIdForEvent(eventId);
+    if (!countryId) return res.status(404).json({ error: 'Event not found' });
+
+    await ensureDocumentStatus(eventId, countryId);
+
+    const required = await queryAll(
+      `SELECT section_id FROM event_required_sections WHERE event_id=$1 ORDER BY section_id ASC`,
+      [eventId]
+    );
+    const sectionIds = required.map(r => Number(r.section_id)).filter(n => Number.isFinite(n));
+    if (sectionIds.length === 0) return res.json({ success:true, approved: 0 });
+
+    // Ensure rows exist
+    for (const sid of sectionIds) {
+      await ensureTpRow(eventId, countryId, sid, req.user.id);
+    }
+
+    const role = String(req.user.role || '').toLowerCase();
+    const targetStatus = (role === 'chairman') ? 'approved_by_chairman' : 'approved_by_supervisor';
+
+    await pool.query(
+      `
+      UPDATE tp_content
+      SET status=$4, status_comment=NULL, last_updated_at=NOW(), last_updated_by_user_id=$5
+      WHERE event_id=$1 AND country_id=$2 AND section_id = ANY($3::int[])
+      `,
+      [eventId, countryId, sectionIds, targetStatus, req.user.id]
+    );
+
+    return res.json({ success:true, approved: sectionIds.length, status: targetStatus });
+  } catch (e) {
+    console.error('POST /api/tp/approve-all-sections failed', e);
+    return res.status(500).json({ error: 'Server error' });
+  }
+});
+
 });
 
 app.post('/api/tp/approve-section-chairman', requireRole('chairman','admin'), async (req, res) => {

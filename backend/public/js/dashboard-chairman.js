@@ -8,6 +8,7 @@
   const eventSelect = document.getElementById("eventSelect");
   const docStatusBox = document.getElementById("docStatusBox");
   const sectionsTbody = document.getElementById("sectionsTbody");
+  const approveAllSectionsBtn = document.getElementById("approveAllSectionsBtn");
   const approveDocBtn = document.getElementById("approveDocBtn");
   const returnDocBtn = document.getElementById("returnDocBtn");
   const previewBtn = document.getElementById("previewBtn");
@@ -17,8 +18,8 @@
   const modalContent = document.getElementById("modalContent");
   const closeModalBtn = document.getElementById("closeModalBtn");
 
-  // Insert End Event button (admin/supervisor/chairman/protocol)
-  const canEndEvent = ['admin','supervisor','chairman','protocol'].includes(role);
+  // Insert End Event button (admin/supervisor/protocol)
+  const canEndEvent = ['admin','supervisor','protocol'].includes(role);
   const endEventBtn = document.createElement('button');
   endEventBtn.className = 'btn danger';
   endEventBtn.textContent = 'End event';
@@ -86,8 +87,7 @@
     }
     currentEventId = evId;
 
-    if (canEndEvent) endEventBtn.style.display = 'inline-block';
-
+    if (canEndEvent)
     // Document status
     const ds = await window.GCP.apiFetch(`/tp/document-status?event_id=${encodeURIComponent(currentEventId)}`, { method:'GET' });
     const last = ds.updatedAt ? window.GCP.formatDateTime(ds.updatedAt) : '';
@@ -222,23 +222,19 @@
       modalContent.innerHTML = '';
     }
   });
-
-  endEventBtn.addEventListener('click', async () => {
-    setMsg('');
+  
+  approveAllSectionsBtn.addEventListener('click', async () => {
     if (!currentEventId) return;
-    if (!confirm('End this event?')) return;
-    try{
-      await window.GCP.apiFetch(`/events/${currentEventId}/end`, { method:'POST' });
-      setMsg('Event ended.');
-      await loadEvents();
-      eventSelect.value = '';
-      await refresh();
-    }catch(e){
-      setMsg(e.message || 'Failed to end event', true);
-    }
+    if (!confirm('Approve all required sections for this event?')) return;
+    setMsg('');
+    await window.GCP.apiFetch('/tp/approve-all-sections', {
+      method:'POST',
+      body: JSON.stringify({ eventId: currentEventId })
+    });
+    await refreshStatusGrid();
   });
 
-  eventSelect.addEventListener('change', refresh);
+eventSelect.addEventListener('change', refresh);
 
   await loadEvents();
   await refresh();
