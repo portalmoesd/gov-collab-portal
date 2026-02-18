@@ -69,22 +69,13 @@
 
   async function loadSectionsForEvent(eventId){
     sectionSelect.innerHTML = `<option value="">Loading...</option>`;
+    console.debug('Loading allowed sections for event', eventId);
+
     sectionSelect.disabled = true;
 
-    let ev;
-    try {
-      ev = await window.GCP.apiFetch(`/events/${eventId}/my-sections`, { method:'GET' });
-    } catch (e) {
-      // Backward-compat: if backend route is missing (404), fall back to event details
-      if (e && (e.status === 404 || (e.message || '').includes('404'))) {
-        ev = await window.GCP.apiFetch(`/events/${eventId}`, { method:'GET' });
-        // Mark fallback so we can optionally show a tiny warning
-        ev.__fallbackRequiredOnly = true;
-      } else {
-        throw e;
-      }
-    }
-        const sections = (ev.required_sections || ev.requiredSections || []).slice().sort((a,b)=> ((a.order_index||a.sort_order||0) - (b.order_index||b.sort_order||0)));
+    // Single source of truth: backend filters by assignments for collaborators/super-collaborators.
+    const r = await window.GCP.apiFetch(`/my/sections?event_id=${encodeURIComponent(eventId)}`, { method:'GET' });
+    const sections = (r.sections || []).slice().sort((a,b)=> ((a.order_index||a.sort_order||0) - (b.order_index||b.sort_order||0)));
 
     sectionSelect.innerHTML = `<option value="">Select section...</option>`;
     for (const s of sections){

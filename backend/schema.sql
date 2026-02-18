@@ -1,176 +1,161 @@
-// editor.js
-(async function(){
-  const me = await window.GCP.requireAuth();
-  if (!me) return;
+-- GOV COLLAB PORTAL schema.sql
+-- Blueprint v2 (Definitive). Implements: roles, users, sections, section_assignments, countries,
+-- events, event_required_sections, tp_content, document_status.
 
-  const role = String(me.role).toLowerCase();
-  const qs = window.GCP.qs();
-  const eventId = Number(qs.event_id || qs.eventId);
-  const sectionId = Number(qs.section_id || qs.sectionId);
+BEGIN;
 
-  const msg = document.getElementById("msg");
-  const meta = document.getElementById("meta");
-  const statusEl = document.getElementById("statusEl");
-  const returnCommentBox = document.getElementById("returnCommentBox");
+-- Extensions (safe if already installed)
+CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
-  const btnSave = document.getElementById("btnSave");
-  const btnSubmit = document.getElementById("btnSubmit");
-  const btnApprove = document.getElementById("btnApprove");
-  const btnReturn = document.getElementById("btnReturn");
+-- Enums
+DO $$ BEGIN
+  CREATE TYPE tp_section_status AS ENUM ('draft', 'submitted', 'returned', 'approved_by_supervisor', 'approved_by_chairman');
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
-  function setStatus(status){
-  const map = {
-    draft: "draft",
-    submitted: "submitted",
-    returned: "returned",
-    approved_by_supervisor: "approved by supervisor",
-    approved_by_chairman: "approved by deputy"
-  };
-  const label = map[status] || String(status).replaceAll("_"," ");
-  statusEl.innerHTML = `<span class="pill ${status}">${window.GCP.escapeHtml(label)}</span>`;
-}
+-- Roles
+CREATE TABLE IF NOT EXISTS roles (
+  id            SERIAL PRIMARY KEY,
+  key           TEXT NOT NULL UNIQUE,
+  label         TEXT NOT NULL,
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
 
-  if (!Number.isFinite(eventId) || !Number.isFinite(sectionId)){
-    msg.textContent = "Missing event_id and/or section_id in URL.";
-    return;
-  }
+-- Users
+CREATE TABLE IF NOT EXISTS users (
+  id             SERIAL PRIMARY KEY,
+  username       TEXT NOT NULL UNIQUE,
+  password_hash  TEXT NOT NULL,
+  full_name      TEXT NOT NULL,
+  email          TEXT,
+  role_id        INTEGER NOT NULL REFERENCES roles(id),
+  is_active      BOOLEAN NOT NULL DEFAULT TRUE,
+  created_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at     TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
 
-  // Buttons visible depending on role (Blueprint editor behaviour)
-  const canEdit = ["admin","chairman","supervisor","collaborator","super_collaborator"].includes(role);
-  const isViewer = role === "viewer";
-  const isProtocol = role === "protocol";
+CREATE INDEX IF NOT EXISTS idx_users_role_id ON users(role_id);
+CREATE INDEX IF NOT EXISTS idx_users_is_active ON users(is_active);
 
-  if (isProtocol){
-    msg.textContent = "Protocol role cannot edit Talking Points.";
-    btnSave.disabled = btnSubmit.disabled = btnApprove.disabled = btnReturn.disabled = true;
-    return;
-  }
+-- Sections
+CREATE TABLE IF NOT EXISTS sections (
+  id            SERIAL PRIMARY KEY,
+  key           TEXT NOT NULL UNIQUE,
+  label         TEXT NOT NULL,
+  order_index   INTEGER NOT NULL DEFAULT 0,
+  is_active     BOOLEAN NOT NULL DEFAULT TRUE,
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
 
-  // Approve button depends on role
-  if (!(role === "supervisor" || role === "chairman" || role === "admin")){
-    btnApprove.style.display = "none";
-    btnReturn.style.display = "none";
-  }
+CREATE INDEX IF NOT EXISTS idx_sections_is_active ON sections(is_active);
+CREATE INDEX IF NOT EXISTS idx_sections_order_index ON sections(order_index);
 
-  // Submit is only for collaborators (they submit their draft for review)
-  if (!(role === "collaborator" || role === "super_collaborator")){
-    btnSubmit.style.display = "none";
-  }
-  if (isViewer){
-    btnSave.style.display = "none";
-    btnSubmit.style.display = "none";
-    btnApprove.style.display = "none";
-    btnReturn.style.display = "none";
-  }
+-- Section assignments (collaborator -> section), global (NOT per country)
+CREATE TABLE IF NOT EXISTS section_assignments (
+  id          SERIAL PRIMARY KEY,
+  user_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  section_id  INTEGER NOT NULL REFERENCES sections(id) ON DELETE CASCADE,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  CONSTRAINT uq_section_assignments_user_section UNIQUE (user_id, section_id)
+);
 
-  let editorInstance = null;
+CREATE INDEX IF NOT EXISTS idx_section_assignments_user_id ON section_assignments(user_id);
+CREATE INDEX IF NOT EXISTS idx_section_assignments_section_id ON section_assignments(section_id);
 
-  async function load(){
-    msg.textContent = "";
-    const tp = await window.GCP.apiFetch(`/tp?event_id=${encodeURIComponent(eventId)}&section_id=${encodeURIComponent(sectionId)}`, { method:"GET" });
+-- Countries
+CREATE TABLE IF NOT EXISTS countries (
+  id          SERIAL PRIMARY KEY,
+  name_en     TEXT NOT NULL,
+  code        TEXT NOT NULL,
+  is_active   BOOLEAN NOT NULL DEFAULT TRUE,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  CONSTRAINT uq_countries_code UNIQUE (code),
+  CONSTRAINT uq_countries_name_en UNIQUE (name_en)
+);
 
-    meta.innerHTML = `
-      <div><b>Event:</b> ${window.GCP.escapeHtml(tp.eventTitle)}</div>
-      <div><b>Country:</b> ${window.GCP.escapeHtml(tp.countryName)}</div>
-      <div><b>Section:</b> ${window.GCP.escapeHtml(tp.sectionLabel)}</div>
-      <div class="small muted">Last updated: ${tp.lastUpdatedAt ? window.GCP.escapeHtml(tp.lastUpdatedAt) : '—'} ${tp.lastUpdatedBy ? '• ' + window.GCP.escapeHtml(tp.lastUpdatedBy) : ''}</div>
-    `;
+CREATE INDEX IF NOT EXISTS idx_countries_is_active ON countries(is_active);
 
-    // Show supervisor/deputy return comment prominently (if any)
-    if (returnCommentBox){
-      const note = (tp.statusComment || '').trim();
-      if (note){
-        returnCommentBox.style.display = 'block';
-        returnCommentBox.innerHTML = `<b>Supervisor/Deputy comment:</b> ${window.GCP.escapeHtml(note)}`;
-      } else {
-        returnCommentBox.style.display = 'none';
-        returnCommentBox.textContent = '';
-      }
-    }
-    setStatus(tp.status || "draft");
+-- Events
+CREATE TABLE IF NOT EXISTS events (
+  id                  SERIAL PRIMARY KEY,
+  country_id          INTEGER NOT NULL REFERENCES countries(id),
+  title               TEXT NOT NULL,
+  occasion            TEXT,
+  deadline_date       DATE,
+  created_by_user_id  INTEGER REFERENCES users(id),
+  is_active           BOOLEAN NOT NULL DEFAULT TRUE,
+  created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at          TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
 
-    const textarea = document.getElementById("editor");
-    textarea.value = tp.htmlContent || "";
+CREATE INDEX IF NOT EXISTS idx_events_country_id ON events(country_id);
+CREATE INDEX IF NOT EXISTS idx_events_is_active ON events(is_active);
+CREATE INDEX IF NOT EXISTS idx_events_deadline_date ON events(deadline_date);
 
-    if (window.CKEDITOR){
-      if (editorInstance) editorInstance.destroy(true);
-      editorInstance = window.CKEDITOR.replace("editor", { height: 420 });
-      if (!canEdit) editorInstance.setReadOnly(true);
-    } else {
-      // Fallback: plain textarea
-      textarea.disabled = !canEdit;
-    }
-  }
+-- Required sections per event
+CREATE TABLE IF NOT EXISTS event_required_sections (
+  id          SERIAL PRIMARY KEY,
+  event_id    INTEGER NOT NULL REFERENCES events(id) ON DELETE CASCADE,
+  section_id  INTEGER NOT NULL REFERENCES sections(id),
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  CONSTRAINT uq_event_required_sections UNIQUE (event_id, section_id)
+);
 
-  function getHtml(){
-    if (editorInstance) return editorInstance.getData();
-    return document.getElementById("editor").value;
-  }
+CREATE INDEX IF NOT EXISTS idx_event_required_sections_event_id ON event_required_sections(event_id);
+CREATE INDEX IF NOT EXISTS idx_event_required_sections_section_id ON event_required_sections(section_id);
 
-  btnSave.addEventListener("click", async () => {
-    try{
-      await window.GCP.apiFetch("/tp/save", {
-        method:"POST",
-        body: JSON.stringify({ eventId, sectionId, htmlContent: getHtml() })
-      });
-      await load();
-      msg.textContent = "Saved.";
-    }catch(err){
-      msg.textContent = err.message || "Save failed";
-    }
-  });
+-- Talking Points content per event + country + section
+CREATE TABLE IF NOT EXISTS tp_content (
+  id                       SERIAL PRIMARY KEY,
+  event_id                 INTEGER NOT NULL REFERENCES events(id) ON DELETE CASCADE,
+  country_id               INTEGER NOT NULL REFERENCES countries(id),
+  section_id               INTEGER NOT NULL REFERENCES sections(id),
+  html_content             TEXT NOT NULL DEFAULT '',
+  status                   tp_section_status NOT NULL DEFAULT 'draft',
+  status_comment           TEXT, -- used for "returned with comment" (per blueprint workflow)
+  last_updated_by_user_id  INTEGER REFERENCES users(id),
+  last_updated_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  CONSTRAINT uq_tp_content_event_country_section UNIQUE (event_id, country_id, section_id)
+);
 
-  btnSubmit.addEventListener("click", async () => {
-    try{
-      await window.GCP.apiFetch("/tp/submit", {
-        method:"POST",
-        body: JSON.stringify({ eventId, sectionId, htmlContent: getHtml() })
-      });
-      await load();
-      msg.textContent = "Submitted.";
-    }catch(err){
-      msg.textContent = err.message || "Submit failed";
-    }
-  });
+CREATE INDEX IF NOT EXISTS idx_tp_content_event_id ON tp_content(event_id);
+CREATE INDEX IF NOT EXISTS idx_tp_content_country_id ON tp_content(country_id);
+CREATE INDEX IF NOT EXISTS idx_tp_content_section_id ON tp_content(section_id);
+CREATE INDEX IF NOT EXISTS idx_tp_content_status ON tp_content(status);
 
-  btnApprove.addEventListener("click", async () => {
-    try{
-      if (role === "chairman"){
-        await window.GCP.apiFetch("/tp/approve-section-chairman", {
-          method:"POST",
-          body: JSON.stringify({ eventId, sectionId, htmlContent: getHtml() })
-        });
-      } else {
-        await window.GCP.apiFetch("/tp/approve-section", {
-          method:"POST",
-          body: JSON.stringify({ eventId, sectionId, htmlContent: getHtml() })
-        });
-      }
-      await load();
-      msg.textContent = "Approved.";
-    }catch(err){
-      msg.textContent = err.message || "Approve failed";
-    }
-  });
+-- Document-level status per event + country
+CREATE TABLE IF NOT EXISTS document_status (
+  id               SERIAL PRIMARY KEY,
+  event_id          INTEGER NOT NULL REFERENCES events(id) ON DELETE CASCADE,
+  country_id        INTEGER NOT NULL REFERENCES countries(id),
+  status            TEXT NOT NULL DEFAULT 'in_progress',
+  chairman_comment  TEXT,
+  updated_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  CONSTRAINT uq_document_status_event_country UNIQUE (event_id, country_id)
+);
 
-  btnReturn.addEventListener("click", async () => {
-    const comment = prompt("Return comment (required):", "");
-    if (comment === null) return;
-    try{
-      await window.GCP.apiFetch("/tp/return", {
-        method:"POST",
-        body: JSON.stringify({ eventId, sectionId, note: comment })
-      });
-      await load();
-      msg.textContent = "Returned.";
-    }catch(err){
-      msg.textContent = err.message || "Return failed";
-    }
-  });
+CREATE INDEX IF NOT EXISTS idx_document_status_event_id ON document_status(event_id);
+CREATE INDEX IF NOT EXISTS idx_document_status_country_id ON document_status(country_id);
+CREATE INDEX IF NOT EXISTS idx_document_status_status ON document_status(status);
 
-  try{
-    await load();
-  }catch(err){
-    msg.textContent = err.message || "Failed to load editor";
-  }
-})();
+COMMIT;
+
+
+-- === Spec v2 additions ===
+
+ALTER TABLE users
+    ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMP,
+    ADD COLUMN IF NOT EXISTS deleted_by_user_id INTEGER;
+
+ALTER TABLE events
+    ADD COLUMN IF NOT EXISTS ended_at TIMESTAMP,
+    ADD COLUMN IF NOT EXISTS ended_by_user_id INTEGER;
+
+CREATE TABLE IF NOT EXISTS country_assignments (
+    user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+    country_id INTEGER REFERENCES countries(id) ON DELETE CASCADE,
+    PRIMARY KEY (user_id, country_id)
+);

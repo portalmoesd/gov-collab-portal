@@ -1,8 +1,18 @@
-// statistics.js
-(async function(){
-  const me = await window.GCP.requireAuth();
-  if (!me) return;
-
-  document.getElementById("placeholder").textContent =
-    "Statistics page placeholder (per Blueprint v2).";
-})();
+{
+  "name": "gov-collab-portal-backend",
+  "version": "1.0.0",
+  "private": true,
+  "main": "server.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node server.js",
+    "seed": "node seed.js"
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "cors": "^2.8.5",
+    "express": "^4.19.2",
+    "jsonwebtoken": "^9.0.2",
+    "pg": "^8.12.0"
+  }
+}
