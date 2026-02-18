@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>GOV COLLAB PORTAL • Admin</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+
+<div class="layout">
+  <aside class="sidebar"></aside>
+  <main class="main">
+    <div class="topbar">
+      <div class="page-title">Admin Panel</div>
+    </div>
+    
+<section class="card col-12" id="mainCard">
+  <div class="row" style="margin-bottom:12px;">
+    <button class="btn" id="tabUsers">Users</button>
+    <button class="btn" id="tabSections">Sections</button>
+    <button class="btn" id="tabAssignments">Assignments</button>
+  </div>
+
+  <div id="usersPanel">
+    <div class="grid">
+      <div class="col-12">
+        <div style="font-weight:900; margin-bottom:10px;">Create user</div>
+        <form id="createUserForm" class="row">
+          <div class="field"><label>Username</label><input id="newUsername" required></div>
+          <div class="field"><label>Full name</label><input id="newFullName" required></div>
+          <div class="field"><label>Email</label><input id="newEmail" type="email"></div>
+          <div class="field">
+            <label>Role</label>
+            <select id="newRole">
+              <option value="admin">admin</option>
+              <option value="chairman">deputy</option>
+              <option value="minister">minister</option>
+              <option value="supervisor">supervisor</option>
+              <option value="super_collaborator">super-collaborator</option>
+              <option value="protocol">protocol</option>
+              <option value="collaborator">collaborator</option>
+              <option value="viewer">viewer</option>
+            </select>
+          </div>
+          <div class="field"><label>Password</label><input id="newPassword" type="password" required></div>
+          <div style="align-self:flex-end;"><button class="btn primary" type="submit">Create</button></div>
+          <div id="msgUsers" class="small" style="color:var(--danger); font-weight:800;"></div>
+        </form>
+      </div>
+
+      <div class="col-12" style="margin-top:8px;">
+        <div style="font-weight:900; margin-bottom:10px;">Users</div>
+        <table class="table">
+          <thead><tr><th>Username</th><th>Full name</th><th>Email</th><th>Role</th><th>Active</th><th></th></tr></thead>
+          <tbody id="usersTbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div id="sectionsPanel" style="display:none;">
+    <div class="grid">
+      <div class="col-12">
+        <div style="font-weight:900; margin-bottom:10px;">Create section</div>
+        <form id="createSectionForm" class="row">
+          <div class="field"><label>Key</label><input id="newSectionKey" required></div>
+          <div class="field"><label>Label</label><input id="newSectionLabel" required></div>
+          <div class="field"><label>Order</label><input id="newSectionOrder" type="text" value="0"></div>
+          <div style="align-self:flex-end;"><button class="btn primary" type="submit">Create</button></div>
+          <div id="msgSections" class="small" style="color:var(--danger); font-weight:800;"></div>
+        </form>
+      </div>
+
+      <div class="col-12" style="margin-top:8px;">
+        <div style="font-weight:900; margin-bottom:10px;">Sections</div>
+        <table class="table">
+          <thead><tr><th>Key</th><th>Label</th><th>Order</th><th>Active</th><th></th></tr></thead>
+          <tbody id="sectionsTbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div id="assignmentsPanel" style="display:none;">
+    <div class="grid">
+      <div class="col-12">
+        <div style="font-weight:900; margin-bottom:10px;">Assign collaborator to section</div>
+        <form id="assignForm" class="row">
+          <div class="field"><label>Collaborator</label><select id="assignUser"></select></div>
+          <div class="field"><label>Section</label><select id="assignSection"></select></div>
+          <div style="align-self:flex-end;"><button class="btn primary" type="submit">Assign</button></div>
+          <div id="msgAssign" class="small" style="color:var(--danger); font-weight:800;"></div>
+        </form>
+      </div>
+
+      <div class="col-12" style="margin-top:8px;">
+        <div style="font-weight:900; margin-bottom:10px;">Current assignments</div>
+        <table class="table">
+          <thead><tr><th>User</th><th>Section</th><th>Created</th><th></th></tr></thead>
+          <tbody id="assignmentTbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</section>
+
+  </main>
+</div>
+  <script src="js/config.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/app.js"></script>
+  <script src="js/admin.js"></script>
+</body>
+</html>
