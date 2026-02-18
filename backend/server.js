@@ -1376,6 +1376,7 @@ app.post('/api/tp/approve-section', requireRole('supervisor','admin'), async (re
   );
 
   return res.json({ success:true });
+});
 
 app.post('/api/tp/approve-all-sections', requireRole('supervisor','chairman','admin'), async (req, res) => {
   try {
