@@ -1050,6 +1050,77 @@ app.get('/api/events/:id/my-sections', authRequired, attachUser, async (req, res
   }
 });
 
+// Return sections the *current user* is allowed to work on for a given event.
+// This is the single source of truth for collaborator/super-collaborator dropdown filtering.
+// GET /api/my/sections?event_id=123
+app.get('/api/my/sections', authRequired, attachUser, async (req, res) => {
+  try {
+    const eventId = Number(req.query.event_id);
+    if (!Number.isFinite(eventId) || eventId <= 0) return res.status(400).json({ error: 'event_id is required' });
+
+    const roleKey = normalizeRoleKey(req.user?.role_key);
+
+    // For non-collab roles, return required sections (they can view all required sections)
+    if (roleKey !== 'collaborator' && roleKey !== 'super_collaborator') {
+      const r = await pool.query(
+        `
+        SELECT s.id, s.label, s.order_index
+        FROM event_required_sections ers
+        JOIN sections s ON s.id = ers.section_id
+        WHERE ers.event_id = $1
+        ORDER BY s.order_index ASC, s.label ASC
+        `,
+        [eventId]
+      );
+      return res.json({ sections: r.rows });
+    }
+
+    // Collaborator/super-collaborator:
+    // allowed sections = required sections for event ∩ section_assignments for user
+    // plus a country guard (if the user has country assignments set, event.country_id must be one of them)
+    const r = await pool.query(
+      `
+      WITH ev AS (
+        SELECT id, country_id
+        FROM events
+        WHERE id = $1 AND is_active = TRUE
+      ),
+      required AS (
+        SELECT section_id
+        FROM event_required_sections
+        WHERE event_id = $1
+      ),
+      assigned_sections AS (
+        SELECT section_id
+        FROM section_assignments
+        WHERE user_id = $2
+      ),
+      assigned_countries AS (
+        SELECT country_id
+        FROM country_assignments
+        WHERE user_id = $2
+      )
+      SELECT s.id, s.label, s.order_index
+      FROM ev
+      JOIN required rqs ON TRUE
+      JOIN assigned_sections asg ON asg.section_id = rqs.section_id
+      JOIN sections s ON s.id = rqs.section_id
+      WHERE (
+        NOT EXISTS (SELECT 1 FROM assigned_countries)
+        OR ev.country_id IN (SELECT country_id FROM assigned_countries)
+      )
+      ORDER BY s.order_index ASC, s.label ASC
+      `,
+      [eventId, req.user.id]
+    );
+
+    return res.json({ sections: r.rows });
+  } catch (e) {
+    console.error('GET /api/my/sections failed', e);
+    return res.status(500).json({ error: 'Server error' });
+  }
+});
+
 app.post('/api/events', requireRole('admin', 'chairman', 'minister', 'supervisor', 'protocol'), async (req, res) => {
   const { countryId, title, occasion, deadlineDate, requiredSectionIds } = req.body || {};
   if (!countryId || !title) return res.status(400).json({ error: 'countryId and title required' });
