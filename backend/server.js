@@ -1419,7 +1419,6 @@ app.post('/api/tp/approve-all-sections', requireRole('supervisor','chairman','ad
   }
 });
 
-});
 
 app.post('/api/tp/approve-section-chairman', requireRole('chairman','admin'), async (req, res) => {
   const eventId = Number(req.body?.eventId);
