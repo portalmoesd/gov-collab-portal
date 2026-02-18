@@ -1034,8 +1034,8 @@ app.get('/api/events/:id/my-sections', authRequired, attachUser, async (req, res
       [eventId]
     );
 
-    const role = String(req.user.role || '').toLowerCase();
-    if (role === 'collaborator' || role === 'super_collaborator') {
+    const roleKey = normalizeRoleKey(req.user.role_key);
+    if (roleKey === 'collaborator' || roleKey === 'super_collaborator') {
       const assignedSectionIds = new Set((await getAssignedSectionIds(req.user.id)).map(Number));
       const filtered = required.filter(r => assignedSectionIds.has(Number(r.id)));
       return res.json({ required_sections: filtered });
