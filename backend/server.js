@@ -110,13 +110,88 @@ async function ensureRolesExist() {
   }
 }
 
+function extractJsonArrayFromSeed(seedContent, constName) {
+  // Extract a JSON-compatible array literal from seed.js like:
+  // const COUNTRIES = [ ... ];
+  const re = new RegExp(`const\\s+${constName}\\s*=\\s*(\\[[\\s\\S]*?\\])\\s*;`);
+  const m = seedContent.match(re);
+  if (!m) return null;
+  const arrLiteral = m[1];
+  try {
+    return JSON.parse(arrLiteral);
+  } catch {
+    return null;
+  }
+}
+
+async function ensureBaseData() {
+  // Populate core reference data (sections + countries) on a fresh DB.
+  // This is intentionally idempotent and safe to run on every boot.
+  try {
+    // Sections
+    const secCount = await queryOne(`SELECT COUNT(*)::int AS n FROM sections`, []);
+    if ((secCount?.n || 0) === 0) {
+      const DEFAULT_SECTIONS = [
+        ['international_relations', 'International Relations', 10],
+        ['economic_relations', 'Economic Relations', 20],
+        ['investment', 'Investment', 30],
+        ['tourism', 'Tourism', 40],
+        ['transport', 'Transport', 50],
+        ['energy', 'Energy', 60],
+        ['communications_it_post', 'Communications, Information Technology and Post', 70],
+        ['innovation', 'Innovation', 80],
+      ];
+      for (const [key, label, orderIndex] of DEFAULT_SECTIONS) {
+        await pool.query(
+          `INSERT INTO sections (key, label, order_index, is_active, created_at, updated_at)
+           VALUES ($1,$2,$3,TRUE,NOW(),NOW())
+           ON CONFLICT (key) DO UPDATE SET
+             label = EXCLUDED.label,
+             order_index = EXCLUDED.order_index,
+             is_active = TRUE,
+             updated_at = NOW()`,
+          [key, label, orderIndex]
+        );
+      }
+      console.log('Base seed: inserted default sections.');
+    }
+
+    // Countries
+    const cCount = await queryOne(`SELECT COUNT(*)::int AS n FROM countries`, []);
+    if ((cCount?.n || 0) === 0) {
+      const seedPath = path.join(__dirname, 'seed.js');
+      const seedContent = fs.readFileSync(seedPath, 'utf8');
+      const countries = extractJsonArrayFromSeed(seedContent, 'COUNTRIES') || [];
+      if (!countries.length) {
+        console.warn('Base seed: could not extract COUNTRIES from seed.js; skipping countries insert.');
+      } else {
+        for (const [name_en, code] of countries) {
+          await pool.query(
+            `INSERT INTO countries (name_en, code, is_active, created_at, updated_at)
+             VALUES ($1,$2,TRUE,NOW(),NOW())
+             ON CONFLICT (code) DO UPDATE SET
+               name_en = EXCLUDED.name_en,
+               is_active = TRUE,
+               updated_at = NOW()`,
+            [name_en, code]
+          );
+        }
+        console.log(`Base seed: inserted ${countries.length} countries.`);
+      }
+    }
+  } catch (e) {
+    console.error('ensureBaseData failed:', e);
+  }
+}
+
 async function ensureInitialAdmin() {
-  const email = process.env.INIT_ADMIN_EMAIL;
   const password = process.env.INIT_ADMIN_PASSWORD;
   const fullName = process.env.INIT_ADMIN_NAME || 'Admin';
+  const username = process.env.INIT_ADMIN_USERNAME;
+  const email = process.env.INIT_ADMIN_EMAIL || (username ? `${username}@example.com` : null);
 
-  // Only create the first admin if credentials are explicitly provided.
-  if (!email || !password) return;
+  // Create the first admin only if we have at least username + password.
+  if (!username || !password) return;
 
   try {
     const countRow = await queryOne(`SELECT COUNT(*)::int AS n FROM users`, []);
@@ -128,7 +203,6 @@ async function ensureInitialAdmin() {
       return;
     }
 
-    const username = process.env.INIT_ADMIN_USERNAME || email;
     const hash = await bcrypt.hash(password, 10);
     await pool.query(
       `INSERT INTO users (username, password_hash, full_name, email, role_id, is_active)
@@ -1900,6 +1974,7 @@ app.use((err, req, res, next) => {
   try {
     await ensureSchema();
     await ensureRolesExist();
+    await ensureBaseData();
     await ensureInitialAdmin();
   } catch (err) {
     console.error('Startup ensureSchema/ensureRoles failed:', err);
