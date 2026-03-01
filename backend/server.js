@@ -13,6 +13,7 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { Pool } = require('pg');
 const path = require('path');
+const fs = require('fs');
 
 const PORT = process.env.PORT || 3000;
 const DATABASE_URL = process.env.DATABASE_URL;
@@ -49,6 +50,20 @@ app.use(cors({
 /** Utilities **/
 
 async function ensureSchema() {
+
+  // Bootstrap schema on brand-new databases (e.g., a fresh Render Postgres)
+  // so the service can start and login works without manual psql steps.
+  try {
+    const chk = await pool.query(`SELECT to_regclass('public.users') AS tbl`);
+    const hasUsersTable = !!(chk.rows && chk.rows[0] && chk.rows[0].tbl);
+    if (!hasUsersTable) {
+      const schemaPath = path.join(__dirname, 'schema.sql');
+      const ddl = fs.readFileSync(schemaPath, 'utf8');
+      await pool.query(ddl);
+    }
+  } catch (e) {
+    console.error('ensureSchema bootstrap failed:', e);
+  }
 
   // Ensure tp_content columns exist for legacy databases
   await pool.query(`
@@ -92,6 +107,37 @@ async function ensureRolesExist() {
       `INSERT INTO roles(key,label) VALUES($1,$2) ON CONFLICT (key) DO NOTHING`,
       [key,label]
     );
+  }
+}
+
+async function ensureInitialAdmin() {
+  const email = process.env.INIT_ADMIN_EMAIL;
+  const password = process.env.INIT_ADMIN_PASSWORD;
+  const fullName = process.env.INIT_ADMIN_NAME || 'Admin';
+
+  // Only create the first admin if credentials are explicitly provided.
+  if (!email || !password) return;
+
+  try {
+    const countRow = await queryOne(`SELECT COUNT(*)::int AS n FROM users`, []);
+    if ((countRow?.n || 0) > 0) return;
+
+    const roleRow = await queryOne(`SELECT id FROM roles WHERE key='admin'`, []);
+    if (!roleRow?.id) {
+      console.error('Cannot init admin: roles table missing admin role.');
+      return;
+    }
+
+    const username = process.env.INIT_ADMIN_USERNAME || email;
+    const hash = await bcrypt.hash(password, 10);
+    await pool.query(
+      `INSERT INTO users (username, password_hash, full_name, email, role_id, is_active)
+       VALUES ($1,$2,$3,$4,$5,TRUE)`,
+      [username, hash, fullName, email, roleRow.id]
+    );
+    console.log('Initial admin user created:', username);
+  } catch (e) {
+    console.error('ensureInitialAdmin failed:', e);
   }
 }
 
@@ -1854,6 +1900,7 @@ app.use((err, req, res, next) => {
   try {
     await ensureSchema();
     await ensureRolesExist();
+    await ensureInitialAdmin();
   } catch (err) {
     console.error('Startup ensureSchema/ensureRoles failed:', err);
   }

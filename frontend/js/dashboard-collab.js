@@ -3,74 +3,137 @@
   const me = await window.GCP.requireAuth();
   if (!me) return;
 
-  const eventsTbody = document.getElementById("eventsTbody");
-  const eventSelect = document.getElementById("eventSelect");
-  const countrySelect = document.getElementById("countrySelect");
-  const sectionSelect = document.getElementById("sectionSelect");
-  const openBtn = document.getElementById("openEditorBtn");
-  const msg = document.getElementById("msg");
+  const eventsTbody = document.getElementById('eventsTbody');
+  const eventSelect = document.getElementById('eventSelect');
+  const sectionSelect = document.getElementById('sectionSelect');
+  const openBtn = document.getElementById('openEditorBtn');
+  const msg = document.getElementById('msg');
+  const sectionStatusBox = document.getElementById('sectionStatusBox');
+
+  function humanStatus(s){
+    const map = {
+      draft: 'Draft',
+      submitted: 'Submitted',
+      returned: 'Returned',
+      approved_by_supervisor: 'Approved (Supervisor)',
+      approved_by_chairman: 'Approved (Deputy)'
+    };
+    return map[s] || (s || '');
+  }
+
+  function showSectionStatus(tp){
+    if (!sectionStatusBox) return;
+    if (!tp){
+      sectionStatusBox.style.display = 'none';
+      sectionStatusBox.textContent = '';
+      return;
+    }
+    const note = (tp.statusComment || '').trim();
+    const last = tp.lastUpdatedAt ? window.GCP.formatDateTime(tp.lastUpdatedAt) : '';
+    sectionStatusBox.style.display = 'block';
+    sectionStatusBox.innerHTML = `
+      <div><b>Status:</b> ${window.GCP.escapeHtml(humanStatus(tp.status))}</div>
+      ${last ? `<div class="small muted" style="margin-top:4px;">Last updated: ${window.GCP.escapeHtml(last)}${tp.lastUpdatedBy ? ' • ' + window.GCP.escapeHtml(tp.lastUpdatedBy) : ''}</div>` : ''}
+      ${note ? `<div style="margin-top:8px; padding:8px 10px; border-radius:10px; border:1px solid rgba(220,38,38,.25); background: rgba(254,226,226,.55);"><b>Supervisor/Deputy comment:</b> ${window.GCP.escapeHtml(note)}</div>` : ''}
+    `;
+  }
+
+  function setMsg(text, isError=false){
+    msg.textContent = text || '';
+    msg.style.color = isError ? 'crimson' : '#2b445b';
+  }
 
   async function loadUpcoming(){
-    const events = await window.GCP.apiFetch("/events/upcoming", { method:"GET" });
-    eventsTbody.innerHTML = "";
+    const events = await window.GCP.apiFetch('/events/upcoming', { method:'GET' });
+    eventsTbody.innerHTML = '';
     eventSelect.innerHTML = `<option value="">Select event...</option>`;
-    for (const ev of events){
-      const tr = document.createElement("tr");
+    sectionSelect.innerHTML = `<option value="">Select section...</option>`;
+    sectionSelect.disabled = true;
+
+    for (const ev of (events || [])) {
+      const tr = document.createElement('tr');
       tr.innerHTML = `
-        <td>${window.GCP.escapeHtml(ev.title)}</td>
-        <td>${window.GCP.escapeHtml(ev.country_name_en)}</td>
-        <td>${ev.deadline_date ? window.GCP.escapeHtml(ev.deadline_date) : '<span class="muted">—</span>'}</td>
-        <td><button class="btn" data-eid="${ev.id}">Select</button></td>
+        <td>${ev.title || ''}</td>
+        <td>${ev.country_name_en || ''}</td>
+        <td>${ev.occasion || ''}</td>
+        <td>${window.GCP.formatDate(ev.deadline_date) || ''}</td>
       `;
-      tr.querySelector("button").addEventListener("click", () => {
-        eventSelect.value = String(ev.id);
-      });
       eventsTbody.appendChild(tr);
 
-      const opt = document.createElement("option");
+      const opt = document.createElement('option');
       opt.value = ev.id;
-      opt.textContent = `${ev.title} (${ev.country_name_en}${ev.deadline_date ? ', ' + ev.deadline_date : ''})`;
+      opt.textContent = `${ev.title || 'Event'} (${ev.country_name_en || ''}${ev.deadline_date ? ', ' + window.GCP.formatDate(ev.deadline_date) : ''})`;
       eventSelect.appendChild(opt);
     }
   }
 
-  async function loadCountries(){
-    const countries = await window.GCP.apiFetch("/countries", { method:"GET" });
-    countrySelect.innerHTML = `<option value="">Select country...</option>`;
-    for (const c of countries){
-      const opt = document.createElement("option");
-      opt.value = c.id;
-      opt.textContent = c.name_en;
-      countrySelect.appendChild(opt);
-    }
-  }
+  async function loadSectionsForEvent(eventId){
+    sectionSelect.innerHTML = `<option value="">Loading...</option>`;
+    console.debug('Loading allowed sections for event', eventId);
 
-  async function loadMySections(){
-    const sections = await window.GCP.apiFetch("/sections?mine=1", { method:"GET" });
+    sectionSelect.disabled = true;
+
+    // Single source of truth: backend filters by assignments for collaborators/super-collaborators.
+    const r = await window.GCP.apiFetch(`/my/sections?event_id=${encodeURIComponent(eventId)}`, { method:'GET' });
+    const sections = (r.sections || []).slice().sort((a,b)=> ((a.order_index||a.sort_order||0) - (b.order_index||b.sort_order||0)));
+
     sectionSelect.innerHTML = `<option value="">Select section...</option>`;
     for (const s of sections){
-      const opt = document.createElement("option");
-      opt.value = s.id;
+      const opt = document.createElement('option');
+      opt.value = (s.id != null ? s.id : s.section_id);
       opt.textContent = s.label;
       sectionSelect.appendChild(opt);
     }
+    sectionSelect.disabled = false;
+
+    // reset status box
+    showSectionStatus(null);
   }
 
-  openBtn.addEventListener("click", () => {
-    msg.textContent = "";
-    const eventId = eventSelect.value;
-    const countryId = countrySelect.value;
-    const sectionId = sectionSelect.value;
-    if (!eventId || !countryId || !sectionId){
-      msg.textContent = "Please select event, country and section.";
+  eventSelect.addEventListener('change', async () => {
+    setMsg('');
+    setMsg('');
+    const eventId = Number(eventSelect.value);
+    if (!Number.isFinite(eventId)) {
+      sectionSelect.innerHTML = `<option value="">Select section...</option>`;
+      sectionSelect.disabled = true;
       return;
     }
-    location.href = `editor.html?eventId=${encodeURIComponent(eventId)}&countryId=${encodeURIComponent(countryId)}&sectionId=${encodeURIComponent(sectionId)}`;
+    try{
+      await loadSectionsForEvent(eventId);
+    }catch(e){
+      setMsg(e.message || 'Failed to load event', true);
+      sectionSelect.innerHTML = `<option value="">Select section...</option>`;
+      sectionSelect.disabled = true;
+    }
   });
 
-  try{
-    await Promise.all([loadUpcoming(), loadCountries(), loadMySections()]);
-  }catch(err){
-    msg.textContent = err.message || "Failed to load data";
-  }
+  sectionSelect.addEventListener('change', async () => {
+    setMsg('');
+    const eventId = Number(eventSelect.value);
+    const sectionId = Number(sectionSelect.value);
+    if (!Number.isFinite(eventId) || !Number.isFinite(sectionId)) {
+      showSectionStatus(null);
+      return;
+    }
+    try{
+      const tp = await window.GCP.apiFetch(`/tp?event_id=${encodeURIComponent(eventId)}&section_id=${encodeURIComponent(sectionId)}`, { method:'GET' });
+      showSectionStatus(tp);
+    }catch(e){
+      showSectionStatus(null);
+    }
+  });
+
+  openBtn.addEventListener('click', () => {
+    setMsg('');
+    const eventId = Number(eventSelect.value);
+    const sectionId = Number(sectionSelect.value);
+    if (!Number.isFinite(eventId) || !Number.isFinite(sectionId)) {
+      setMsg('Please select an event and a section.', true);
+      return;
+    }
+    window.location.href = `editor.html?event_id=${eventId}&section_id=${sectionId}`;
+  });
+
+  await loadUpcoming();
 })();
