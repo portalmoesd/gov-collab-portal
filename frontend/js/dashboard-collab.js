@@ -32,11 +32,15 @@
     const last = tp.lastUpdatedAt ? window.GCP.formatDateTime(tp.lastUpdatedAt) : '';
     sectionStatusBox.style.display = 'block';
     sectionStatusBox.innerHTML = `
-      <div><b>Status:</b> ${window.GCP.escapeHtml(humanStatus(tp.status))}</div>
-      ${last ? `<div class="small muted" style="margin-top:4px;">Last updated: ${window.GCP.escapeHtml(last)}${tp.lastUpdatedBy ? ' • ' + window.GCP.escapeHtml(tp.lastUpdatedBy) : ''}</div>` : ''}
-      ${note ? `<div style="margin-top:8px; padding:8px 10px; border-radius:10px; border:1px solid rgba(220,38,38,.25); background: rgba(254,226,226,.55);"><b>Supervisor/Deputy comment:</b> ${window.GCP.escapeHtml(note)}</div>` : ''}
+      <div style="margin-bottom:8px;"><b>Status:</b> ${window.GCP.escapeHtml(humanStatus(tp.status))}</div>
+      <div>${renderStatusProgress(tp.status)}</div>
+      ${last ? `<div class="small muted" style="margin-top:6px;">Last updated: ${window.GCP.escapeHtml(last)}${tp.lastUpdatedBy ? ' • ' + window.GCP.escapeHtml(tp.lastUpdatedBy) : ''}</div>` : ''}
+      ${note ? `<div style="margin-top:10px; padding:8px 10px; border-radius:10px; border:1px solid rgba(220,38,38,.25); background: rgba(254,226,226,.55);"><b>Supervisor/Deputy comment:</b> ${window.GCP.escapeHtml(note)}</div>` : ''}
+      <div style="margin-top:12px;"><b>Task:</b> ${window.GCP.escapeHtml((taskText || '').trim() || '—')}</div>
     `;
   }
+
+
 
   function setMsg(text, isError=false){
     msg.textContent = text || '';
