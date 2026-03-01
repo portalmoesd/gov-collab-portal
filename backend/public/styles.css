@@ -274,26 +274,32 @@ textarea{min-height:120px; resize:vertical}
 
 /* Status progress bar (Collaborator/Super-collab status box) */
 .gcp-progress{
+  position:relative;
   display:flex;
-  gap:18px;
   align-items:flex-start;
-  flex-wrap:wrap;
+  flex-wrap:nowrap;
+  gap:0;
+  padding:4px 2px 0;
+  overflow-x:auto;
+}
+.gcp-progress::before{
+  content:"";
+  position:absolute;
+  left:11px;
+  right:11px;
+  top:13px;
+  height:2px;
+  background: rgba(43,68,91,.18);
+  z-index:0;
 }
 .gcp-step{
   position:relative;
   display:flex;
+  flex:1 0 96px;
+  flex-direction:column;
   align-items:center;
-  gap:10px;
-}
-.gcp-step:not(:last-child)::after{
-  content:"";
-  position:absolute;
-  left:20px;
-  top:10px;
-  width:32px;
-  height:2px;
-  background: rgba(43,68,91,.18);
-  z-index:0;
+  gap:6px;
+  min-width:96px;
 }
 .gcp-dot{
   position:relative;
