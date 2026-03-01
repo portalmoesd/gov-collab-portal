@@ -271,3 +271,50 @@ textarea{min-height:120px; resize:vertical}
   color:var(--ink);
   margin:0 0 8px;
 }
+
+/* Status progress bar (Collaborator/Super-collab status box) */
+.gcp-progress{
+  display:flex;
+  gap:18px;
+  align-items:flex-start;
+  flex-wrap:wrap;
+}
+.gcp-step{
+  position:relative;
+  display:flex;
+  align-items:center;
+  gap:10px;
+}
+.gcp-step:not(:last-child)::after{
+  content:"";
+  position:absolute;
+  left:20px;
+  top:10px;
+  width:32px;
+  height:2px;
+  background: rgba(43,68,91,.18);
+}
+.gcp-dot{
+  width:18px;
+  height:18px;
+  border-radius:999px;
+  border:2px solid rgba(43,68,91,.28);
+  background:#fff;
+  flex:0 0 auto;
+}
+.gcp-label{
+  font-size:12px;
+  color: rgba(43,68,91,.75);
+  white-space:nowrap;
+}
+.gcp-step.done .gcp-dot{
+  background: rgba(16,185,129,.18);
+  border-color: rgba(16,185,129,.65);
+}
+.gcp-step.active .gcp-dot{
+  background: rgba(59,130,246,.18);
+  border-color: rgba(59,130,246,.7);
+}
+.gcp-step.todo .gcp-dot{
+  background:#fff;
+}

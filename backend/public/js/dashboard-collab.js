@@ -16,11 +16,43 @@
     const map = {
       draft: 'Draft',
       submitted: 'Submitted',
+      submitted_to_deputy: 'Submitted (Deputy)',
       returned: 'Returned',
       approved_by_supervisor: 'Approved (Supervisor)',
       approved_by_chairman: 'Approved (Deputy)'
     };
     return map[s] || (s || '');
+  }
+
+  function statusStageIndex(status){
+    // 0 Draft/Returned  | 1 Submitted to Supervisor | 2 Submitted to Deputy | 3 Approved
+    if (status === 'approved_by_chairman') return 3;
+    if (status === 'submitted_to_deputy' || status === 'approved_by_supervisor') return 2;
+    if (status === 'submitted') return 1;
+    return 0;
+  }
+
+  function renderStatusProgress(status){
+    const idx = statusStageIndex(status);
+    const steps = [
+      { label: 'Draft' },
+      { label: 'To Supervisor' },
+      { label: 'To Deputy' },
+      { label: 'Approved' },
+    ];
+    return `
+      <div class="gcp-progress" role="list" aria-label="Document status progress">
+        ${steps.map((s,i)=>{
+          const state = i < idx ? 'done' : (i === idx ? 'active' : 'todo');
+          return `
+            <div class="gcp-step ${state}" role="listitem">
+              <div class="gcp-dot" aria-hidden="true"></div>
+              <div class="gcp-label">${window.GCP.escapeHtml(s.label)}</div>
+            </div>
+          `;
+        }).join('')}
+      </div>
+    `;
   }
 
   function showSectionStatus(tp, taskText){
@@ -35,7 +67,8 @@
     sectionStatusBox.style.display = 'block';
     sectionStatusBox.innerHTML = `
       <div><b>Task:</b> ${window.GCP.escapeHtml((taskText || '').trim() || '—')}</div>
-      <div style="margin-top:6px;"><b>Status:</b> ${window.GCP.escapeHtml(humanStatus(tp.status))}</div>
+      <div style="margin-top:10px;">${renderStatusProgress(tp.status)}</div>
+      <div style="margin-top:8px;"><b>Status:</b> ${window.GCP.escapeHtml(humanStatus(tp.status))}</div>
       ${last ? `<div class="small muted" style="margin-top:4px;">Last updated: ${window.GCP.escapeHtml(last)}${tp.lastUpdatedBy ? ' • ' + window.GCP.escapeHtml(tp.lastUpdatedBy) : ''}</div>` : ''}
       ${note ? `<div style="margin-top:8px; padding:8px 10px; border-radius:10px; border:1px solid rgba(220,38,38,.25); background: rgba(254,226,226,.55);"><b>Supervisor/Deputy comment:</b> ${window.GCP.escapeHtml(note)}</div>` : ''}
     `;
