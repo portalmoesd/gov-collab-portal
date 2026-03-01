@@ -9,6 +9,8 @@
   const openBtn = document.getElementById('openEditorBtn');
   const msg = document.getElementById('msg');
   const sectionStatusBox = document.getElementById('sectionStatusBox');
+  const eventsById = new Map();
+
 
   function humanStatus(s){
     const map = {
@@ -21,7 +23,7 @@
     return map[s] || (s || '');
   }
 
-  function showSectionStatus(tp){
+  function showSectionStatus(tp, taskText){
     if (!sectionStatusBox) return;
     if (!tp){
       sectionStatusBox.style.display = 'none';
@@ -32,7 +34,8 @@
     const last = tp.lastUpdatedAt ? window.GCP.formatDateTime(tp.lastUpdatedAt) : '';
     sectionStatusBox.style.display = 'block';
     sectionStatusBox.innerHTML = `
-      <div><b>Status:</b> ${window.GCP.escapeHtml(humanStatus(tp.status))}</div>
+      <div><b>Task:</b> ${window.GCP.escapeHtml((taskText || '').trim() || '—')}</div>
+      <div style="margin-top:6px;"><b>Status:</b> ${window.GCP.escapeHtml(humanStatus(tp.status))}</div>
       ${last ? `<div class="small muted" style="margin-top:4px;">Last updated: ${window.GCP.escapeHtml(last)}${tp.lastUpdatedBy ? ' • ' + window.GCP.escapeHtml(tp.lastUpdatedBy) : ''}</div>` : ''}
       ${note ? `<div style="margin-top:8px; padding:8px 10px; border-radius:10px; border:1px solid rgba(220,38,38,.25); background: rgba(254,226,226,.55);"><b>Supervisor/Deputy comment:</b> ${window.GCP.escapeHtml(note)}</div>` : ''}
     `;
@@ -45,6 +48,9 @@
 
   async function loadUpcoming(){
     const events = await window.GCP.apiFetch('/events/upcoming', { method:'GET' });
+    eventsById.clear();
+    for (const ev of (events || [])) eventsById.set(Number(ev.id), ev);
+
     eventsTbody.innerHTML = '';
     eventSelect.innerHTML = `<option value="">Select event...</option>`;
     sectionSelect.innerHTML = `<option value="">Select section...</option>`;
@@ -87,7 +93,7 @@
     sectionSelect.disabled = false;
 
     // reset status box
-    showSectionStatus(null);
+    showSectionStatus(null, (eventsById.get(Number(eventSelect.value))||{}).occasion||'');
   }
 
   eventSelect.addEventListener('change', async () => {
@@ -113,14 +119,14 @@
     const eventId = Number(eventSelect.value);
     const sectionId = Number(sectionSelect.value);
     if (!Number.isFinite(eventId) || !Number.isFinite(sectionId)) {
-      showSectionStatus(null);
+      showSectionStatus(null, (eventsById.get(Number(eventSelect.value))||{}).occasion||'');
       return;
     }
     try{
       const tp = await window.GCP.apiFetch(`/tp?event_id=${encodeURIComponent(eventId)}&section_id=${encodeURIComponent(sectionId)}`, { method:'GET' });
-      showSectionStatus(tp);
+      showSectionStatus(tp, (eventsById.get(eventId)||{}).occasion||'');
     }catch(e){
-      showSectionStatus(null);
+      showSectionStatus(null, (eventsById.get(Number(eventSelect.value))||{}).occasion||'');
     }
   });
 
