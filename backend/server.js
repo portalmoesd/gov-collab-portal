@@ -1241,7 +1241,8 @@ app.get('/api/my/sections', authRequired, attachUser, async (req, res) => {
   }
 });
 
-app.post('/api/events', requireRole('admin', 'chairman', 'minister', 'supervisor', 'protocol'), async (req, res) => {
+// Super-collaborators can also create/update events (they still cannot end events)
+app.post('/api/events', requireRole('admin', 'chairman', 'minister', 'supervisor', 'protocol', 'super_collaborator'), async (req, res) => {
   const { countryId, title, occasion, deadlineDate, requiredSectionIds } = req.body || {};
   if (!countryId || !title) return res.status(400).json({ error: 'countryId and title required' });
 
@@ -1290,7 +1291,7 @@ app.post('/api/events', requireRole('admin', 'chairman', 'minister', 'supervisor
   }
 });
 
-app.put('/api/events/:id', requireRole('admin', 'chairman', 'minister', 'supervisor', 'protocol'), async (req, res) => {
+app.put('/api/events/:id', requireRole('admin', 'chairman', 'minister', 'supervisor', 'protocol', 'super_collaborator'), async (req, res) => {
   const eventId = Number(req.params.id);
   if (!Number.isFinite(eventId)) return res.status(400).json({ error: 'Invalid id' });
 

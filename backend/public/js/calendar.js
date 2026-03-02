@@ -4,7 +4,8 @@
   if (!me) return;
 
   const role = String(me.role).toLowerCase();
-  const canManage = ['admin','chairman','supervisor','protocol'].includes(role);
+  // Super-collaborators are allowed to create/edit events
+  const canManage = ['admin','chairman','supervisor','protocol','super_collaborator'].includes(role);
   const canEnd = ['admin','chairman','supervisor','protocol'].includes(role);
 
   const msg = document.getElementById("msg");
