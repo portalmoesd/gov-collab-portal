@@ -77,7 +77,9 @@
     sectionsTbody.innerHTML = '';
     docStatusBox.innerHTML = '';
     const evId = Number(eventSelect.value);
-    if (!Number.isFinite(evId)) {
+    // When no event is selected, the <select> value is "" which becomes 0.
+    // Guard against calling APIs with event_id=0.
+    if (!Number.isFinite(evId) || evId <= 0) {
       currentEventId = null;
       approveDocBtn.disabled = true;
       returnDocBtn.disabled = true;
@@ -87,8 +89,8 @@
     }
     currentEventId = evId;
 
-    // End-event button visibility (Deputy should not see it; Admin/Protocol may)
-    endEventBtn.style.display = canEndEvent ? '' : 'none';
+    // End event button visibility (Deputy should not see it; Admin/Protocol may)
+    endEventBtn.style.display = canEndEvent ? 'inline-flex' : 'none';
 
     // Document status
     const ds = await window.GCP.apiFetch(`/tp/document-status?event_id=${encodeURIComponent(currentEventId)}`, { method:'GET' });
@@ -229,11 +231,15 @@
     if (!currentEventId) return;
     if (!confirm('Approve all required sections for this event?')) return;
     setMsg('');
-    await window.GCP.apiFetch('/tp/approve-all-sections', {
-      method:'POST',
-      body: JSON.stringify({ eventId: currentEventId })
-    });
-    await refreshStatusGrid();
+    try{
+      await window.GCP.apiFetch('/tp/approve-all-sections', {
+        method:'POST',
+        body: JSON.stringify({ eventId: currentEventId })
+      });
+      await refresh();
+    }catch(e){
+      setMsg(e.message || 'Failed to approve all sections', true);
+    }
   });
 
 eventSelect.addEventListener('change', refresh);
