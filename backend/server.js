@@ -1042,6 +1042,17 @@ app.get('/api/events', authRequired, attachUser, async (req, res) => {
     where.push(`EXISTS (SELECT 1 FROM event_required_sections ers WHERE ers.event_id=e.id AND ers.section_id = ANY($${idx++}::int[]))`); vals.push(sections);
   }
 
+  // Document submitter visibility rules
+  // - If submitter is Supervisor, Deputy and Minister should not see the event.
+  // - If submitter is Deputy, Minister should not see the event.
+  // - If submitter is Minister, only Minister sees it at final stage.
+  if (roleKey === 'chairman') {
+    where.push(`COALESCE(e.submitter_role,'chairman') <> 'supervisor'`);
+  }
+  if (roleKey === 'minister') {
+    where.push(`COALESCE(e.submitter_role,'chairman') = 'minister'`);
+  }
+
   if (roleKey === 'chairman') {
     where.push(`COALESCE(e.submitter_role,'chairman') <> 'supervisor'`);
   }

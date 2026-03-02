@@ -140,7 +140,7 @@ eventSelect.addEventListener('change', async () => {
     try {
       const ev = await window.GCP.apiFetch(`/events/${currentEventId}`, { method:'GET' });
       const sr = String(ev.submitterRole || '').toLowerCase();
-      submitDocBtn.textContent = sr === 'supervisor' ? 'Approve document' : 'Submit document to Deputy';
+      submitDocBtn.textContent = sr === 'supervisor' ? 'Send to Library' : 'Submit document to Deputy';
     } catch (e) {
       submitDocBtn.textContent = 'Submit document to Deputy';
     }
@@ -186,11 +186,29 @@ modalBackdrop.addEventListener('click', (e) => {
   submitDocBtn.addEventListener('click', async () => {
     if (!currentEventId) return;
     setMsg('');
-    try{
+    try {
+      // Determine the configured submitter for this event (Supervisor/Deputy/Minister)
+      let sr = '';
+      try {
+        const ev = await window.GCP.apiFetch(`/events/${currentEventId}`, { method: 'GET' });
+        sr = String(ev.submitterRole || '').toLowerCase();
+      } catch (e) { sr = ''; }
+
       await window.GCP.apiFetch('/document/submit-to-chairman', {
-        method:'POST',
+        method: 'POST',
         body: JSON.stringify({ eventId: currentEventId })
       });
+
+      if (sr === 'supervisor') {
+        setMsg('Document finalized and sent to Library.');
+      } else {
+        setMsg('Submitted to Deputy.');
+      }
+      await refreshStatusGrid();
+    } catch (e) {
+      setMsg(e.message || 'Submit failed', true);
+    }
+  });
       setMsg('Submitted to Deputy.');
       await refreshStatusGrid();
     }catch(e){
