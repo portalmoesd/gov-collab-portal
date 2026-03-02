@@ -31,7 +31,13 @@
 
   async function loadCountries(){
     const countries = await window.GCP.apiFetch("/countries", { method:"GET" });
+    if (!countrySelect) return;
     countrySelect.innerHTML = `<option value="">Select country</option>` + countries.map(c => `<option value="${c.id}">${window.GCP.escapeHtml(c.name_en)}</option>`).join("");
+    // Auto-select first country to avoid an empty library view.
+    if (countries.length) {
+      countrySelect.value = String(countries[0].id);
+      await loadDocs();
+    }
   }
 
   function fmtDate(s){
@@ -86,7 +92,7 @@
           <h2 style="margin:0 0 6px;">${window.GCP.escapeHtml(doc.event.title)}</h2>
           <div class="small muted">${window.GCP.escapeHtml(doc.event.countryName)}</div>
         </div>
-        <div class="small muted">Last updated: ${doc.documentStatus?.updatedAt ? window.GCP.escapeHtml(fmt(doc.documentStatus.updatedAt)) : '—'}</div>
+        <div class="small muted">Last updated: ${doc.documentStatus?.updatedAt ? window.GCP.escapeHtml(fmtDateTime(doc.documentStatus.updatedAt)) : '—'}</div>
       </div>
       <hr style="margin:12px 0; border:none; border-top:1px solid var(--border);" />`);
 
@@ -193,7 +199,9 @@
     }
   }
 
-  countrySelect.addEventListener("change", loadDocs);
+  if (countrySelect) {
+    countrySelect.addEventListener("change", loadDocs);
+  }
 
   try{
     await loadCountries();
