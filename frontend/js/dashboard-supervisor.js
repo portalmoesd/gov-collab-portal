@@ -13,7 +13,40 @@
   const eventSelect = document.getElementById("eventSelect");
   const sectionsTbody = document.getElementById("sectionsTbody");
   const docStatusBox = document.getElementById("docStatusBox");
+    const submitter = String(ev.submitter_role || 'chairman').toLowerCase();
+    if (submitter === 'supervisor'){
+      submitDocBtn.textContent = 'Send to Library';
+      submitDocBtn.dataset.mode = 'library';
+    } else {
+      submitDocBtn.textContent = 'Submit document to Deputy';
+      submitDocBtn.dataset.mode = 'deputy';
+    }
+  }
   const submitDocBtn = document.getElementById("submitDocBtn");
+
+  let eventsCache = new Map();
+
+  function getSelectedEvent(){
+    const id = String(eventSelect.value || '');
+    return eventsCache.get(id) || null;
+  }
+
+  function updateSubmitButton(){
+    const ev = getSelectedEvent();
+    if (!ev){
+      submitDocBtn.textContent = 'Submit document';
+      submitDocBtn.dataset.mode = '';
+      return;
+    }
+    const submitter = String(ev.submitter_role || 'chairman').toLowerCase();
+    if (submitter === 'supervisor'){
+      submitDocBtn.textContent = 'Send to Library';
+      submitDocBtn.dataset.mode = 'library';
+    } else {
+      submitDocBtn.textContent = 'Submit document to Deputy';
+      submitDocBtn.dataset.mode = 'deputy';
+    }
+  }
   const previewFullBtn = document.getElementById("previewFullBtn");
   const msg = document.getElementById("msg");
 
@@ -43,7 +76,9 @@
       return;
     }
     const events = await window.GCP.apiFetch(`/events?is_active=true&country_id=${encodeURIComponent(countryId)}`, { method:"GET" });
+    eventsCache = new Map(events.map(ev => [String(ev.id), ev]));
     eventSelect.innerHTML = `<option value="">Select event</option>` + events.map(ev => `<option value="${ev.id}">${window.GCP.escapeHtml(ev.title)}</option>`).join("");
+    updateSubmitButton();
   }
 
   async function refresh(){
@@ -53,6 +88,7 @@
 
     const countryId = countrySelect.value;
     const eventId = eventSelect.value;
+    updateSubmitButton();
 
     if (!countryId || !eventId){
       msg.textContent = "Please choose a country and an event.";
@@ -121,14 +157,16 @@
       msg.textContent = "Choose a country and event first.";
       return;
     }
-    if (!confirm("Submit the entire document to Deputy?")) return;
+    const mode = submitDocBtn.dataset.mode;
+    const confirmMsg = (mode === "library") ? "Send the entire document to Library?" : "Submit the entire document to Deputy?";
+    if (!confirm(confirmMsg)) return;
     try{
       await window.GCP.apiFetch("/tp/submit-document", {
         method:"POST",
         body: JSON.stringify({ eventId: Number(eventId), countryId: Number(countryId) })
       });
       await refresh();
-      msg.textContent = "Submitted to Deputy.";
+      msg.textContent = (mode === "library") ? "Sent to Library." : "Submitted to Deputy.";
     }catch(err){
       msg.textContent = err.message || "Submit failed";
     }
@@ -142,7 +180,7 @@
     msg.textContent = "";
   });
 
-  eventSelect.addEventListener("change", refresh);
+  eventSelect.addEventListener("change", () => { updateSubmitButton(); refresh(); });
 
   try{
     await loadCountries();
