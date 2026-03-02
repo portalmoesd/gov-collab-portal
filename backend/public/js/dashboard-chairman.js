@@ -87,7 +87,9 @@
     }
     currentEventId = evId;
 
-    if (canEndEvent)
+    // End-event button visibility (Deputy should not see it; Admin/Protocol may)
+    endEventBtn.style.display = canEndEvent ? '' : 'none';
+
     // Document status
     const ds = await window.GCP.apiFetch(`/tp/document-status?event_id=${encodeURIComponent(currentEventId)}`, { method:'GET' });
     const last = ds.updatedAt ? window.GCP.formatDateTime(ds.updatedAt) : '';
