@@ -136,6 +136,14 @@ eventSelect.addEventListener('change', async () => {
       endEventBtn.style.display = 'none';
       return;
     }
+    // Adjust document submit button label based on configured submitter
+    try {
+      const ev = await window.GCP.apiFetch(`/events/${currentEventId}`, { method:'GET' });
+      const sr = String(ev.submitterRole || '').toLowerCase();
+      submitDocBtn.textContent = sr === 'supervisor' ? 'Approve document' : 'Submit document to Deputy';
+    } catch (e) {
+      submitDocBtn.textContent = 'Submit document to Deputy';
+    }
     try{
       await refreshStatusGrid();
     }catch(e){

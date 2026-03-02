@@ -77,6 +77,7 @@ async function ensureSchema() {
   await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS deleted_by_user_id INTEGER`);
   await pool.query(`ALTER TABLE events ADD COLUMN IF NOT EXISTS ended_at TIMESTAMP`);
   await pool.query(`ALTER TABLE events ADD COLUMN IF NOT EXISTS ended_by_user_id INTEGER`);
+  await pool.query(`ALTER TABLE events ADD COLUMN IF NOT EXISTS submitter_role TEXT NOT NULL DEFAULT 'chairman'`).catch(()=>{});
   await pool.query(`
     CREATE TABLE IF NOT EXISTS country_assignments (
       user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
@@ -241,6 +242,11 @@ async function eventHasAnyRequiredSection(eventId, sectionIds){
 
 async function userCanSeeEvent(user, event){
   const roleKey = normalizeRoleKey(user.role_key);
+  // Submitter visibility rules
+  const submitterRole = String(event.submitter_role || 'chairman').toLowerCase();
+  if (roleKey === 'chairman' && submitterRole === 'supervisor') return false;
+  if (roleKey === 'minister' && submitterRole !== 'minister') return false;
+
   if (roleKey !== 'collaborator' && roleKey !== 'super_collaborator') return true;
 
   const countries = await getAssignedCountryIds(user.id);
@@ -468,6 +474,7 @@ async function getEventWithSections(eventId, countryIdForStatuses = null) {
     countryCode: event.country_code,
     title: event.title,
     occasion: event.occasion,
+    submitterRole: event.submitter_role,
     deadlineDate: event.deadline_date,
     isActive: event.is_active,
     createdAt: event.created_at,
@@ -1035,10 +1042,28 @@ app.get('/api/events', authRequired, attachUser, async (req, res) => {
     where.push(`EXISTS (SELECT 1 FROM event_required_sections ers WHERE ers.event_id=e.id AND ers.section_id = ANY($${idx++}::int[]))`); vals.push(sections);
   }
 
+  if (roleKey === 'chairman') {
+    where.push(`COALESCE(e.submitter_role,'chairman') <> 'supervisor'`);
+  }
+  if (roleKey === 'minister') {
+    where.push(`COALESCE(e.submitter_role,'chairman') = 'minister'`);
+  }
+
+  // Document submitter visibility rules:
+  // - If submitter is Supervisor, Deputy and Minister should not see the event.
+  // - If submitter is Deputy, Minister should not see the event.
+  // - If submitter is Minister, everyone can see (normal workflow).
+  if (roleKey === 'chairman') {
+    where.push(`COALESCE(e.submitter_role,'chairman') <> 'supervisor'`);
+  }
+  if (roleKey === 'minister') {
+    where.push(`COALESCE(e.submitter_role,'chairman') = 'minister'`);
+  }
+
   const rows = await queryAll(
     `
     SELECT e.id, e.country_id, c.name_en AS country_name_en, c.code AS country_code,
-           e.title, e.occasion, e.deadline_date, e.is_active, e.ended_at, e.created_at, e.updated_at
+           e.title, e.occasion, e.submitter_role, e.deadline_date, e.is_active, e.ended_at, e.created_at, e.updated_at
     FROM events e
     JOIN countries c ON c.id = e.country_id
     ${where.length ? `WHERE ${where.join(' AND ')}` : ''}
@@ -1071,7 +1096,7 @@ app.get('/api/events/upcoming', authRequired, attachUser, async (req, res) => {
   const rows = await queryAll(
     `
     SELECT e.id, e.country_id, c.name_en AS country_name_en, c.code AS country_code,
-           e.title, e.occasion, e.deadline_date, e.ended_at
+           e.title, e.occasion, e.submitter_role, e.deadline_date, e.ended_at
     FROM events e
     JOIN countries c ON c.id = e.country_id
     WHERE ${where.join(' AND ')}
@@ -1243,8 +1268,12 @@ app.get('/api/my/sections', authRequired, attachUser, async (req, res) => {
 
 // Super-collaborators can also create/update events (they still cannot end events)
 app.post('/api/events', requireRole('admin', 'chairman', 'minister', 'supervisor', 'protocol', 'super_collaborator'), async (req, res) => {
-  const { countryId, title, occasion, deadlineDate, requiredSectionIds } = req.body || {};
+  const { countryId, title, occasion, deadlineDate, requiredSectionIds, submitterRole } = req.body || {};
   if (!countryId || !title) return res.status(400).json({ error: 'countryId and title required' });
+
+  const normalizedSubmitterRole = ['supervisor','chairman','minister'].includes(String(submitterRole||'').toLowerCase())
+    ? String(submitterRole).toLowerCase()
+    : 'chairman';
 
   const client = await pool.connect();
   try {
@@ -1252,14 +1281,15 @@ app.post('/api/events', requireRole('admin', 'chairman', 'minister', 'supervisor
 
     const ev = await client.query(
       `
-      INSERT INTO events (country_id, title, occasion, deadline_date, created_by_user_id, is_active, created_at, updated_at)
-      VALUES ($1, $2, $3, $4, $5, true, NOW(), NOW())
+      INSERT INTO events (country_id, title, occasion, submitter_role, deadline_date, created_by_user_id, is_active, created_at, updated_at)
+      VALUES ($1, $2, $3, $4, $5, $6, true, NOW(), NOW())
       RETURNING id
       `,
       [
         Number(countryId),
         String(title),
         occasion ? String(occasion) : null,
+        normalizedSubmitterRole,
         deadlineDate ? String(deadlineDate) : null,
         req.user.id
       ]
@@ -1295,7 +1325,7 @@ app.put('/api/events/:id', requireRole('admin', 'chairman', 'minister', 'supervi
   const eventId = Number(req.params.id);
   if (!Number.isFinite(eventId)) return res.status(400).json({ error: 'Invalid id' });
 
-  const { countryId, title, occasion, deadlineDate, isActive, requiredSectionIds } = req.body || {};
+  const { countryId, title, occasion, deadlineDate, isActive, requiredSectionIds, submitterRole } = req.body || {};
 
   const client = await pool.connect();
   try {
@@ -1308,6 +1338,13 @@ app.put('/api/events/:id', requireRole('admin', 'chairman', 'minister', 'supervi
     if (countryId !== undefined) { fields.push(`country_id=$${idx++}`); vals.push(Number(countryId)); }
     if (title !== undefined) { fields.push(`title=$${idx++}`); vals.push(String(title)); }
     if (occasion !== undefined) { fields.push(`occasion=$${idx++}`); vals.push(occasion ? String(occasion) : null); }
+    if (submitterRole !== undefined) {
+      const nsr = ['supervisor','chairman','minister'].includes(String(submitterRole||'').toLowerCase())
+        ? String(submitterRole).toLowerCase()
+        : 'chairman';
+      fields.push(`submitter_role=$${idx++}`);
+      vals.push(nsr);
+    }
     if (deadlineDate !== undefined) { fields.push(`deadline_date=$${idx++}`); vals.push(deadlineDate ? String(deadlineDate) : null); }
     if (isActive !== undefined) { fields.push(`is_active=$${idx++}`); vals.push(Boolean(isActive)); }
 
@@ -1768,6 +1805,9 @@ app.post('/api/document/submit-to-chairman', requireRole('supervisor','admin'), 
   const eventId = Number(req.body?.eventId);
   if (!Number.isFinite(eventId)) return res.status(400).json({ error: 'eventId required' });
 
+  const evMeta = await queryOne(`SELECT submitter_role FROM events WHERE id=$1`, [eventId]);
+  const submitterRole = String(evMeta?.submitter_role || 'chairman').toLowerCase();
+
   const countryId = await resolveCountryIdForEvent(eventId);
   if (!countryId) return res.status(404).json({ error: 'Event not found' });
 
@@ -1777,17 +1817,20 @@ app.post('/api/document/submit-to-chairman', requireRole('supervisor','admin'), 
   const tsCol = schema.tsCol || 'updated_at';
   const byCol = schema.byCol || 'updated_by_user_id';
 
+  // If the chosen submitter is Supervisor, we finalize at Supervisor stage.
+  const nextStatus = submitterRole === 'supervisor' ? 'approved' : 'submitted_to_chairman';
+
   if (schema.hasCountryId) {
     await pool.query(
       `UPDATE document_status
-       SET status='submitted_to_chairman', ${tsCol}=NOW(), ${byCol}=$3
+       SET status='${nextStatus}', ${tsCol}=NOW(), ${byCol}=$3
        WHERE event_id=$1 AND country_id=$2`,
       [eventId, countryId, req.user.id]
     );
   } else {
     await pool.query(
       `UPDATE document_status
-       SET status='submitted_to_chairman', ${tsCol}=NOW(), ${byCol}=$2
+       SET status='${nextStatus}', ${tsCol}=NOW(), ${byCol}=$2
        WHERE event_id=$1`,
       [eventId, req.user.id]
     );
@@ -1799,8 +1842,49 @@ app.post('/api/document/approve', requireRole('chairman','admin'), asyncRoute(as
   const eventId = Number(req.body?.eventId);
   if (!Number.isFinite(eventId)) return res.status(400).json({ error: 'eventId required' });
 
+  const evMeta = await queryOne(`SELECT submitter_role FROM events WHERE id=$1`, [eventId]);
+  const submitterRole = String(evMeta?.submitter_role || 'chairman').toLowerCase();
+
   const countryId = await resolveCountryIdForEvent(eventId);
   if (!countryId) return res.status(404).json({ error: 'Event not found' });
+
+  const schema = await getDocumentStatusSchema();
+  await ensureDocumentStatus(eventId, countryId);
+
+  const tsCol = schema.tsCol || 'updated_at';
+  const byCol = schema.byCol || 'updated_by_user_id';
+
+  // If the chosen submitter is Minister, Deputy only submits the document onward.
+  const newStatus = submitterRole === 'minister' ? 'submitted_to_minister' : 'approved';
+
+  if (schema.hasCountryId) {
+    await pool.query(
+      `UPDATE document_status
+       SET status='${newStatus}', ${tsCol}=NOW(), ${byCol}=$3
+       WHERE event_id=$1 AND country_id=$2`,
+      [eventId, countryId, req.user.id]
+    );
+  } else {
+    await pool.query(
+      `UPDATE document_status
+       SET status='${newStatus}', ${tsCol}=NOW(), ${byCol}=$2
+       WHERE event_id=$1`,
+      [eventId, req.user.id]
+    );
+  }
+  return res.json({ success:true });
+}));
+
+app.post('/api/document/approve-minister', requireRole('minister','admin'), asyncRoute(async (req, res) => {
+  const eventId = Number(req.body?.eventId);
+  if (!Number.isFinite(eventId)) return res.status(400).json({ error: 'eventId required' });
+
+  const countryId = await resolveCountryIdForEvent(eventId);
+  if (!countryId) return res.status(404).json({ error: 'Event not found' });
+
+  const evMeta = await queryOne(`SELECT submitter_role FROM events WHERE id=$1`, [eventId]);
+  const submitterRole = String(evMeta?.submitter_role || 'chairman').toLowerCase();
+  if (submitterRole !== 'minister') return res.status(400).json({ error: 'This event is not configured for Minister submission' });
 
   const schema = await getDocumentStatusSchema();
   await ensureDocumentStatus(eventId, countryId);
@@ -1826,7 +1910,7 @@ app.post('/api/document/approve', requireRole('chairman','admin'), asyncRoute(as
   return res.json({ success:true });
 }));
 
-app.post('/api/document/return', requireRole('chairman','admin'), asyncRoute(async (req, res) => {
+app.post('/api/document/return', requireRole('chairman','minister','admin'), asyncRoute(async (req, res) => {
   const eventId = Number(req.body?.eventId);
   const comment = (req.body?.comment ?? '').toString();
   if (!Number.isFinite(eventId)) return res.status(400).json({ error: 'eventId required' });

@@ -53,6 +53,7 @@
       approved_by_supervisor: 'Approved by Supervisor',
       submitted_to_chairman: 'Submitted to Deputy',
       approved_by_chairman: 'Approved by Deputy',
+      submitted_to_minister: 'Submitted to Minister',
       approved: 'Approved',
       returned: 'Returned'
     };
@@ -181,7 +182,7 @@
     if (!currentEventId) return;
     if (!confirm('Approve the full document?')) return;
     try{
-      await window.GCP.apiFetch('/document/approve', {
+      await window.GCP.apiFetch('/document/approve-minister', {
         method:'POST',
         body: JSON.stringify({ eventId: currentEventId })
       });

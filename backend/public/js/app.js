@@ -56,6 +56,7 @@ function formatTbilisiDate(value) {
       { href: "statistics.html", label: "Statistics" },
     ],
     minister: [
+      { href: "dashboard-minister.html", label: "Dashboard" },
       { href: "calendar.html", label: "Calendar" },
       { href: "library.html", label: "Library" },
       { href: "statistics.html", label: "Statistics" },

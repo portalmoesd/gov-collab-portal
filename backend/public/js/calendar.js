@@ -16,6 +16,7 @@
   const countrySelect = document.getElementById("countryId");
   const titleInput = document.getElementById("title");
   const occasionInput = document.getElementById("occasion");
+  const submitterRoleInput = document.getElementById("submitterRole");
   const deadlineInput = document.getElementById("deadlineDate");
   const requiredBox = document.getElementById("requiredSectionsBox");
   const saveBtn = document.getElementById("saveEventBtn");
@@ -79,6 +80,7 @@ ${(labels.length ? labels.join('\n') : '—')}`);
           countrySelect.value = String(details.country_id);
           titleInput.value = details.title || "";
           occasionInput.value = details.occasion || "";
+          if (submitterRoleInput) submitterRoleInput.value = (details.submitter_role || details.submitterRole || 'chairman');
           deadlineInput.value = formatDate(details.deadline_date);
           // select required sections
           const req = (details.required_sections || details.requiredSections || []);
@@ -128,6 +130,7 @@ ${(labels.length ? labels.join('\n') : '—')}`);
       countryId: Number(countrySelect.value),
       title: titleInput.value.trim(),
       occasion: occasionInput.value.trim() || null,
+      submitterRole: (submitterRoleInput?.value || 'chairman'),
       deadlineDate: deadlineInput.value || null,
       requiredSectionIds,
     };
