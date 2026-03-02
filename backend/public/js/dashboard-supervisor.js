@@ -209,12 +209,6 @@ modalBackdrop.addEventListener('click', (e) => {
       setMsg(e.message || 'Submit failed', true);
     }
   });
-      setMsg('Submitted to Deputy.');
-      await refreshStatusGrid();
-    }catch(e){
-      setMsg(e.message || 'Submit failed', true);
-    }
-  });
 
   await loadUpcoming();
 })();
