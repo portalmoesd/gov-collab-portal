@@ -13,15 +13,6 @@
   const eventSelect = document.getElementById("eventSelect");
   const sectionsTbody = document.getElementById("sectionsTbody");
   const docStatusBox = document.getElementById("docStatusBox");
-    const submitter = String(ev.submitter_role || 'chairman').toLowerCase();
-    if (submitter === 'supervisor'){
-      submitDocBtn.textContent = 'Send to Library';
-      submitDocBtn.dataset.mode = 'library';
-    } else {
-      submitDocBtn.textContent = 'Submit document to Deputy';
-      submitDocBtn.dataset.mode = 'deputy';
-    }
-  }
   const submitDocBtn = document.getElementById("submitDocBtn");
 
   let eventsCache = new Map();
