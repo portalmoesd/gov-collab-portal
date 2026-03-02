@@ -1155,6 +1155,9 @@ app.get('/api/events/:id', authRequired, attachUser, async (req, res) => {
     country_code: event.country_code,
     title: event.title,
     occasion: event.occasion,
+    // Document submission endpoint config (Supervisor / Deputy / Minister)
+    submitter_role: event.submitter_role,
+    submitterRole: event.submitter_role,
     deadline_date: event.deadline_date,
     is_active: event.is_active,
     ended_at: event.ended_at,

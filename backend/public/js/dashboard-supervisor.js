@@ -46,6 +46,8 @@
     for (const ev of (events || [])){
       const opt = document.createElement('option');
       opt.value = ev.id;
+      // carry submitter role so we can set the button label without an extra /events/:id call
+      opt.dataset.submitterRole = (ev.submitter_role || ev.submitterRole || '').toLowerCase();
       opt.textContent = `${ev.title || 'Event'} (${ev.country_name_en || ''}${ev.deadline_date ? ', ' + window.GCP.formatDateTime(ev.deadline_date) : ''})`;
       eventSelect.appendChild(opt);
     }
@@ -129,7 +131,7 @@
 eventSelect.addEventListener('change', async () => {
     setMsg('');
     currentEventId = Number(eventSelect.value);
-    if (!Number.isFinite(currentEventId)) {
+    if (!Number.isFinite(currentEventId) || currentEventId <= 0) {
       currentEventId = null;
       sectionsTbody.innerHTML = '';
       submitDocBtn.disabled = true;
@@ -137,13 +139,10 @@ eventSelect.addEventListener('change', async () => {
       return;
     }
     // Adjust document submit button label based on configured submitter
-    try {
-      const ev = await window.GCP.apiFetch(`/events/${currentEventId}`, { method:'GET' });
-      const sr = String(ev.submitterRole || '').toLowerCase();
-      submitDocBtn.textContent = sr === 'supervisor' ? 'Send to Library' : 'Submit document to Deputy';
-    } catch (e) {
-      submitDocBtn.textContent = 'Submit document to Deputy';
-    }
+    // (use data from /events/upcoming to avoid permission/latency issues)
+    const selectedOpt = eventSelect.options[eventSelect.selectedIndex];
+    const sr = String(selectedOpt?.dataset?.submitterRole || '').toLowerCase();
+    submitDocBtn.textContent = sr === 'supervisor' ? 'Send to Library' : 'Submit document to Deputy';
     try{
       await refreshStatusGrid();
     }catch(e){
@@ -188,11 +187,9 @@ modalBackdrop.addEventListener('click', (e) => {
     setMsg('');
     try {
       // Determine the configured submitter for this event (Supervisor/Deputy/Minister)
-      let sr = '';
-      try {
-        const ev = await window.GCP.apiFetch(`/events/${currentEventId}`, { method: 'GET' });
-        sr = String(ev.submitterRole || '').toLowerCase();
-      } catch (e) { sr = ''; }
+      // (use the value stored on the selected <option> from /events/upcoming)
+      const selectedOpt = eventSelect.options[eventSelect.selectedIndex];
+      const sr = String(selectedOpt?.dataset?.submitterRole || '').toLowerCase();
 
       await window.GCP.apiFetch('/document/submit-to-chairman', {
         method: 'POST',
