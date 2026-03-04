@@ -141,8 +141,18 @@ eventSelect.addEventListener('change', async () => {
     // Adjust document submit button label based on configured submitter
     // (use data from /events/upcoming to avoid permission/latency issues)
     const selectedOpt = eventSelect.options[eventSelect.selectedIndex];
-    const sr = String(selectedOpt?.dataset?.submitterRole || '').toLowerCase();
+    let sr = ((selectedOpt?.dataset?.submitterRole || '')).toLowerCase();
+    // Fallback: if submitter role wasn't included in the upcoming events list, fetch event details.
+    if (!sr && eventId > 0) {
+      try {
+        const evDetails = await window.GCP.apiFetch(`/events/${eventId}`, { method: 'GET' });
+        sr = String(evDetails?.submitter_role || evDetails?.submitterRole || '').toLowerCase();
+      } catch (e) {
+        // ignore; keep default
+      }
+    }
     submitDocBtn.textContent = sr === 'supervisor' ? 'Send to Library' : 'Submit document to Deputy';
+    submitDocBtn.dataset.submitterRole = sr || 'chairman';
     try{
       await refreshStatusGrid();
     }catch(e){
