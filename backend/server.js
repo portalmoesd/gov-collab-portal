@@ -1104,6 +1104,17 @@ app.get('/api/events/upcoming', authRequired, attachUser, async (req, res) => {
     where.push(`EXISTS (SELECT 1 FROM event_required_sections ers WHERE ers.event_id=e.id AND ers.section_id = ANY($${idx++}::int[]))`); vals.push(sections);
   }
 
+  // Document submitter visibility rules (keep consistent with /api/events and userCanSeeEvent)
+  // - If submitter is Supervisor, Deputy and Minister should not see the event.
+  // - If submitter is Deputy, Minister should not see the event.
+  // - If submitter is Minister, Minister should see it (Deputy still participates).
+  if (roleKey === 'chairman') {
+    where.push(`COALESCE(e.submitter_role,'chairman') <> 'supervisor'`);
+  }
+  if (roleKey === 'minister') {
+    where.push(`COALESCE(e.submitter_role,'chairman') = 'minister'`);
+  }
+
   const rows = await queryAll(
     `
     SELECT e.id, e.country_id, c.name_en AS country_name_en, c.code AS country_code,
