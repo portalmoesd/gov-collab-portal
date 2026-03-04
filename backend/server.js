@@ -78,6 +78,18 @@ async function ensureSchema() {
   await pool.query(`ALTER TABLE events ADD COLUMN IF NOT EXISTS ended_at TIMESTAMP`);
   await pool.query(`ALTER TABLE events ADD COLUMN IF NOT EXISTS ended_by_user_id INTEGER`);
   await pool.query(`ALTER TABLE events ADD COLUMN IF NOT EXISTS submitter_role TEXT NOT NULL DEFAULT 'chairman'`).catch(()=>{});
+
+  // Ensure enum value exists for minister approvals (legacy DBs)
+  await pool.query(`ALTER TYPE tp_section_status ADD VALUE IF NOT EXISTS 'approved_by_minister'`).catch(async ()=>{
+    // Fallback for older Postgres that may not support IF NOT EXISTS
+    try {
+      const has = await pool.query(`SELECT 1 FROM pg_type t JOIN pg_enum e ON t.oid=e.enumtypid WHERE t.typname='tp_section_status' AND e.enumlabel='approved_by_minister'`);
+      if (!has.rowCount) {
+        await pool.query(`ALTER TYPE tp_section_status ADD VALUE 'approved_by_minister'`);
+      }
+    } catch (_) {}
+  });
+
   await pool.query(`
     CREATE TABLE IF NOT EXISTS country_assignments (
       user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,

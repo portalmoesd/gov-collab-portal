@@ -28,7 +28,7 @@
   }
 
   // Buttons visible depending on role (Blueprint editor behaviour)
-  const canEdit = ["admin","chairman","supervisor","collaborator","super_collaborator"].includes(role);
+  const canEdit = ["admin","chairman","minister","supervisor","collaborator","super_collaborator"].includes(role);
   const isViewer = role === "viewer";
   const isProtocol = role === "protocol";
 
@@ -39,7 +39,7 @@
   }
 
   // Approve button depends on role
-  if (!(role === "supervisor" || role === "chairman" || role === "admin")){
+  if (!(role === "supervisor" || role === "chairman" || role === "minister" || role === "admin")){
     btnApprove.style.display = "none";
     btnReturn.style.display = "none";
   }
@@ -76,7 +76,7 @@
     if (window.CKEDITOR){
       if (editorInstance) editorInstance.destroy(true);
       editorInstance = window.CKEDITOR.replace("editor", { height: 420 });
-      if (!canEdit) editorInstance.setReadOnly(true);
+      if (!canEdit && editorInstance && typeof editorInstance.setReadOnly === 'function') editorInstance.setReadOnly(true);
     } else {
       // Fallback: plain textarea
       textarea.disabled = !canEdit;

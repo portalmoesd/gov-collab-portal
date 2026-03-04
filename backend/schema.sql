@@ -9,7 +9,7 @@ CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
 -- Enums
 DO $$ BEGIN
-  CREATE TYPE tp_section_status AS ENUM ('draft', 'submitted', 'returned', 'approved_by_supervisor', 'approved_by_chairman');
+  CREATE TYPE tp_section_status AS ENUM ('draft', 'submitted', 'returned', 'approved_by_supervisor', 'approved_by_chairman', 'approved_by_minister');
 EXCEPTION
   WHEN duplicate_object THEN NULL;
 END $$;
