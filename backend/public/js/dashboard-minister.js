@@ -54,6 +54,7 @@
       submitted_to_chairman: 'Submitted to Deputy',
       approved_by_chairman: 'Approved by Deputy',
       submitted_to_minister: 'Submitted to Minister',
+      approved_by_minister: 'Approved by Minister',
       approved: 'Approved',
       returned: 'Returned'
     };
@@ -163,14 +164,8 @@
       sectionsTbody.appendChild(tr);
     }
 
-    // Adjust approve button based on configured submitter
-    try {
-      const ev = await window.GCP.apiFetch(`/events/${currentEventId}`, { method:'GET' });
-      const sr = String(ev.submitterRole || '').toLowerCase();
-      approveDocBtn.textContent = sr === 'minister' ? 'Submit to Minister' : 'Approve document';
-    } catch (e) {
-      approveDocBtn.textContent = 'Approve document';
-    }
+    // Minister is the final approver when they see the event.
+    approveDocBtn.textContent = 'Approve document';
 
     approveDocBtn.disabled = false;
     returnDocBtn.disabled = false;

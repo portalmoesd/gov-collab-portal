@@ -1502,7 +1502,7 @@ app.post('/api/tp/save', authRequired, async (req, res) => {
 
   const roleKey = normalizeRoleKey(req.user.role_key);
   const isCollab = (roleKey === 'collaborator' || roleKey === 'super_collaborator');
-  const canEdit = ['collaborator','super_collaborator','supervisor','chairman','admin'].includes(roleKey);
+  const canEdit = ['collaborator','super_collaborator','supervisor','chairman','minister','admin'].includes(roleKey);
   if (!canEdit) return res.status(403).json({ error: 'Forbidden' });
 
   // Collaborators may only edit their assigned event/country + section.
@@ -1631,7 +1631,7 @@ app.post('/api/tp/approve-section', requireRole('supervisor','admin'), async (re
   return res.json({ success:true });
 });
 
-app.post('/api/tp/approve-all-sections', requireRole('supervisor','chairman','admin'), async (req, res) => {
+app.post('/api/tp/approve-all-sections', requireRole('supervisor','chairman','minister','admin'), async (req, res) => {
   try {
     const eventId = Number(req.body?.eventId);
     if (!Number.isFinite(eventId)) return res.status(400).json({ error: 'eventId required' });
@@ -1653,8 +1653,8 @@ app.post('/api/tp/approve-all-sections', requireRole('supervisor','chairman','ad
       await ensureTpRow(eventId, countryId, sid, req.user.id);
     }
 
-    const role = String(req.user.role || '').toLowerCase();
-    const targetStatus = (role === 'chairman') ? 'approved_by_chairman' : 'approved_by_supervisor';
+    const roleKey = normalizeRoleKey(req.user.role_key);
+    const targetStatus = (roleKey === 'minister') ? 'approved_by_minister' : (roleKey === 'chairman') ? 'approved_by_chairman' : 'approved_by_supervisor';
 
     await pool.query(
       `
@@ -1673,7 +1673,7 @@ app.post('/api/tp/approve-all-sections', requireRole('supervisor','chairman','ad
 });
 
 
-app.post('/api/tp/approve-section-chairman', requireRole('chairman','admin'), async (req, res) => {
+app.post('/api/tp/approve-section-chairman', requireRole('chairman','minister','admin'), async (req, res) => {
   const eventId = Number(req.body?.eventId);
   const sectionId = Number(req.body?.sectionId);
   if (!Number.isFinite(eventId) || !Number.isFinite(sectionId)) {
@@ -1686,13 +1686,16 @@ app.post('/api/tp/approve-section-chairman', requireRole('chairman','admin'), as
   await ensureDocumentStatus(eventId, countryId);
   await ensureTpRow(eventId, countryId, sectionId, req.user.id);
 
+  const roleKey = normalizeRoleKey(req.user.role_key);
+  const targetStatus = (roleKey === 'minister') ? 'approved_by_minister' : 'approved_by_chairman';
+
   await pool.query(
     `
     UPDATE tp_content
-    SET status='approved_by_chairman', status_comment=NULL, last_updated_at=NOW(), last_updated_by_user_id=$4
+    SET status=$5, status_comment=NULL, last_updated_at=NOW(), last_updated_by_user_id=$4
     WHERE event_id=$1 AND country_id=$2 AND section_id=$3
     `,
-    [eventId, countryId, sectionId, req.user.id]
+    [eventId, countryId, sectionId, req.user.id, targetStatus]
   );
 
   return res.json({ success:true });

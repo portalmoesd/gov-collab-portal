@@ -135,7 +135,7 @@
 
   btnApprove.addEventListener("click", async () => {
     try{
-      if (role === "chairman"){
+      if (role === "chairman" || role === "minister"){
         await window.GCP.apiFetch("/tp/approve-section-chairman", {
           method:"POST",
           body: JSON.stringify({ eventId, sectionId, htmlContent: getHtml() })
