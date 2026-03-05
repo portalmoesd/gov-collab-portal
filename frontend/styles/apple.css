@@ -587,3 +587,41 @@ hr, .divider{
 .gcp-step.active .gcp-label{
   color: rgba(11,11,15,0.88);
 }
+
+/* === Apple status bar v3 (ref) OVERRIDE === */
+.gcp-progress.gcp-progress-v2{ --dot:18px; --line:4px; padding:10px 10px 6px !important; }
+.gcp-progress.gcp-progress-v2 .gcp-line{
+  left: calc(10px + (var(--dot) / 2)) !important;
+  right: calc(10px + (var(--dot) / 2)) !important;
+  top: calc(10px + (var(--dot) / 2) - (var(--line) / 2)) !important;
+  height: var(--line) !important;
+  background: rgba(10,132,255,0.22) !important;
+}
+.gcp-progress.gcp-progress-v2 .gcp-line-done{
+  top: calc(10px + (var(--dot) / 2) - (var(--line) / 2)) !important;
+  height: var(--line) !important;
+  background: #059669 !important;
+}
+.gcp-progress.gcp-progress-v2 .gcp-line-after{
+  top: calc(10px + (var(--dot) / 2) - (var(--line) / 2)) !important;
+  height: var(--line) !important;
+  background:#0a84ff !important;
+}
+.gcp-progress.gcp-progress-v2 .gcp-dot{
+  width: var(--dot) !important;
+  height: var(--dot) !important;
+  border:none !important;
+  background: rgba(10,132,255,0.28) !important;
+  box-shadow:none !important;
+}
+.gcp-progress.gcp-progress-v2 .gcp-step.done .gcp-dot{ background:#059669 !important; }
+.gcp-progress.gcp-progress-v2 .gcp-step.done .gcp-dot::before{
+  content:"✓" !important;
+  color:#fff !important;
+  font-weight:900 !important;
+  font-size:11px !important;
+}
+.gcp-progress.gcp-progress-v2 .gcp-step.active .gcp-dot{
+  background:#0a84ff !important;
+  box-shadow:0 0 0 3px rgba(10,132,255,0.25), 0 0 0 6px rgba(10,132,255,0.12) !important;
+}
