@@ -68,20 +68,62 @@
     const sidebar = document.querySelector(".sidebar");
     if (!sidebar) return;
 
+    // Dock-style collapsible sidebar (hover to expand)
+    sidebar.classList.add("sidebar-dock");
+
     const role = String(user.role || "").toLowerCase();
     const items = ROLE_NAV[role] || [];
-
     const activeFile = location.pathname.split("/").pop();
 
+    const initials = (user.fullName || user.username || "U").trim().split(/\s+/).slice(0,2).map(s=>s[0]?.toUpperCase()||"").join("") || "U";
+
+    function iconSvg(name){
+      const svgs = {
+        dashboard: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 13.5a2 2 0 0 0 2 2h4.5v4.5a2 2 0 0 0 2 2h3.5a2 2 0 0 0 2-2v-8a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v1.5zM4 4a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v3.5a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4z"/></svg>`,
+        calendar: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 2a1 1 0 0 1 1 1v1h8V3a1 1 0 1 1 2 0v1h1a3 3 0 0 1 3 3v12a3 3 0 0 1-3 3H5a3 3 0 0 1-3-3V7a3 3 0 0 1 3-3h1V3a1 1 0 0 1 1-1zm14 8H3v9a1 1 0 0 0 1 1h16a1 1 0 0 0 1-1v-9z"/></svg>`,
+        library: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 3h10a3 3 0 0 1 3 3v15a1 1 0 0 1-1.5.86L11 19.5l-4.5 2.36A1 1 0 0 1 5 21V6a3 3 0 0 1-1-2.22V3zM18 6h2a2 2 0 0 1 2 2v13a1 1 0 0 1-1.5.86L18 20.5V6z"/></svg>`,
+        stats: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 21a1 1 0 0 1-1-1V4a1 1 0 0 1 2 0v15h16a1 1 0 1 1 0 2H4zm4-4a1 1 0 0 1-1-1V11a1 1 0 1 1 2 0v5a1 1 0 0 1-1 1zm5 0a1 1 0 0 1-1-1V7a1 1 0 1 1 2 0v9a1 1 0 0 1-1 1zm5 0a1 1 0 0 1-1-1V9a1 1 0 1 1 2 0v7a1 1 0 0 1-1 1z"/></svg>`,
+        admin: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 1a2 2 0 0 1 2 2v1.06a7.01 7.01 0 0 1 2.09.87l.75-.75a2 2 0 1 1 2.83 2.83l-.75.75c.36.66.64 1.36.82 2.1H21a2 2 0 1 1 0 4h-1.06a7.01 7.01 0 0 1-.87 2.09l.75.75a2 2 0 1 1-2.83 2.83l-.75-.75A7.01 7.01 0 0 1 14 19.94V21a2 2 0 1 1-4 0v-1.06a7.01 7.01 0 0 1-2.09-.87l-.75.75a2 2 0 1 1-2.83-2.83l.75-.75A7.01 7.01 0 0 1 4.06 14H3a2 2 0 1 1 0-4h1.06c.18-.74.46-1.44.82-2.1l-.75-.75A2 2 0 1 1 6.96 4.3l.75.75A7.01 7.01 0 0 1 10 4.06V3a2 2 0 0 1 2-2zm0 7a4 4 0 1 0 0 8 4 4 0 0 0 0-8z"/></svg>`,
+        logout: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 17a1 1 0 0 1-1-1v-1H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h5V3a1 1 0 0 1 1-1h7a3 3 0 0 1 3 3v14a3 3 0 0 1-3 3h-7zm9-5a1 1 0 0 0-1-1h-6a1 1 0 1 0 0 2h6a1 1 0 0 0 1-1z"/></svg>`
+      };
+      return svgs[name] || svgs.dashboard;
+    }
+
+    function iconForLabel(label){
+      const l = String(label||"").toLowerCase();
+      if (l.includes("calendar")) return "calendar";
+      if (l.includes("library")) return "library";
+      if (l.includes("stat")) return "stats";
+      if (l.includes("admin")) return "admin";
+      return "dashboard";
+    }
+
     sidebar.innerHTML = `
-      <div class="brand">GOV COLLAB PORTAL</div>
-      <div class="user-badge">
-        <div class="name">${escapeHtml(user.fullName || user.username || "")}</div>
-        <div class="role">${escapeHtml(roleToTitle(role))}</div>
+      <div class="dock-top">
+        <div class="dock-brand">
+          <div class="dock-logo" aria-hidden="true"></div>
+          <div class="dock-wordmark">
+            <div class="dock-title">GOV COLLAB</div>
+            <div class="dock-subtitle">Portal</div>
+          </div>
+        </div>
       </div>
-      <nav class="nav" id="nav"></nav>
-      <div style="margin-top:auto; padding:14px 6px 0;">
-        <button class="btn" id="logoutBtn" style="width:100%;">Logout</button>
+
+      <div class="dock-user">
+        <div class="dock-avatar" title="${escapeHtml(user.fullName || user.username || "")}">${escapeHtml(initials)}</div>
+        <div class="dock-usertext">
+          <div class="dock-name">${escapeHtml(user.fullName || user.username || "")}</div>
+          <div class="dock-role">${escapeHtml(roleToTitle(role))}</div>
+        </div>
+      </div>
+
+      <nav class="dock-nav" id="nav"></nav>
+
+      <div class="dock-bottom">
+        <button class="dock-link dock-logout" id="logoutBtn" type="button">
+          <span class="dock-ic">${iconSvg("logout")}</span>
+          <span class="dock-label">Logout</span>
+        </button>
       </div>
     `;
 
@@ -89,17 +131,19 @@
     for (const it of items){
       const a = document.createElement("a");
       a.href = it.href;
-      a.textContent = it.label;
+      a.className = "dock-link";
+      const ic = iconForLabel(it.label);
+      a.innerHTML = `<span class="dock-ic">${iconSvg(ic)}</span><span class="dock-label">${escapeHtml(it.label)}</span>`;
       if (activeFile === it.href) a.classList.add("active");
       nav.appendChild(a);
     }
 
     sidebar.querySelector("#logoutBtn").addEventListener("click", () => {
       localStorage.removeItem("gcp_token");
-      localStorage.removeItem("gcp_user");
       location.href = "login.html";
     });
   }
+
 
   async function requireAuth(){
     const token = localStorage.getItem("gcp_token");

@@ -1,9 +1,13 @@
 // dashboard-collab.js
 (async function(){
+  function escapeHtml(s){
+    return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+
   const me = await window.GCP.requireAuth();
   if (!me) return;
 
-  const eventsTbody = document.getElementById('eventsTbody');
+  const eventsGrid = document.getElementById('eventsGrid');
   const eventSelect = document.getElementById('eventSelect');
   const sectionSelect = document.getElementById('sectionSelect');
   const openBtn = document.getElementById('openEditorBtn');
@@ -110,20 +114,42 @@
     eventsById.clear();
     for (const ev of (events || [])) eventsById.set(Number(ev.id), ev);
 
-    eventsTbody.innerHTML = '';
+    if (eventsGrid) eventsGrid.innerHTML = '';
     eventSelect.innerHTML = `<option value="">Select event...</option>`;
     sectionSelect.innerHTML = `<option value="">Select section...</option>`;
     sectionSelect.disabled = true;
 
     for (const ev of (events || [])) {
-      const tr = document.createElement('tr');
-      tr.innerHTML = `
-        <td>${ev.title || ''}</td>
-        <td>${ev.country_name_en || ''}</td>
-        <td>${ev.occasion || ''}</td>
-        <td>${window.GCP.formatDate(ev.deadline_date) || ''}</td>
-      `;
-      eventsTbody.appendChild(tr);
+      if (eventsGrid){
+        const card = document.createElement('div');
+        card.className = 'event-card';
+        const deadline = window.GCP.formatDate(ev.deadline_date) || '';
+        const country = ev.country_name_en || '';
+        const task = ev.task || ev.occasion || '';
+        card.innerHTML = `
+          <div class="row1">
+            <div>
+              <div class="title">${escapeHtml(ev.title || '')}</div>
+              <div class="meta">
+                <span class="badge primary">${escapeHtml(country)}</span>
+                ${deadline ? `<span class="badge">Deadline: ${escapeHtml(deadline)}</span>` : ''}
+              </div>
+            </div>
+          </div>
+          <div class="task">${escapeHtml(task)}</div>
+          <div class="actions">
+            <button class="openmini" type="button">Open</button>
+          </div>
+        `;
+        card.querySelector('button.openmini').addEventListener('click', () => {
+          // Preselect the event in the editor launcher below
+          eventSelect.value = String(ev.id);
+          eventSelect.dispatchEvent(new Event('change'));
+          const openSection = document.getElementById('openEditorSection');
+          if (openSection) openSection.scrollIntoView({behavior:'smooth', block:'start'});
+        });
+        eventsGrid.appendChild(card);
+      }
 
       const opt = document.createElement('option');
       opt.value = ev.id;
