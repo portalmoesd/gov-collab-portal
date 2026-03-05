@@ -348,6 +348,9 @@ hr, .divider{
 /* ---- Collaborator calendar widget (added) ---- */
 .events-calendar{
   margin-bottom: 14px;
+  /* keep it compact (like an event tile) instead of stretching full width */
+  width: 100%;
+  max-width: 520px;
   padding: 14px 14px 12px 14px;
   border-radius: 18px;
   border: 1px solid var(--border);
