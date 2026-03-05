@@ -1,0 +1,140 @@
+/* Apple-ish skin for GOV COLLAB PORTAL (non-breaking override layer) */
+:root{
+  --bg: #f5f5f7;
+  --card: rgba(255,255,255,.72);
+  --text: #0b0b0f;
+  --muted: rgba(11,11,15,.62);
+  --primary: #0a84ff;
+  --primary-2: #0071e3;
+  --border: rgba(0,0,0,.10);
+  --danger: #ff3b30;
+  --success: #34c759;
+  --warn: #ff9f0a;
+  --shadow: 0 14px 40px rgba(0,0,0,.10);
+  --radius: 22px;
+  --sidebar-w: 300px;
+  --font: ui-sans-serif, system-ui, -apple-system, "SF Pro Display","SF Pro Text", Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji","Segoe UI Emoji";
+}
+
+body{
+  background:
+    radial-gradient(1200px 700px at 20% 0%, rgba(10,132,255,0.12), transparent 60%),
+    radial-gradient(900px 600px at 90% 10%, rgba(88,86,214,0.10), transparent 55%),
+    var(--bg);
+}
+
+/* Layout polish */
+.layout{ gap: 18px; padding: 26px; max-width: 1280px; margin: 0 auto; }
+.sidebar{
+  border: 1px solid var(--border);
+  background: rgba(255,255,255,.68);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  box-shadow: 0 6px 18px rgba(0,0,0,.06);
+}
+.main{ gap: 18px; }
+
+/* Topbar */
+.topbar{
+  border: 1px solid var(--border);
+  background: rgba(255,255,255,.62);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  border-radius: var(--radius);
+  box-shadow: 0 6px 18px rgba(0,0,0,.06);
+}
+.page-title{
+  font-size: 20px;
+  letter-spacing: -0.02em;
+}
+
+/* Cards */
+.card{
+  border: 1px solid var(--border);
+  background: var(--card);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  box-shadow: 0 8px 26px rgba(0,0,0,.08);
+}
+.card h1,.card h2,.card h3{ letter-spacing: -0.02em; }
+
+/* Buttons */
+.btn{
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: rgba(255,255,255,.82);
+  transition: transform .18s ease, box-shadow .18s ease, filter .18s ease;
+  box-shadow: 0 1px 2px rgba(0,0,0,.06);
+}
+.btn:hover{ transform: translateY(-1px); box-shadow: 0 10px 24px rgba(0,0,0,.12); }
+.btn:active{ transform: translateY(0px); filter: brightness(.98); }
+.btn.primary{
+  background: linear-gradient(180deg, var(--primary), var(--primary-2));
+  border-color: rgba(10,132,255,.55);
+}
+.btn.danger{
+  background: rgba(255,59,48,.14);
+  border-color: rgba(255,59,48,.25);
+  color: rgba(150,0,0,.95);
+}
+
+/* Inputs */
+.input, select, textarea{
+  border-radius: 16px;
+  border: 1px solid var(--border);
+  background: rgba(255,255,255,.78);
+}
+.input:focus, select:focus, textarea:focus{
+  outline: none;
+  box-shadow: 0 0 0 4px rgba(10,132,255,.22);
+  border-color: rgba(10,132,255,.35);
+}
+
+/* Tables */
+.table{
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  overflow: hidden;
+  background: rgba(255,255,255,.55);
+}
+.table thead th{
+  background: rgba(255,255,255,.75);
+}
+.table tbody tr:hover{
+  background: rgba(10,132,255,.06);
+}
+
+/* Pills / tags */
+.pill{
+  border: 1px solid var(--border);
+  background: rgba(0,0,0,.05);
+}
+
+/* Sidebar items */
+.nav-item, .side-link, .menu-item, .sidebar a{
+  border-radius: 16px;
+}
+.sidebar .section-title{
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  font-size: 11px;
+}
+
+/* Progress bar (Apple-ish) */
+.gcp-progress .gcp-line{
+  background: rgba(0,0,0,.10);
+}
+.gcp-progress .gcp-dot{
+  box-shadow: 0 4px 16px rgba(0,0,0,.10);
+}
+.gcp-progress .gcp-dot.done{ background: var(--success); }
+.gcp-progress .gcp-dot.active{ background: var(--primary); }
+.gcp-progress .gcp-dot.todo{ background: rgba(0,0,0,.22); }
+.gcp-progress .gcp-label{ color: var(--muted); }
+
+/* Subtle separators */
+hr, .divider{
+  border: none;
+  height: 1px;
+  background: rgba(0,0,0,.10);
+}
