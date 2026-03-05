@@ -128,6 +128,7 @@
         const task = ev.task || ev.occasion || '';
         card.innerHTML = `
           <div class="row1">
+            <button class="openmini openmini-top" type="button">Open</button>
             <div>
               <div class="title">${escapeHtml(ev.title || '')}</div>
               <div class="meta">
@@ -137,10 +138,7 @@
             </div>
           </div>
           <div class="task">${escapeHtml(task)}</div>
-          <div class="actions">
-            <button class="openmini" type="button">Open</button>
-          </div>
-        `;
+`;
         card.querySelector('button.openmini').addEventListener('click', () => {
           // Preselect the event in the editor launcher below
           eventSelect.value = String(ev.id);

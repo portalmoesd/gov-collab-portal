@@ -12,19 +12,11 @@
 <div class="layout">
   <aside class="sidebar"></aside>
   <main class="main">
-    <div class="topbar">
+    <div class="topbar topbar-ghost">
       <div class="page-title">Collaborator Dashboard</div>
     </div>
     
 <div class="grid">
-  <section class="card col-12">
-    <div style="font-weight:900; margin-bottom:10px;">Upcoming events</div>
-    <div class="upcoming-split">
-      <div id="eventsCalendar" class="events-calendar"></div>
-      <div id="eventsGrid" class="event-grid"></div>
-    </div>
-  </section>
-
   <section class="card col-12" id="openEditorSection">
     <div style="font-weight:900; margin-bottom:10px;">Open Talking Points editor</div>
     <div class="row">
@@ -49,6 +41,14 @@
     <div id="sectionStatusBox" class="statusbox" style="display:none;"></div>
 
     <div id="msg" class="small" style="color:var(--danger); font-weight:800; margin-top:10px;"></div>
+  </section>
+
+  <section class="card col-12">
+    <div style="font-weight:900; margin-bottom:10px;">Upcoming events</div>
+    <div class="upcoming-split">
+      <div id="eventsCalendar" class="events-calendar"></div>
+      <div id="eventsGrid" class="event-grid"></div>
+    </div>
   </section>
 </div>
 

@@ -435,3 +435,25 @@ hr, .divider{
   outline: none;
   box-shadow: 0 0 0 4px rgba(10,132,255,0.18);
 }
+
+
+/* --- Collaborator dashboard tweaks --- */
+.topbar-ghost{
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+}
+
+.event-card{ position: relative; }
+.openmini.openmini-top{
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  padding: 7px 12px;
+  font-size: 13px;
+  line-height: 1;
+  letter-spacing: -0.01em;
+}
+.event-card .title{ padding-right: 84px; } /* space for the top-right button */
+
