@@ -18,7 +18,16 @@
     
 <div class="grid">
   <section class="card col-12">
-    <div style="font-weight:900; margin-bottom:10px;">Upcoming events</div>
+    <div class="upcoming-header">
+      <div style="font-weight:900;">Upcoming events</div>
+      <div class="upcoming-actions">
+        <button class="btn" id="calPrevBtn" type="button" aria-label="Previous month">‹</button>
+        <div class="cal-month" id="calMonthLabel">—</div>
+        <button class="btn" id="calNextBtn" type="button" aria-label="Next month">›</button>
+      </div>
+    </div>
+    <div id="eventsCalendar" class="events-calendar"></div>
+    <div style="height:14px"></div>
     <div id="eventsGrid" class="event-grid"></div>
   </section>
 
@@ -29,7 +38,11 @@
         <label>Event</label>
         <select id="eventSelect"></select>
       </div>
-<div class="field">
+      <div class="field">
+        <label>Country</label>
+        <select id="countrySelect"></select>
+      </div>
+      <div class="field">
         <label>Section (assigned)</label>
         <select id="sectionSelect"></select>
       </div>
@@ -37,7 +50,10 @@
         <button class="btn primary" id="openEditorBtn">Open editor</button>
       </div>
     </div>
-    <div id="sectionStatusBox" style="display:none; margin-top:12px; padding:10px 12px; border-radius:12px; border:1px solid rgba(43,68,91,.15); background: rgba(43,68,91,.04);"></div>
+
+    <!-- Status / progress / task summary for the selected section -->
+    <div id="sectionStatusBox" class="statusbox" style="display:none;"></div>
+
     <div id="msg" class="small" style="color:var(--danger); font-weight:800; margin-top:10px;"></div>
   </section>
 </div>
