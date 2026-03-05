@@ -245,3 +245,64 @@ textarea{min-height:120px; resize:vertical}
 }
 .checkitem:hover{ background:#f8fafc; }
 .checkitem input{ margin-top:2px; }
+
+/* ------------------------------
+   Dynamic status progress bar
+   (line sits behind dots only; labels are below so nothing gets crossed out)
+------------------------------ */
+.gcp-progress{
+  position: relative;
+  display: flex;
+  gap: 22px;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding: 14px 6px 2px;
+}
+.gcp-progress .gcp-line{
+  position:absolute;
+  left: 18px;
+  right: 18px;
+  top: 26px;
+  height: 3px;
+  background: #e5e7eb;
+  border-radius: 999px;
+  z-index: 0;
+}
+.gcp-step{
+  position: relative;
+  z-index: 1;
+  display:flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 84px;
+  text-align: center;
+}
+.gcp-dot{
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  background: #ffffff;
+  border: 4px solid #d1d5db;
+  box-sizing: border-box;
+}
+.gcp-step.active .gcp-dot{ border-color: #7aa7ff; }
+.gcp-step.done .gcp-dot{ border-color: #2c3e50; }
+.gcp-label{
+  margin-top: 10px;
+  font-size: 14px;
+  color: #6b7280;
+  line-height: 1.1;
+}
+.gcp-step.active .gcp-label{ color:#1f2937; font-weight:600; }
+
+.statusbox{
+  width:100%;
+  background:#f3f4f6;
+  border:1px solid #e5e7eb;
+  border-radius: 14px;
+  padding: 16px 18px;
+  margin-top: 14px;
+}
+.statusbox .meta{ color:#6b7280; font-weight:600; margin-top:6px; }
+.statusbox .taskline{ margin-top: 10px; font-size: 16px; color:#111827; }
+.statusbox .taskline b{ font-weight:800; }

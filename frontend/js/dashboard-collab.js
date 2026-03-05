@@ -10,31 +10,52 @@
   const msg = document.getElementById('msg');
   const sectionStatusBox = document.getElementById('sectionStatusBox');
 
-  function humanStatus(s){
+  let eventMeta = {}; // { [eventId]: { taskText, submitterRole } }
+  let taskText = '';
+  let submitterRole = 'deputy';
+
+  function humanDocStatus(s){
     const map = {
       draft: 'Draft',
-      submitted: 'Submitted',
       returned: 'Returned',
-      approved_by_supervisor: 'Approved (Supervisor)',
-      approved_by_chairman: 'Approved (Deputy)'
+      submitted_to_supervisor: 'Submitted to Supervisor',
+      submitted_to_chairman: 'Submitted to Deputy',
+      submitted_to_minister: 'Submitted to Minister',
+      approved: 'Approved'
     };
     return map[s] || (s || '');
   }
 
-  function showSectionStatus(tp){
+  function normalizeSubmitterRole(r){
+    const v = String(r || '').toLowerCase();
+    return v === 'chairman' ? 'deputy' : v;
+  }
+
+  async function showSectionStatus(eventId, tp){
     if (!sectionStatusBox) return;
     if (!tp){
       sectionStatusBox.style.display = 'none';
       sectionStatusBox.textContent = '';
       return;
     }
+
+    // Document status is per-event; fetch it so the progress bar matches the selected submitter flow.
+    let doc = null;
+    try{
+      doc = await window.GCP.apiFetch(`/tp/document-status?event_id=${encodeURIComponent(eventId)}`, { method:'GET' });
+    }catch(e){
+      // keep going; we'll render without it
+    }
+
     const note = (tp.statusComment || '').trim();
-    const last = tp.lastUpdatedAt ? window.GCP.formatDateTime(tp.lastUpdatedAt) : '';
+    const last = (doc && doc.updatedAt) ? window.GCP.formatDateTime(doc.updatedAt) : (tp.lastUpdatedAt ? window.GCP.formatDateTime(tp.lastUpdatedAt) : '');
+    const docStatus = doc ? doc.status : 'draft';
+
     sectionStatusBox.style.display = 'block';
     sectionStatusBox.innerHTML = `
-      <div style="margin-bottom:8px;"><b>Status:</b> ${window.GCP.escapeHtml(humanStatus(tp.status))}</div>
-      <div>${renderStatusProgress(tp.status)}</div>
-      ${last ? `<div class="small muted" style="margin-top:6px;">Last updated: ${window.GCP.escapeHtml(last)}${tp.lastUpdatedBy ? ' • ' + window.GCP.escapeHtml(tp.lastUpdatedBy) : ''}</div>` : ''}
+      <div style="margin-bottom:8px;"><b>Status:</b> ${window.GCP.escapeHtml(humanDocStatus(docStatus))}</div>
+      <div>${window.GCP.renderStatusProgress(docStatus, submitterRole)}</div>
+      ${last ? `<div class="small muted" style="margin-top:6px;">Last updated: ${window.GCP.escapeHtml(last)}</div>` : ''}
       ${note ? `<div style="margin-top:10px; padding:8px 10px; border-radius:10px; border:1px solid rgba(220,38,38,.25); background: rgba(254,226,226,.55);"><b>Supervisor/Deputy comment:</b> ${window.GCP.escapeHtml(note)}</div>` : ''}
       <div style="margin-top:12px;"><b>Task:</b> ${window.GCP.escapeHtml((taskText || '').trim() || '—')}</div>
     `;
@@ -49,12 +70,17 @@
 
   async function loadUpcoming(){
     const events = await window.GCP.apiFetch('/events/upcoming', { method:'GET' });
+    eventMeta = {};
     eventsTbody.innerHTML = '';
     eventSelect.innerHTML = `<option value="">Select event...</option>`;
     sectionSelect.innerHTML = `<option value="">Select section...</option>`;
     sectionSelect.disabled = true;
 
     for (const ev of (events || [])) {
+      eventMeta[ev.id] = {
+        taskText: ev.task || ev.occasion || '',
+        submitterRole: normalizeSubmitterRole(ev.submitter_role)
+      };
       const tr = document.createElement('tr');
       tr.innerHTML = `
         <td>${ev.title || ''}</td>
@@ -104,6 +130,9 @@
       return;
     }
     try{
+      // Cache event meta for status bar
+      taskText = (eventMeta[eventId] && eventMeta[eventId].taskText) || '';
+      submitterRole = (eventMeta[eventId] && eventMeta[eventId].submitterRole) || 'deputy';
       await loadSectionsForEvent(eventId);
     }catch(e){
       setMsg(e.message || 'Failed to load event', true);
@@ -117,14 +146,14 @@
     const eventId = Number(eventSelect.value);
     const sectionId = Number(sectionSelect.value);
     if (!Number.isFinite(eventId) || !Number.isFinite(sectionId)) {
-      showSectionStatus(null);
+      await showSectionStatus(eventId, null);
       return;
     }
     try{
       const tp = await window.GCP.apiFetch(`/tp?event_id=${encodeURIComponent(eventId)}&section_id=${encodeURIComponent(sectionId)}`, { method:'GET' });
-      showSectionStatus(tp);
+      await showSectionStatus(eventId, tp);
     }catch(e){
-      showSectionStatus(null);
+      await showSectionStatus(eventId, null);
     }
   });
 

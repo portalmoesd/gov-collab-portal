@@ -124,4 +124,52 @@
   window.GCP.requireAuth = requireAuth;
   window.GCP.escapeHtml = escapeHtml;
   window.GCP.roleToTitle = roleToTitle;
+
+  // ------------------------------
+  // Dynamic document status progress bar
+  // ------------------------------
+  // submitterRole: 'supervisor' | 'deputy' | 'minister' (or undefined)
+  window.GCP.getStatusSteps = function(submitterRole){
+    const raw = String(submitterRole || '').toLowerCase();
+    const r = raw === 'chairman' ? 'deputy' : raw;
+    if (r === 'supervisor') return ['Draft','Supervisor','Approved'];
+    if (r === 'minister') return ['Draft','Supervisor','Deputy','Minister','Approved'];
+    // default (deputy)
+    return ['Draft','Supervisor','Deputy','Approved'];
+  };
+
+  // Map document_status.status to an index in the steps array
+  window.GCP.statusToStepIndex = function(status, submitterRole){
+    const s = String(status || '').toLowerCase();
+    // Backend stores deputy as 'chairman'. Normalize to 'deputy' for UI.
+    const rawRole = String(submitterRole || '').toLowerCase();
+    const r = rawRole === 'chairman' ? 'deputy' : rawRole;
+
+    if (!s || s === 'draft' || s === 'returned') return 0;
+    if (s === 'submitted_to_supervisor') return 1;
+    if (s === 'submitted_to_chairman') {
+      // If the flow ends at Supervisor, we should never see this, but keep safe.
+      return r === 'supervisor' ? 1 : 2;
+    }
+    if (s === 'submitted_to_minister') {
+      // Draft -> Supervisor -> Deputy -> Minister
+      return r === 'minister' ? 3 : 0;
+    }
+    if (s === 'approved') return window.GCP.getStatusSteps(r).length - 1;
+    return 0;
+  };
+
+  window.GCP.renderStatusProgress = function(status, submitterRole){
+    const steps = window.GCP.getStatusSteps(submitterRole);
+    const active = window.GCP.statusToStepIndex(status, submitterRole);
+
+    const stepsHtml = steps.map((label, idx) => {
+      const isDone = idx < active;
+      const isActive = idx === active;
+      const cls = isActive ? 'gcp-step active' : (isDone ? 'gcp-step done' : 'gcp-step');
+      return `\n        <div class="${cls}">\n          <div class="gcp-dot" aria-hidden="true"></div>\n          <div class="gcp-label">${escapeHtml(label)}</div>\n        </div>\n      `;
+    }).join('');
+
+    return `\n      <div class="gcp-progress" role="group" aria-label="Document status">\n        <div class="gcp-line" aria-hidden="true"></div>\n        ${stepsHtml}\n      </div>\n    `;
+  };
 })();
