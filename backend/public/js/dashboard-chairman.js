@@ -38,6 +38,7 @@
     if(!s) return '';
     const map = {
       draft: 'Draft',
+      in_progress: 'Draft',
       returned_by_supervisor: 'Returned',
       returned_by_chairman: 'Returned',
       returned_by_minister: 'Returned',
@@ -102,6 +103,7 @@
   function humanStatus(s){
     const m = {
       draft: 'Draft',
+      in_progress: 'Draft',
       submitted: 'Submitted',
       submitted_to_supervisor: 'Submitted to Supervisor',
       approved_by_supervisor: 'Approved by Supervisor',
@@ -156,7 +158,8 @@
     const submitterRole = (ds.submitterRole || ev?.submitter_role || 'deputy');
     const steps = workflowSteps(submitterRole);
     const active = statusStage(ds.status);
-    const task = (ev?.task || '').trim();
+    // Back-compat: the DB column is still "occasion" but UI now calls it "task"
+    const task = ((ev?.task ?? ev?.occasion) || '').trim();
 
     docStatusBox.innerHTML = `
       <div style="display:flex; align-items:baseline; justify-content:space-between; gap:12px; flex-wrap:wrap;">
