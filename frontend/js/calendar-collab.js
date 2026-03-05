@@ -9,7 +9,7 @@
   if (!grid || !mount) return;
 
   const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
-  const DOW = ['SUN','MON','TUE','WED','THU','FRI','SAT'];
+  const DOW = ['MON','TUE','WED','THU','FRI','SAT','SUN'];
 
   function parseDMY(s){
     // Expect dd/mm/yyyy or d/m/yyyy
@@ -68,7 +68,7 @@
     body.className = 'cal-grid';
 
     const first = new Date(year, month, 1);
-    const startDay = first.getDay(); // 0 Sunday
+    const startDay = (first.getDay() + 6) % 7; // 0 Monday
     const daysInMonth = new Date(year, month+1, 0).getDate();
 
     // leading blanks
@@ -89,12 +89,19 @@
       if (has){
         cell.addEventListener('click', () => {
           const cards = deadlineMap.get(key) || [];
-          if (cards[0]){
-            cards[0].scrollIntoView({behavior:'smooth', block:'center'});
-            // subtle focus ring for a moment
-            cards[0].classList.add('pulse-focus');
-            setTimeout(()=>cards[0] && cards[0].classList.remove('pulse-focus'), 900);
+          if (!cards.length) return;
+
+          // Remove any previous highlights
+          Array.from(grid.querySelectorAll('.event-card.pulse-focus')).forEach(el => el.classList.remove('pulse-focus'));
+
+          // Scroll to first and highlight all matching cards
+          cards[0].scrollIntoView({behavior:'smooth', block:'center'});
+          for (const c of cards){
+            c.classList.add('pulse-focus');
           }
+          setTimeout(() => {
+            for (const c of cards){ c.classList.remove('pulse-focus'); }
+          }, 1000);
         });
       }
       body.appendChild(cell);

@@ -391,12 +391,14 @@ hr, .divider{
   display:grid;
   grid-template-columns: repeat(7, 1fr);
   gap: 8px;
+  justify-items: center;
   margin-bottom: 8px;
   color: var(--muted);
   font-size: 12px;
   font-weight: 800;
   letter-spacing: 0.06em;
 }
+.cal-dow > div{ text-align:center; }
 .cal-grid{
   display:grid;
   grid-template-columns: repeat(7, 1fr);
@@ -411,7 +413,7 @@ hr, .divider{
   display:flex;
   align-items:center;
   justify-content:center;
-  font-weight: 800;
+  font-weight: 500;
   color: rgba(0,0,0,0.82);
 }
 .cal-cell.blank{
