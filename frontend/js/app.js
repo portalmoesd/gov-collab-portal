@@ -206,14 +206,34 @@
   window.GCP.renderStatusProgress = function(status, submitterRole){
     const steps = window.GCP.getStatusSteps(submitterRole);
     const active = window.GCP.statusToStepIndex(status, submitterRole);
+    const n = Math.max(steps.length, 1);
+    const denom = Math.max(n - 1, 1);
+
+    const stepPct = 100 / denom;               // width of one segment
+    const donePct = Math.max(0, Math.min(100, (Math.max(active - 1, 0) / denom) * 100)); // fully completed segments
+    const activePct = Math.max(0, Math.min(100, (active / denom) * 100));               // up to current step
+    const afterLeft = activePct;
+    const afterWidth = Math.max(0, Math.min(100 - afterLeft, stepPct * 0.55));          // small blue hint after current
 
     const stepsHtml = steps.map((label, idx) => {
       const isDone = idx < active;
       const isActive = idx === active;
       const cls = isActive ? 'gcp-step active' : (isDone ? 'gcp-step done' : 'gcp-step');
-      return `\n        <div class="${cls}">\n          <div class="gcp-dot" aria-hidden="true"></div>\n          <div class="gcp-label">${escapeHtml(label)}</div>\n        </div>\n      `;
+      return `
+        <div class="${cls}" style="--gcp-i:${idx}; --gcp-n:${n};">
+          <div class="gcp-dot" aria-hidden="true"></div>
+          <div class="gcp-label">${escapeHtml(label)}</div>
+        </div>
+      `;
     }).join('');
 
-    return `\n      <div class="gcp-progress" role="group" aria-label="Document status">\n        <div class="gcp-line" aria-hidden="true"></div>\n        ${stepsHtml}\n      </div>\n    `;
+    return `
+      <div class="gcp-progress gcp-progress-v2" role="group" aria-label="Document status">
+        <div class="gcp-line" aria-hidden="true"></div>
+        <div class="gcp-line-done" aria-hidden="true" style="width:${activePct}%;"></div>
+        <div class="gcp-line-after" aria-hidden="true" style="left:${afterLeft}%; width:${afterWidth}%;"></div>
+        ${stepsHtml}
+      </div>
+    `;
   };
 })();

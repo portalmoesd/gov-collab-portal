@@ -332,3 +332,76 @@ textarea{min-height:120px; resize:vertical}
 .gcp-step.todo .gcp-dot{
   background:#fff;
 }
+
+
+/* === Apple status bar v3 (ref) === */
+
+.gcp-progress.gcp-progress-v2{
+  padding: 18px 10px 6px;
+}
+.gcp-progress.gcp-progress-v2 .gcp-line{
+  top: 28px;
+  height: 6px;
+  background: rgba(10,132,255,0.22);
+  border-radius: 999px;
+}
+.gcp-progress.gcp-progress-v2 .gcp-line-done{
+  position:absolute;
+  left: 18px;
+  top: 28px;
+  height: 6px;
+  background: #059669; /* green */
+  border-radius: 999px;
+  z-index: 0;
+}
+.gcp-progress.gcp-progress-v2 .gcp-line-after{
+  position:absolute;
+  top: 28px;
+  height: 6px;
+  background: #0a84ff;
+  border-radius: 999px;
+  z-index: 0;
+  opacity: 0.85;
+}
+.gcp-progress.gcp-progress-v2 .gcp-step{
+  min-width: 90px;
+}
+.gcp-progress.gcp-progress-v2 .gcp-dot{
+  width: 34px;
+  height: 34px;
+  border-radius: 999px;
+  border: none;
+  background: rgba(10,132,255,0.28); /* upcoming */
+  box-shadow: none;
+  position: relative;
+}
+.gcp-progress.gcp-progress-v2 .gcp-step.done .gcp-dot{
+  background:#059669;
+}
+.gcp-progress.gcp-progress-v2 .gcp-step.done .gcp-dot::before{
+  content:"✓";
+  position:absolute;
+  inset:0;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  color:#fff;
+  font-weight:900;
+  font-size:18px;
+}
+.gcp-progress.gcp-progress-v2 .gcp-step.active .gcp-dot{
+  background:#0a84ff;
+  box-shadow:
+    0 0 0 4px rgba(10,132,255,0.25),
+    0 0 0 8px rgba(10,132,255,0.12);
+}
+.gcp-progress.gcp-progress-v2 .gcp-label{
+  margin-top: 10px;
+  font-size: 13px;
+  color: rgba(11,11,15,0.60);
+  font-weight: 600;
+}
+.gcp-progress.gcp-progress-v2 .gcp-step.active .gcp-label{
+  color: rgba(11,11,15,0.78);
+}
+

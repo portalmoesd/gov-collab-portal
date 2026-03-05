@@ -510,3 +510,80 @@ hr, .divider{
   font-weight: 600;
 }
 
+
+
+/* === Progress bar v2 (match reference) === */
+.gcp-progress{
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0;
+  padding: 18px 10px 6px;
+}
+.gcp-progress .gcp-line{
+  position: absolute;
+  left: 28px;
+  right: 28px;
+  top: 36px;
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(10,132,255,0.18);
+}
+.gcp-progress .gcp-line-fill{
+  position: absolute;
+  left: 28px;
+  top: 36px;
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(52,199,89,0.95);
+  width: 0%;
+}
+.gcp-step{
+  flex: 1;
+  min-width: 0;
+  text-align: center;
+  position: relative;
+  z-index: 2;
+}
+.gcp-dot{
+  width: 38px;
+  height: 38px;
+  border-radius: 999px;
+  margin: 0 auto;
+  background: rgba(10,132,255,0.25);
+  border: none;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.10);
+  display: grid;
+  place-items: center;
+  color: white;
+  font-weight: 800;
+}
+.gcp-step.done .gcp-dot{
+  background: rgba(6,153,111,1);
+}
+.gcp-step.done .gcp-dot::after{
+  content: "✓";
+  font-size: 18px;
+  line-height: 1;
+}
+.gcp-step.active .gcp-dot{
+  background: rgba(10,132,255,1);
+  box-shadow: 0 0 0 6px rgba(10,132,255,0.18), 0 10px 28px rgba(0,0,0,0.12);
+}
+.gcp-step:not(.done):not(.active) .gcp-dot{
+  background: rgba(10,132,255,0.28);
+  box-shadow: 0 6px 18px rgba(0,0,0,0.08);
+}
+.gcp-label{
+  margin-top: 10px;
+  font-size: 13px;
+  font-weight: 600;
+  color: rgba(11,11,15,0.62);
+  background: transparent;
+  border: none;
+  padding: 0;
+}
+.gcp-step.active .gcp-label{
+  color: rgba(11,11,15,0.88);
+}
