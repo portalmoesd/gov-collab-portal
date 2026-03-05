@@ -317,6 +317,9 @@ textarea{min-height:120px; resize:vertical}
   font-size:12px;
   color: rgba(43,68,91,.75);
   white-space:nowrap;
+  background:#fff;
+  padding:0 6px;
+  border-radius:8px;
 }
 .gcp-step.done .gcp-dot{
   background: rgba(16,185,129,.18);

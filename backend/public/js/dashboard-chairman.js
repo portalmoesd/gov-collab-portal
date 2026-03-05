@@ -32,6 +32,60 @@
   let currentEventId = null;
   let currentSections = [];
 
+  const eventsById = new Map();
+
+  function humanStatus(s){
+    if(!s) return '';
+    const map = {
+      draft: 'Draft',
+      returned_by_supervisor: 'Returned',
+      returned_by_chairman: 'Returned',
+      returned_by_minister: 'Returned',
+      submitted_to_supervisor: 'Submitted',
+      approved_by_supervisor: 'Approved (Supervisor)',
+      submitted_to_chairman: 'Submitted',
+      approved_by_chairman: 'Approved (Deputy)',
+      submitted_to_minister: 'Submitted',
+      approved_by_minister: 'Approved (Minister)',
+      approved: 'Approved'
+    };
+    return map[s] || String(s);
+  }
+
+  function workflowSteps(submitterRole){
+    const steps = ['Draft','Supervisor'];
+    if(submitterRole === 'deputy' || submitterRole === 'minister') steps.push('Deputy');
+    if(submitterRole === 'minister') steps.push('Minister');
+    steps.push('Approved');
+    return steps;
+  }
+
+  function statusStage(status){
+    const s = String(status||'').toLowerCase();
+    if(s === 'approved' || s === 'locked') return 'Approved';
+    if(s.includes('minister')) return 'Minister';
+    if(s.includes('chairman')) return 'Deputy';
+    if(s.includes('supervisor')) return 'Supervisor';
+    return 'Draft';
+  }
+
+  function renderProgress(steps, activeLabel){
+    const idx = Math.max(0, steps.indexOf(activeLabel));
+    return `
+      <div class="gcp-progress" role="list">
+        ${steps.map((label,i)=>{
+          const cls = i < idx ? 'done' : (i===idx ? 'active' : 'todo');
+          return `
+            <div class="gcp-step ${cls}" role="listitem">
+              <div class="gcp-dot"></div>
+              <div class="gcp-label">${window.GCP.escapeHtml(label)}</div>
+            </div>
+          `;
+        }).join('')}
+      </div>
+    `;
+  }
+
   function setMsg(text, isError=false){
     msg.textContent = text || '';
     msg.style.color = isError ? 'crimson' : '#2b445b';
@@ -63,7 +117,10 @@
     eventSelect.innerHTML = '<option value="">Select…</option>';
     const events = await window.GCP.apiFetch('/events/upcoming', { method:'GET' });
 
+    eventsById.clear();
+
     for (const ev of (events || [])){
+      eventsById.set(Number(ev.id), ev);
       const opt = document.createElement('option');
       opt.value = String(ev.id);
       const deadline = ev.deadline_date ? window.GCP.formatDate(ev.deadline_date) : '';
@@ -92,12 +149,23 @@
     // End event button visibility (Deputy should not see it; Admin/Protocol may)
     endEventBtn.style.display = canEndEvent ? 'inline-flex' : 'none';
 
-    // Document status
+    // Document status (workflow bar)
     const ds = await window.GCP.apiFetch(`/tp/document-status?event_id=${encodeURIComponent(currentEventId)}`, { method:'GET' });
     const last = ds.updatedAt ? window.GCP.formatDateTime(ds.updatedAt) : '';
+    const ev = eventsById.get(currentEventId);
+    const submitterRole = (ds.submitterRole || ev?.submitter_role || 'deputy');
+    const steps = workflowSteps(submitterRole);
+    const active = statusStage(ds.status);
+    const task = (ev?.task || '').trim();
+
     docStatusBox.innerHTML = `
-      <div><b>Document status:</b> ${pill(ds.status)} ${last ? `<span class="muted">(${window.GCP.escapeHtml(last)})</span>` : ''}</div>
-      ${ds.chairmanComment ? `<div class="muted" style="margin-top:6px;"><b>Comment:</b> ${window.GCP.escapeHtml(ds.chairmanComment)}</div>` : ''}
+      <div style="display:flex; align-items:baseline; justify-content:space-between; gap:12px; flex-wrap:wrap;">
+        <div><b>Status:</b> ${window.GCP.escapeHtml(humanStatus(ds.status) || '')}</div>
+        ${last ? `<div class="muted">${window.GCP.escapeHtml(last)}</div>` : ''}
+      </div>
+      ${renderProgress(steps, active)}
+      ${task ? `<div style="margin-top:10px;"><b>Task:</b> ${window.GCP.escapeHtml(task)}</div>` : ''}
+      ${ds.chairmanComment ? `<div class="muted" style="margin-top:8px;"><b>Comment:</b> ${window.GCP.escapeHtml(ds.chairmanComment)}</div>` : ''}
     `;
 
     // Per-section status grid

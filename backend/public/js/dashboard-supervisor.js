@@ -17,9 +17,46 @@
   endEventBtn.textContent = 'End event';
   endEventBtn.style.display = 'none';
   const msg = document.getElementById('msg');
+  const docStatusBox = document.getElementById('docStatusBox');
 
   let currentEventId = null;
   let currentSections = [];
+
+  const eventsById = new Map();
+
+  function workflowSteps(submitterRole){
+    const steps = ['Draft','Supervisor'];
+    if(submitterRole === 'deputy' || submitterRole === 'minister') steps.push('Deputy');
+    if(submitterRole === 'minister') steps.push('Minister');
+    steps.push('Approved');
+    return steps;
+  }
+
+  function statusStage(status){
+    const s = String(status||'').toLowerCase();
+    if(s === 'approved' || s === 'locked') return 'Approved';
+    if(s.includes('minister')) return 'Minister';
+    if(s.includes('chairman')) return 'Deputy';
+    if(s.includes('supervisor')) return 'Supervisor';
+    return 'Draft';
+  }
+
+  function renderProgress(steps, activeLabel){
+    const idx = Math.max(0, steps.indexOf(activeLabel));
+    return `
+      <div class="gcp-progress" role="list">
+        ${steps.map((label,i)=>{
+          const cls = i < idx ? 'done' : (i===idx ? 'active' : 'todo');
+          return `
+            <div class="gcp-step ${cls}" role="listitem">
+              <div class="gcp-dot"></div>
+              <div class="gcp-label">${window.GCP.escapeHtml(label)}</div>
+            </div>
+          `;
+        }).join('')}
+      </div>
+    `;
+  }
 
   function setMsg(text, isError=false){
     msg.textContent = text || '';
@@ -43,7 +80,9 @@
   async function loadUpcoming(){
     const events = await window.GCP.apiFetch('/events/upcoming', { method:'GET' });
     eventSelect.innerHTML = `<option value="">Select event...</option>`;
+    eventsById.clear();
     for (const ev of (events || [])){
+      eventsById.set(Number(ev.id), ev);
       const opt = document.createElement('option');
       opt.value = ev.id;
       // carry submitter role so we can set the button label without an extra /events/:id call
@@ -143,18 +182,37 @@ eventSelect.addEventListener('change', async () => {
     const selectedOpt = eventSelect.options[eventSelect.selectedIndex];
     let sr = ((selectedOpt?.dataset?.submitterRole || '')).toLowerCase();
     // Fallback: if submitter role wasn't included in the upcoming events list, fetch event details.
-    if (!sr && eventId > 0) {
+    if (!sr && currentEventId > 0) {
       try {
-        const evDetails = await window.GCP.apiFetch(`/events/${eventId}`, { method: 'GET' });
+        const evDetails = await window.GCP.apiFetch(`/events/${currentEventId}`, { method: 'GET' });
         sr = String(evDetails?.submitter_role || evDetails?.submitterRole || '').toLowerCase();
       } catch (e) {
         // ignore; keep default
       }
     }
-    submitDocBtn.textContent = sr === 'supervisor' ? 'Send to Library' : 'Submit document to Deputy';
+    submitDocBtn.textContent = sr === 'supervisor' ? 'Send to Library' : (sr === 'minister' ? 'Submit to Deputy' : 'Submit document to Deputy');
     submitDocBtn.dataset.submitterRole = sr || 'chairman';
     try{
       await refreshStatusGrid();
+
+      // Document status box (same workflow bar as collaborator)
+      const ds = await window.GCP.apiFetch(`/tp/document-status?event_id=${encodeURIComponent(currentEventId)}`, { method:'GET' });
+      const last = ds.updatedAt ? window.GCP.formatDateTime(ds.updatedAt) : '';
+      const ev = eventsById.get(currentEventId);
+      const submitterRole = (ds.submitterRole || ev?.submitter_role || 'deputy');
+      const steps = workflowSteps(String(submitterRole).toLowerCase());
+      const active = statusStage(ds.status);
+      const task = (ev?.task || '').trim();
+      if (docStatusBox) {
+        docStatusBox.innerHTML = `
+          <div style="display:flex; align-items:baseline; justify-content:space-between; gap:12px; flex-wrap:wrap;">
+            <div><b>Status:</b> ${window.GCP.escapeHtml(humanStatus(ds.status) || '')}</div>
+            ${last ? `<div class="muted">${window.GCP.escapeHtml(last)}</div>` : ''}
+          </div>
+          ${renderProgress(steps, active)}
+          ${task ? `<div style="margin-top:10px;"><b>Task:</b> ${window.GCP.escapeHtml(task)}</div>` : ''}
+        `;
+      }
     }catch(e){
       setMsg(e.message || 'Failed to load sections', true);
       sectionsTbody.innerHTML = '';

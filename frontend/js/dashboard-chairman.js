@@ -3,10 +3,12 @@
   const me = await window.GCP.requireAuth();
   if (!me) return;
 
-  const countrySelect = document.getElementById("countrySelect");
+  const role = String(me.role || '').toLowerCase();
+
   const eventSelect = document.getElementById("eventSelect");
   const docStatusBox = document.getElementById("docStatusBox");
   const sectionsTbody = document.getElementById("sectionsTbody");
+  const approveAllSectionsBtn = document.getElementById("approveAllSectionsBtn");
   const approveDocBtn = document.getElementById("approveDocBtn");
   const returnDocBtn = document.getElementById("returnDocBtn");
   const previewBtn = document.getElementById("previewBtn");
@@ -16,173 +18,309 @@
   const modalContent = document.getElementById("modalContent");
   const closeModalBtn = document.getElementById("closeModalBtn");
 
-  closeModalBtn.addEventListener("click", () => {
-    modalBackdrop.style.display = "none";
-    modalContent.innerHTML = "";
-  });
+  // Insert End Event button (admin/supervisor/protocol)
+  const canEndEvent = ['admin','supervisor','protocol'].includes(role);
+  const endEventBtn = document.createElement('button');
+  endEventBtn.className = 'btn danger';
+  endEventBtn.textContent = 'End event';
+  endEventBtn.style.display = 'none';
+  if (canEndEvent) {
+    // place next to preview button
+    previewBtn.parentElement.insertBefore(endEventBtn, previewBtn);
+  }
 
-  async function loadCountries(){
-    const countries = await window.GCP.apiFetch("/countries", { method:"GET" });
-    countrySelect.innerHTML = `<option value="">Select country...</option>`;
-    for (const c of countries){
-      const opt = document.createElement("option");
-      opt.value = c.id;
-      opt.textContent = c.name_en;
-      countrySelect.appendChild(opt);
-    }
+  let currentEventId = null;
+  let currentSections = [];
+
+  const eventsById = new Map();
+
+  function humanStatus(s){
+    if(!s) return '';
+    const map = {
+      draft: 'Draft',
+      returned_by_supervisor: 'Returned',
+      returned_by_chairman: 'Returned',
+      returned_by_minister: 'Returned',
+      submitted_to_supervisor: 'Submitted',
+      approved_by_supervisor: 'Approved (Supervisor)',
+      submitted_to_chairman: 'Submitted',
+      approved_by_chairman: 'Approved (Deputy)',
+      submitted_to_minister: 'Submitted',
+      approved_by_minister: 'Approved (Minister)',
+      approved: 'Approved'
+    };
+    return map[s] || String(s);
+  }
+
+  function workflowSteps(submitterRole){
+    const steps = ['Draft','Supervisor'];
+    if(submitterRole === 'deputy' || submitterRole === 'minister') steps.push('Deputy');
+    if(submitterRole === 'minister') steps.push('Minister');
+    steps.push('Approved');
+    return steps;
+  }
+
+  function statusStage(status){
+    const s = String(status||'').toLowerCase();
+    if(s === 'approved' || s === 'locked') return 'Approved';
+    if(s.includes('minister')) return 'Minister';
+    if(s.includes('chairman')) return 'Deputy';
+    if(s.includes('supervisor')) return 'Supervisor';
+    return 'Draft';
+  }
+
+  function renderProgress(steps, activeLabel){
+    const idx = Math.max(0, steps.indexOf(activeLabel));
+    return `
+      <div class="gcp-progress" role="list">
+        ${steps.map((label,i)=>{
+          const cls = i < idx ? 'done' : (i===idx ? 'active' : 'todo');
+          return `
+            <div class="gcp-step ${cls}" role="listitem">
+              <div class="gcp-dot"></div>
+              <div class="gcp-label">${window.GCP.escapeHtml(label)}</div>
+            </div>
+          `;
+        }).join('')}
+      </div>
+    `;
+  }
+
+  function setMsg(text, isError=false){
+    msg.textContent = text || '';
+    msg.style.color = isError ? 'crimson' : '#2b445b';
+  }
+
+  function pill(status){
+    const s = String(status || '').toLowerCase();
+    const cls = (s === 'approved') ? 'pill success' :
+                (s.includes('returned')) ? 'pill danger' :
+                (s.includes('submitted')) ? 'pill warn' : 'pill';
+    return `<span class="${cls}">${window.GCP.escapeHtml(humanStatus(s))}</span>`;
+  }
+
+  function humanStatus(s){
+    const m = {
+      draft: 'Draft',
+      submitted: 'Submitted',
+      submitted_to_supervisor: 'Submitted to Supervisor',
+      approved_by_supervisor: 'Approved by Supervisor',
+      submitted_to_chairman: 'Submitted to Deputy',
+      approved_by_chairman: 'Approved by Deputy',
+      approved: 'Approved',
+      returned: 'Returned'
+    };
+    return m[s] || s || '';
   }
 
   async function loadEvents(){
-    const events = await window.GCP.apiFetch("/events?is_active=true", { method:"GET" });
-    eventSelect.innerHTML = `<option value="">Select event...</option>`;
-    for (const ev of events){
-      const opt = document.createElement("option");
-      opt.value = ev.id;
-      opt.textContent = `${ev.title} (${ev.country_name_en}${ev.deadline_date ? ', ' + ev.deadline_date : ''})`;
+    eventSelect.innerHTML = '<option value="">Select…</option>';
+    const events = await window.GCP.apiFetch('/events/upcoming', { method:'GET' });
+
+    eventsById.clear();
+
+    for (const ev of (events || [])){
+      eventsById.set(Number(ev.id), ev);
+      const opt = document.createElement('option');
+      opt.value = String(ev.id);
+      const deadline = ev.deadline_date ? window.GCP.formatDate(ev.deadline_date) : '';
+      opt.textContent = `${ev.title || 'Event'} — ${ev.country_name_en || ''}${deadline ? ' ('+deadline+')' : ''}`;
       eventSelect.appendChild(opt);
     }
   }
 
-  function pill(status){
-    return `<span class="pill ${status}">${status.replaceAll("_"," ")}</span>`;
-  }
-
   async function refresh(){
-    msg.textContent = "";
-    const eventId = eventSelect.value;
-    const countryId = countrySelect.value;
-    if (!eventId || !countryId){
-      sectionsTbody.innerHTML = "";
-      docStatusBox.innerHTML = `<span class="muted">Select event and country.</span>`;
+    setMsg('');
+    sectionsTbody.innerHTML = '';
+    docStatusBox.innerHTML = '';
+    const evId = Number(eventSelect.value);
+    // When no event is selected, the <select> value is "" which becomes 0.
+    // Guard against calling APIs with event_id=0.
+    if (!Number.isFinite(evId) || evId <= 0) {
+      currentEventId = null;
+      approveDocBtn.disabled = true;
+      returnDocBtn.disabled = true;
+      previewBtn.disabled = true;
+      endEventBtn.style.display = 'none';
       return;
     }
+    currentEventId = evId;
 
-    const event = await window.GCP.apiFetch(`/events/${encodeURIComponent(eventId)}?country_id=${encodeURIComponent(countryId)}`, { method:"GET" });
-    const ds = await window.GCP.apiFetch(`/document-status?event_id=${encodeURIComponent(eventId)}&country_id=${encodeURIComponent(countryId)}`, { method:"GET" });
+    // End event button visibility (Deputy should not see it; Admin/Protocol may)
+    endEventBtn.style.display = canEndEvent ? 'inline-flex' : 'none';
+
+    // Document status (workflow bar)
+    const ds = await window.GCP.apiFetch(`/tp/document-status?event_id=${encodeURIComponent(currentEventId)}`, { method:'GET' });
+    const last = ds.updatedAt ? window.GCP.formatDateTime(ds.updatedAt) : '';
+    const ev = eventsById.get(currentEventId);
+    const submitterRole = (ds.submitterRole || ev?.submitter_role || 'deputy');
+    const steps = workflowSteps(submitterRole);
+    const active = statusStage(ds.status);
+    const task = (ev?.task || '').trim();
 
     docStatusBox.innerHTML = `
-      <div><b>Document status:</b> ${pill(ds.status)}</div>
-      ${ds.chairmanComment ? `<div class="small"><b>Deputy comment:</b> ${window.GCP.escapeHtml(ds.chairmanComment)}</div>` : ''}
-      <div class="small muted">Updated: ${window.GCP.escapeHtml(ds.updatedAt)}</div>
+      <div style="display:flex; align-items:baseline; justify-content:space-between; gap:12px; flex-wrap:wrap;">
+        <div><b>Status:</b> ${window.GCP.escapeHtml(humanStatus(ds.status) || '')}</div>
+        ${last ? `<div class="muted">${window.GCP.escapeHtml(last)}</div>` : ''}
+      </div>
+      ${renderProgress(steps, active)}
+      ${task ? `<div style="margin-top:10px;"><b>Task:</b> ${window.GCP.escapeHtml(task)}</div>` : ''}
+      ${ds.chairmanComment ? `<div class="muted" style="margin-top:8px;"><b>Comment:</b> ${window.GCP.escapeHtml(ds.chairmanComment)}</div>` : ''}
     `;
 
-    const stMap = new Map();
-    for (const st of (event.sectionStatuses || [])) stMap.set(st.section_id, st);
+    // Per-section status grid
+    const grid = await window.GCP.apiFetch(`/tp/status-grid?event_id=${encodeURIComponent(currentEventId)}`, { method:'GET' });
+    currentSections = grid.sections || [];
 
-    sectionsTbody.innerHTML = "";
-    for (const sec of event.requiredSections){
-      const st = stMap.get(sec.id) || { status: "draft" };
-      const tr = document.createElement("tr");
+    for (const s of currentSections){
+      const tr = document.createElement('tr');
+      const lastUpdate = s.lastUpdatedAt ? window.GCP.formatDateTime(s.lastUpdatedAt) : '';
+      const note = (s.statusComment || '').trim();
       tr.innerHTML = `
-        <td>${window.GCP.escapeHtml(sec.label)}</td>
-        <td>${pill(st.status || 'draft')}</td>
-        <td class="small">${st.last_updated_by ? window.GCP.escapeHtml(st.last_updated_by) : '<span class="muted">—</span>'}<br/>
-            <span class="muted">${st.last_updated_at ? window.GCP.escapeHtml(st.last_updated_at) : ''}</span>
-            ${st.status_comment ? `<div class="small"><b>Comment:</b> ${window.GCP.escapeHtml(st.status_comment)}</div>` : ''}
-        </td>
-        <td class="row">
-          <button class="btn" data-act="open" data-sid="${sec.id}">Open</button>
-          <button class="btn success" data-act="approve" data-sid="${sec.id}">Approve section</button>
-          <button class="btn danger" data-act="return" data-sid="${sec.id}">Return section</button>
-        </td>
+        <td>${window.GCP.escapeHtml(s.sectionLabel || '')}</td>
+        <td>${pill(s.status)}${note ? `<div class="small" style="margin-top:4px; padding:6px 8px; border-radius:10px; border:1px solid rgba(220,38,38,.25); background: rgba(254,226,226,.55);"><b>Comment:</b> ${window.GCP.escapeHtml(note)}</div>` : ''}</td>
+        <td>${window.GCP.escapeHtml(lastUpdate)}</td>
+        <td class="actions"></td>
       `;
-      tr.querySelectorAll("button").forEach(btn => {
-        btn.addEventListener("click", async () => {
-          const act = btn.dataset.act;
-          const sid = btn.dataset.sid;
-          if (act === "open"){
-            location.href = `editor.html?eventId=${encodeURIComponent(eventId)}&countryId=${encodeURIComponent(countryId)}&sectionId=${encodeURIComponent(sid)}`;
-            return;
-          }
-          try{
-            if (act === "approve"){
-              await window.GCP.apiFetch("/tp/approve-section-chairman", { method:"POST", body: JSON.stringify({ eventId, countryId, sectionId: sid }) });
-            } else if (act === "return"){
-              const comment = prompt("Return comment (required):", "");
-              if (comment === null) return;
-              await window.GCP.apiFetch("/tp/return", { method:"POST", body: JSON.stringify({ eventId, countryId, sectionId: sid, comment }) });
-            }
-            await refresh();
-          }catch(err){
-            alert(err.message || "Action failed");
-          }
-        });
+      const actionsTd = tr.querySelector('.actions');
+
+      const openBtn = document.createElement('button');
+      openBtn.className = 'btn';
+      openBtn.textContent = 'Open editor';
+      openBtn.addEventListener('click', () => {
+        window.open(`editor.html?event_id=${currentEventId}&section_id=${s.sectionId}`, '_blank');
       });
+      actionsTd.appendChild(openBtn);
+
+      const approveBtn = document.createElement('button');
+      approveBtn.className = 'btn success';
+      approveBtn.textContent = 'Approve section';
+      approveBtn.style.marginLeft = '8px';
+      approveBtn.addEventListener('click', async () => {
+        try{
+          await window.GCP.apiFetch('/tp/approve-section-chairman', {
+            method:'POST',
+            body: JSON.stringify({ eventId: currentEventId, sectionId: s.sectionId })
+          });
+          await refresh();
+        }catch(e){
+          setMsg(e.message || 'Failed to approve section', true);
+        }
+      });
+      actionsTd.appendChild(approveBtn);
+
+      const returnBtn = document.createElement('button');
+      returnBtn.className = 'btn danger';
+      returnBtn.textContent = 'Return section';
+      returnBtn.style.marginLeft = '8px';
+      returnBtn.addEventListener('click', async () => {
+        const note = prompt('Return note (optional):', '') || '';
+        try{
+          await window.GCP.apiFetch('/tp/return', {
+            method:'POST',
+            body: JSON.stringify({ eventId: currentEventId, sectionId: s.sectionId, note })
+          });
+          await refresh();
+        }catch(e){
+          setMsg(e.message || 'Failed to return section', true);
+        }
+      });
+      actionsTd.appendChild(returnBtn);
+
       sectionsTbody.appendChild(tr);
     }
+
+    // Adjust approve button based on configured submitter
+    try {
+      const ev = await window.GCP.apiFetch(`/events/${currentEventId}`, { method:'GET' });
+      const sr = String(ev.submitterRole || '').toLowerCase();
+      approveDocBtn.textContent = sr === 'minister' ? 'Submit to Minister' : 'Approve document';
+    } catch (e) {
+      approveDocBtn.textContent = 'Approve document';
+    }
+
+    approveDocBtn.disabled = false;
+    returnDocBtn.disabled = false;
+    previewBtn.disabled = false;
   }
 
-  approveDocBtn.addEventListener("click", async () => {
-    const eventId = eventSelect.value;
-    const countryId = countrySelect.value;
-    if (!eventId || !countryId) return;
-    if (!confirm("Approve the entire document and send to Library?")) return;
+  approveDocBtn.addEventListener('click', async () => {
+    setMsg('');
+    if (!currentEventId) return;
+    if (!confirm('Approve the full document?')) return;
     try{
-      await window.GCP.apiFetch("/document/approve", { method:"POST", body: JSON.stringify({ eventId, countryId }) });
+      await window.GCP.apiFetch('/document/approve', {
+        method:'POST',
+        body: JSON.stringify({ eventId: currentEventId })
+      });
       await refresh();
-    }catch(err){
-      alert(err.message || "Failed");
+    }catch(e){
+      setMsg(e.message || 'Failed to approve document', true);
     }
   });
 
-  returnDocBtn.addEventListener("click", async () => {
-    const eventId = eventSelect.value;
-    const countryId = countrySelect.value;
-    if (!eventId || !countryId) return;
-    const comment = prompt("Return document comment (required):", "");
-    if (comment === null) return;
+  returnDocBtn.addEventListener('click', async () => {
+    setMsg('');
+    if (!currentEventId) return;
+    const note = prompt('Return note (optional):', '') || '';
+    if (!confirm('Return the full document?')) return;
     try{
-      await window.GCP.apiFetch("/document/return", { method:"POST", body: JSON.stringify({ eventId, countryId, comment }) });
+      await window.GCP.apiFetch('/document/return', {
+        method:'POST',
+        body: JSON.stringify({ eventId: currentEventId, note })
+      });
       await refresh();
-    }catch(err){
-      alert(err.message || "Failed");
+    }catch(e){
+      setMsg(e.message || 'Failed to return document', true);
     }
   });
 
-  previewBtn.addEventListener("click", async () => {
-    const eventId = eventSelect.value;
-    const countryId = countrySelect.value;
-    if (!eventId || !countryId) return;
+  previewBtn.addEventListener('click', async () => {
+    setMsg('');
+    if (!currentEventId) return;
     try{
-      const doc = await window.GCP.apiFetch(`/library/document?event_id=${encodeURIComponent(eventId)}&country_id=${encodeURIComponent(countryId)}`, { method:"GET" });
-      modalBackdrop.style.display = "flex";
-      modalContent.innerHTML = renderDocPreview(doc);
-    }catch(err){
-      alert(err.message || "Failed");
+      // Build a full preview from TP HTML per required section
+      const parts = [];
+      for (const s of currentSections){
+        const tp = await window.GCP.apiFetch(`/tp?event_id=${encodeURIComponent(currentEventId)}&section_id=${encodeURIComponent(s.sectionId)}`, { method:'GET' });
+        parts.push(`<h2 style="margin:18px 0 8px;">${window.GCP.escapeHtml(tp.sectionLabel || s.sectionLabel || '')}</h2>`);
+        parts.push(tp.htmlContent || '<div class="muted">—</div>');
+      }
+      modalContent.innerHTML = `<div style="padding:8px 2px;">${parts.join('')}</div>`;
+      modalBackdrop.style.display = 'flex';
+    }catch(e){
+      setMsg(e.message || 'Failed to preview', true);
     }
   });
 
-  function renderDocPreview(doc){
-    const secHtml = (doc.sections || []).map(s => `
-      <div class="card" style="margin-bottom:12px; box-shadow:none;">
-        <div style="display:flex; align-items:center; justify-content:space-between; gap:10px;">
-          <div style="font-weight:900;">${window.GCP.escapeHtml(s.sectionLabel)}</div>
-          <div class="small">${s.status ? `<span class="pill ${s.status}">${s.status.replaceAll("_"," ")}</span>` : ''}</div>
-        </div>
-        <div class="small muted">Last updated: ${s.lastUpdatedAt ? window.GCP.escapeHtml(s.lastUpdatedAt) : '—'}</div>
-        <hr style="border:0; border-top:1px solid var(--border); margin:10px 0;">
-        <div>${s.htmlContent || '<span class="muted">No content</span>'}</div>
-      </div>
-    `).join("");
+  closeModalBtn.addEventListener('click', () => {
+    modalBackdrop.style.display = 'none';
+    modalContent.innerHTML = '';
+  });
+  modalBackdrop.addEventListener('click', (e) => {
+    if (e.target === modalBackdrop) {
+      modalBackdrop.style.display = 'none';
+      modalContent.innerHTML = '';
+    }
+  });
+  
+  approveAllSectionsBtn.addEventListener('click', async () => {
+    if (!currentEventId) return;
+    if (!confirm('Approve all required sections for this event?')) return;
+    setMsg('');
+    try{
+      await window.GCP.apiFetch('/tp/approve-all-sections', {
+        method:'POST',
+        body: JSON.stringify({ eventId: currentEventId })
+      });
+      await refresh();
+    }catch(e){
+      setMsg(e.message || 'Failed to approve all sections', true);
+    }
+  });
 
-    const title = doc?.event?.title || "Preview";
-    const country = doc?.event?.countryName || "";
-    const deadline = doc?.event?.deadlineDate || "";
+eventSelect.addEventListener('change', refresh);
 
-    return `
-      <h2>${window.GCP.escapeHtml(title)}</h2>
-      <div class="small muted">${window.GCP.escapeHtml(country)} ${deadline ? '• ' + window.GCP.escapeHtml(deadline) : ''}</div>
-      <div style="margin-top:12px;">${secHtml}</div>
-    `;
-  }
-
-  countrySelect.addEventListener("change", refresh);
-  eventSelect.addEventListener("change", refresh);
-
-  try{
-    await Promise.all([loadCountries(), loadEvents()]);
-    await refresh();
-  }catch(err){
-    msg.textContent = err.message || "Failed to load";
-  }
+  await loadEvents();
+  await refresh();
 })();

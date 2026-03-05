@@ -292,6 +292,9 @@ textarea{min-height:120px; resize:vertical}
   font-size: 14px;
   color: #6b7280;
   line-height: 1.1;
+  background:#fff;
+  padding:0 6px;
+  border-radius:8px;
 }
 .gcp-step.active .gcp-label{ color:#1f2937; font-weight:600; }
 
