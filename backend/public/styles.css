@@ -46,7 +46,7 @@ button, input, select, textarea{font:inherit}
 .brand{
   font-weight:800;
   letter-spacing:.3px;
-  font-size:16px;
+  font-size: 9px;
   margin:6px 8px 18px;
   opacity:.95;
 }
@@ -336,27 +336,29 @@ textarea{min-height:120px; resize:vertical}
 
 /* === Apple status bar v3 (ref) === */
 
-.gcp-progress.gcp-progress-v2{
-  --dot: 18px;
-  --line: 4px;
-  padding: 10px 10px 6px;
+.gcp-progress..gcp-progress-v2{
+  --pad: 14px;
+  --dot: 12px;   /* smaller circles */
+  --line: 3px;   /* thinner line */
+  padding: var(--pad) var(--pad) 8px;
 }
 
+
 .gcp-progress.gcp-progress-v2 .gcp-line{
-  left: calc(10px + (var(--dot) / 2));
-  right: calc(10px + (var(--dot) / 2));
-  top: calc(10px + (var(--dot) / 2) - (var(--line) / 2));
+  left: calc(var(--pad) + (var(--dot) / 2));
+  right: calc(var(--pad) + (var(--dot) / 2));
+  top: calc(var(--pad) + (var(--dot) / 2) - (var(--line) / 2));
   height: var(--line);
-  background: rgba(10,132,255,0.22);
+  background: rgba(10,132,255,0.20);
   border-radius: 999px;
 }
 
 .gcp-progress.gcp-progress-v2 .gcp-line-done{
   position:absolute;
-  left: calc(10px + (var(--dot) / 2));
-  top: calc(10px + (var(--dot) / 2) - (var(--line) / 2));
+  left: calc(var(--pad) + (var(--dot) / 2));
+  top: calc(var(--pad) + (var(--dot) / 2) - (var(--line) / 2));
   height: var(--line);
-  background: #059669; /* green */
+  background: #059669;
   border-radius: 999px;
   z-index: 0;
 }
@@ -364,7 +366,7 @@ textarea{min-height:120px; resize:vertical}
 .gcp-progress.gcp-progress-v2 .gcp-line-after{
   position:absolute;
   left: 0; /* JS sets left % */
-  top: calc(10px + (var(--dot) / 2) - (var(--line) / 2));
+  top: calc(var(--pad) + (var(--dot) / 2) - (var(--line) / 2));
   height: var(--line);
   background: #0a84ff;
   border-radius: 999px;
@@ -381,7 +383,7 @@ textarea{min-height:120px; resize:vertical}
   height: var(--dot);
   border-radius: 999px;
   border: none;
-  background: rgba(10,132,255,0.28); /* upcoming */
+  background: rgba(10,132,255,0.22);
   box-shadow: none;
   position: relative;
 }
@@ -399,15 +401,16 @@ textarea{min-height:120px; resize:vertical}
   justify-content:center;
   color:#fff;
   font-weight:900;
-  font-size: 11px;
+  font-size: 9px;
   line-height: 1;
 }
 
 .gcp-progress.gcp-progress-v2 .gcp-step.active .gcp-dot{
   background:#0a84ff;
   box-shadow:
-    0 0 0 3px rgba(10,132,255,0.25),
-    0 0 0 6px rgba(10,132,255,0.12);
+    
+    0 0 0 2px rgba(10,132,255,0.25),
+    0 0 0 4px rgba(10,132,255,0.10);
 }
 
 .gcp-progress.gcp-progress-v2 .gcp-label{
