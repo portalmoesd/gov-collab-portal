@@ -1747,6 +1747,10 @@ app.get('/api/tp/document-status', async (req, res) => {
   const countryId = await resolveCountryIdForEvent(eventId);
   if (!countryId) return res.status(404).json({ error: 'Event not found' });
 
+  // Provide the event's chosen submitter role so the frontend can render the correct workflow steps.
+  const evMeta = await queryOne(`SELECT submitter_role FROM events WHERE id=$1`, [eventId]);
+  const submitterRole = String(evMeta?.submitter_role || 'chairman').toLowerCase();
+
   await ensureDocumentStatus(eventId, countryId);
   const row = await queryOne(`SELECT * FROM document_status WHERE event_id=$1 AND country_id=$2`, [eventId, countryId]);
 
@@ -1755,6 +1759,7 @@ app.get('/api/tp/document-status', async (req, res) => {
     status: row.status,
     chairmanComment: row.chairman_comment,
     updatedAt: row.updated_at,
+    submitterRole,
   });
 });
 

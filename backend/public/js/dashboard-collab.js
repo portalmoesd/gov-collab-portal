@@ -14,40 +14,53 @@
 
   function humanStatus(s){
     const map = {
+      // document workflow
+      in_progress: 'Draft',
       draft: 'Draft',
-      submitted: 'Submitted',
-      submitted_to_deputy: 'Submitted (Deputy)',
       returned: 'Returned',
-      approved_by_supervisor: 'Approved (Supervisor)',
-      approved_by_chairman: 'Approved (Deputy)'
+      submitted_to_supervisor: 'Submitted',
+      submitted_to_chairman: 'Submitted',
+      submitted_to_deputy: 'Submitted',
+      submitted_to_minister: 'Submitted',
+      approved: 'Approved',
+
+      // legacy section values (fallback)
+      submitted: 'Submitted',
+      approved_by_supervisor: 'Approved',
+      approved_by_chairman: 'Approved'
     };
     return map[s] || (s || '');
   }
 
-  function statusStageIndex(status){
-    // 0 Draft/Returned  | 1 Submitted to Supervisor | 2 Submitted to Deputy | 3 Approved
-    if (status === 'approved_by_chairman') return 3;
-    if (status === 'submitted_to_deputy' || status === 'approved_by_supervisor') return 2;
-    if (status === 'submitted') return 1;
+  function getWorkflowSteps(submitterRole){
+    const role = String(submitterRole || 'chairman').toLowerCase();
+    if (role === 'minister') return ['Draft','Supervisor','Deputy','Minister','Approved'];
+    if (role === 'supervisor') return ['Draft','Supervisor','Approved'];
+    // default: deputy (chairman)
+    return ['Draft','Supervisor','Deputy','Approved'];
+  }
+
+  function stageIndexForStatus(status, steps){
+    if (!status) return 0;
+    const s = String(status).toLowerCase();
+    if (s === 'approved' || s.includes('approved')) return steps.length - 1;
+    if (s === 'submitted_to_minister') return Math.max(0, steps.indexOf('Minister'));
+    if (s === 'submitted_to_chairman' || s === 'submitted_to_deputy') return Math.max(0, steps.indexOf('Deputy'));
+    if (s === 'submitted_to_supervisor' || s === 'submitted') return Math.max(0, steps.indexOf('Supervisor'));
     return 0;
   }
 
-  function renderStatusProgress(status){
-    const idx = statusStageIndex(status);
-    const steps = [
-      { label: 'Draft' },
-      { label: 'Supervisor' },
-      { label: 'Deputy' },
-      { label: 'Approved' },
-    ];
+  function renderStatusProgress(status, submitterRole){
+    const steps = getWorkflowSteps(submitterRole);
+    const idx = stageIndexForStatus(status, steps);
     return `
       <div class="gcp-progress" role="list" aria-label="Document status progress">
-        ${steps.map((s,i)=>{
+        ${steps.map((label,i)=>{
           const state = i < idx ? 'done' : (i === idx ? 'active' : 'todo');
           return `
             <div class="gcp-step ${state}" role="listitem">
               <div class="gcp-dot" aria-hidden="true"></div>
-              <div class="gcp-label">${window.GCP.escapeHtml(s.label)}</div>
+              <div class="gcp-label">${window.GCP.escapeHtml(label)}</div>
             </div>
           `;
         }).join('')}
@@ -55,7 +68,7 @@
     `;
   }
 
-  function showSectionStatus(tp, taskText){
+  function showSectionStatus(tp, taskText, docStatus){
     if (!sectionStatusBox) return;
     if (!tp){
       sectionStatusBox.style.display = 'none';
@@ -64,14 +77,25 @@
     }
     const note = (tp.statusComment || '').trim();
     const last = tp.lastUpdatedAt ? window.GCP.formatDateTime(tp.lastUpdatedAt) : '';
+    const docStatusKey = String(docStatus?.status || 'in_progress').toLowerCase();
+    const submitterRole = docStatus?.submitterRole || docStatus?.submitter_role || 'chairman';
     sectionStatusBox.style.display = 'block';
     sectionStatusBox.innerHTML = `
-      <div style="margin-bottom:8px;"><b>Status:</b> ${window.GCP.escapeHtml(humanStatus(tp.status))}</div>
-      <div>${renderStatusProgress(tp.status)}</div>
+      <div style="margin-bottom:8px;"><b>Status:</b> ${window.GCP.escapeHtml(humanStatus(docStatusKey))}</div>
+      <div>${renderStatusProgress(docStatusKey, submitterRole)}</div>
       ${last ? `<div class="small muted" style="margin-top:6px;">Last updated: ${window.GCP.escapeHtml(last)}${tp.lastUpdatedBy ? ' • ' + window.GCP.escapeHtml(tp.lastUpdatedBy) : ''}</div>` : ''}
       ${note ? `<div style="margin-top:10px; padding:8px 10px; border-radius:10px; border:1px solid rgba(220,38,38,.25); background: rgba(254,226,226,.55);"><b>Supervisor/Deputy comment:</b> ${window.GCP.escapeHtml(note)}</div>` : ''}
       <div style="margin-top:12px;"><b>Task:</b> ${window.GCP.escapeHtml((taskText || '').trim() || '—')}</div>
     `;
+  }
+
+  async function fetchDocStatus(eventId){
+    if (!Number.isFinite(eventId)) return null;
+    try{
+      return await window.GCP.apiFetch(`/tp/document-status?event_id=${encodeURIComponent(eventId)}`, { method: 'GET' });
+    }catch(e){
+      return null;
+    }
   }
 
 
@@ -154,14 +178,16 @@
     const eventId = Number(eventSelect.value);
     const sectionId = Number(sectionSelect.value);
     if (!Number.isFinite(eventId) || !Number.isFinite(sectionId)) {
-      showSectionStatus(null, (eventsById.get(Number(eventSelect.value))||{}).occasion||'');
       return;
     }
     try{
-      const tp = await window.GCP.apiFetch(`/tp?event_id=${encodeURIComponent(eventId)}&section_id=${encodeURIComponent(sectionId)}`, { method:'GET' });
-      showSectionStatus(tp, (eventsById.get(eventId)||{}).occasion||'');
+      const [tp, ds] = await Promise.all([
+        window.GCP.apiFetch(`/tp?event_id=${encodeURIComponent(eventId)}&section_id=${encodeURIComponent(sectionId)}`, { method:'GET' }),
+        fetchDocStatus(eventId),
+      ]);
+      showSectionStatus(tp, (eventsById.get(eventId)||{}).occasion||'', ds);
     }catch(e){
-      showSectionStatus(null, (eventsById.get(Number(eventSelect.value))||{}).occasion||'');
+      console.warn(e);
     }
   });
 
