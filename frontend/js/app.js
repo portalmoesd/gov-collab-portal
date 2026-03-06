@@ -204,28 +204,24 @@
   };
 
   window.GCP.renderStatusProgress = function(status, submitterRole){
-  const steps = window.GCP.getStatusSteps(submitterRole);
-  const active = window.GCP.statusToStepIndex(status, submitterRole);
-  const n = Math.max(steps.length, 1);
-  const progressPct = n <= 1 ? 100 : Math.max(0, Math.min(100, (active / (n - 1)) * 100));
+    const steps = window.GCP.getStatusSteps(submitterRole);
+    const active = window.GCP.statusToStepIndex(status, submitterRole);
+    const maxIndex = Math.max(steps.length - 1, 1);
+    const progressPct = (active / maxIndex) * 100;
 
-  const nodeHtml = (label, idx) => {
-    const cls = idx <= active ? 'gcp-node active-or-done' : 'gcp-node todo';
-    return `
-      <div class="${cls}">
-        <div class="gcp-circle" aria-hidden="true">${idx + 1}</div>
-        <div class="gcp-label">${escapeHtml(label)}</div>
-      </div>
-    `;
+    let html = `<div class="gcp-progress gcp-progress-v4" role="group" aria-label="Document status">`;
+    html += `<div class="gcp-progress-track" aria-hidden="true"><div class="gcp-progress-fill" style="width:${progressPct}%;"></div></div>`;
+    html += `<div class="gcp-progress-steps">`;
+    for (let i = 0; i < steps.length; i++) {
+      const state = i < active ? 'done' : (i === active ? 'active' : 'todo');
+      html += `
+        <div class="gcp-step ${state}">
+          <div class="gcp-step-circle" aria-hidden="true">${i + 1}</div>
+          <div class="gcp-step-label">${escapeHtml(steps[i])}</div>
+        </div>
+      `;
+    }
+    html += `</div></div>`;
+    return html;
   };
-
-  return `
-    <div class="gcp-progress gcp-progress-v4" role="group" aria-label="Document status">
-      <div class="gcp-progress-v4-steps">${steps.map((label, idx) => nodeHtml(label, idx)).join('')}</div>
-      <div class="gcp-progress-v4-track" aria-hidden="true">
-        <div class="gcp-progress-v4-fill" style="width:${progressPct}%;"></div>
-      </div>
-    </div>
-  `;
-};
 })();
