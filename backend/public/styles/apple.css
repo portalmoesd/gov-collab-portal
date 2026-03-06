@@ -190,7 +190,7 @@ hr, .divider{
   padding: 12px 6px 8px;
   border-top: 1px solid var(--border);
   border-bottom: 1px solid var(--border);
-  margin-top: 10px;
+  margin-top: 7px;
 }
 .dock-avatar{
   width: 42px; height: 42px;
@@ -576,7 +576,7 @@ hr, .divider{
   box-shadow: 0 6px 18px rgba(0,0,0,0.08);
 }
 .gcp-label{
-  margin-top: 10px;
+  margin-top: 7px;
   font-size: 13px;
   font-weight: 600;
   color: rgba(11,11,15,0.62);
@@ -642,14 +642,14 @@ hr, .divider{
   min-width: 110px;
 }
 .gcp-progress-v3 .gcp-label{
-  margin-top: 10px;
+  margin-top: 7px;
   font-size: 14px;
   font-weight: 600;
   color: rgba(0,0,0,.62);
 }
 .gcp-progress-v3 .gcp-circle{
-  width: 26px;
-  height: 26px;
+  width: 18px;
+  height: 18px;
   border-radius: 999px;
   display:flex;
   align-items:center;
@@ -684,9 +684,9 @@ hr, .divider{
 
 .gcp-progress-v3 .gcp-conn{
   flex: 1 1 auto;
-  height: 6px;
+  height: 4px;
   border-radius: 999px;
-  margin-top: 10px; /* centers the line through the circles */
+  margin-top: 7px; /* centers the line through the circles */
   background: rgba(10,132,255,.30);
   position:relative;
 }
@@ -705,6 +705,12 @@ hr, .divider{
   border-radius: 999px;
 }
 
+
+/* Kill any legacy full-width line on .gcp-progress when using v3 */
+.gcp-progress.gcp-progress-v3::before{
+  content: none !important;
+  display: none !important;
+}
 /* Make sure legacy v2 line doesn't show when v3 is used */
 .gcp-progress-v3 .gcp-line,
 .gcp-progress-v3 .gcp-line-done,
