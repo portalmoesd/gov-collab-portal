@@ -625,3 +625,89 @@ hr, .divider{
   background:#0a84ff !important;
   box-shadow:0 0 0 3px rgba(10,132,255,0.25), 0 0 0 6px rgba(10,132,255,0.12) !important;
 }
+
+
+/* ===== Status Progress v3 (segment connectors like reference) ===== */
+.gcp-progress.gcp-progress-v3{
+  display:flex;
+  align-items:flex-start;
+  gap:0;
+  padding: 10px 6px 2px;
+}
+.gcp-progress-v3 .gcp-node{
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:flex-start;
+  min-width: 110px;
+}
+.gcp-progress-v3 .gcp-label{
+  margin-top: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  color: rgba(0,0,0,.62);
+}
+.gcp-progress-v3 .gcp-circle{
+  width: 26px;
+  height: 26px;
+  border-radius: 999px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  background: rgba(10,132,255,.28);
+  position:relative;
+}
+.gcp-progress-v3 .gcp-node.todo .gcp-circle{
+  background: rgba(10,132,255,.26);
+}
+.gcp-progress-v3 .gcp-node.done .gcp-circle{
+  background: rgba(34,197,94,.95);
+}
+.gcp-progress-v3 .gcp-node.done .gcp-check{
+  color:#fff;
+  font-size: 16px;
+  line-height: 1;
+  font-weight: 900;
+}
+.gcp-progress-v3 .gcp-node.active .gcp-circle{
+  background: rgba(10,132,255,1);
+  box-shadow: 0 0 0 4px rgba(10,132,255,.20);
+}
+.gcp-progress-v3 .gcp-node.active .gcp-circle::before{
+  content:"";
+  position:absolute;
+  inset:-6px;
+  border-radius:999px;
+  border: 2px solid rgba(10,132,255,.55);
+  pointer-events:none;
+}
+
+.gcp-progress-v3 .gcp-conn{
+  flex: 1 1 auto;
+  height: 6px;
+  border-radius: 999px;
+  margin-top: 10px; /* centers the line through the circles */
+  background: rgba(10,132,255,.30);
+  position:relative;
+}
+.gcp-progress-v3 .gcp-conn.done{
+  background: rgba(34,197,94,.95);
+}
+.gcp-progress-v3 .gcp-conn.active{
+  background: rgba(10,132,255,.30);
+  overflow:hidden;
+}
+.gcp-progress-v3 .gcp-conn.active .gcp-conn-fill{
+  position:absolute;
+  left:0; top:0; bottom:0;
+  width: 55%;
+  background: rgba(10,132,255,1);
+  border-radius: 999px;
+}
+
+/* Make sure legacy v2 line doesn't show when v3 is used */
+.gcp-progress-v3 .gcp-line,
+.gcp-progress-v3 .gcp-line-done,
+.gcp-progress-v3 .gcp-line-after{
+  display:none !important;
+}
