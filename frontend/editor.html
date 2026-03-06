@@ -4,8 +4,8 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>GOV COLLAB PORTAL • Editor</title>
-  <link rel="stylesheet" href="styles.css?v=20260307ed2" />
-  <link rel="stylesheet" href="styles/apple.css?v=20260307ed2" />
+  <link rel="stylesheet" href="styles.css?v=20260307ed3" />
+  <link rel="stylesheet" href="styles/apple.css?v=20260307ed3" />
   <style>
     /* Hide CKEditor security warning notification banner */
     .cke_notification, .cke_notifications_area { display:none !important; }
@@ -20,37 +20,38 @@
       <div class="page-title">Talking Points Editor</div>
     </div>
     
-<section class="card col-12">
-  <div id="meta" style="margin-bottom:12px;"></div>
-  <div class="row" style="justify-content:space-between; margin-bottom:12px;">
-    <div class="row">
-      <div><b>Status:</b> <span id="statusEl"></span></div>
-    </div>
-    <div class="tp-actionbar" aria-label="Editor actions">
-      <button class="micro-action micro-action--save" id="btnSave" type="button" aria-label="Save">
-        <span class="micro-action__icon" aria-hidden="true"></span>
-        <span class="micro-action__label">Save</span>
-      </button>
-      <button class="micro-action micro-action--submit" id="btnSubmit" type="button" aria-label="Submit">
-        <span class="micro-action__icon" aria-hidden="true"></span>
-        <span class="micro-action__label">Submit</span>
-      </button>
-      <button class="micro-action micro-action--approve" id="btnApprove" type="button" aria-label="Approve">
-        <span class="micro-action__icon" aria-hidden="true"></span>
-        <span class="micro-action__label">Approve</span>
-      </button>
-      <button class="micro-action micro-action--return" id="btnReturn" type="button" aria-label="Return">
-        <span class="micro-action__icon" aria-hidden="true"></span>
-        <span class="micro-action__label">Return</span>
-      </button>
+<section class="card col-12 editor-card">
+  <div class="editor-head">
+    <div id="meta" class="editor-meta"></div>
+    <div id="returnCommentBox" class="editor-return-box" style="display:none;"></div>
+    <div class="editor-control-row">
+      <div class="editor-status-line"><b>Status:</b> <span id="statusEl"></span></div>
+      <div class="tp-actionbar" aria-label="Editor actions">
+        <button class="micro-action micro-action--save" id="btnSave" type="button" aria-label="Save">
+          <span class="micro-action__icon" aria-hidden="true"></span>
+          <span class="micro-action__label">Save</span>
+        </button>
+        <button class="micro-action micro-action--submit" id="btnSubmit" type="button" aria-label="Submit">
+          <span class="micro-action__icon" aria-hidden="true"></span>
+          <span class="micro-action__label">Submit</span>
+        </button>
+        <button class="micro-action micro-action--approve" id="btnApprove" type="button" aria-label="Approve">
+          <span class="micro-action__icon" aria-hidden="true"></span>
+          <span class="micro-action__label">Approve</span>
+        </button>
+        <button class="micro-action micro-action--return" id="btnReturn" type="button" aria-label="Return">
+          <span class="micro-action__icon" aria-hidden="true"></span>
+          <span class="micro-action__label">Return</span>
+        </button>
+      </div>
     </div>
   </div>
 
   <textarea id="editor"></textarea>
 
-  <div id="msg" class="small" style="color:var(--danger); font-weight:800; margin-top:10px;"></div>
-  <div class="small muted" style="margin-top:10px;">
-    Note: CKEditor loads from CDN. If blocked, the editor falls back to a plain textarea.
+  <div class="editor-foot">
+    <div id="msg" class="small editor-msg"></div>
+    <div class="small muted editor-note">CKEditor loads from CDN. If blocked, the editor falls back to a plain textarea.</div>
   </div>
 </section>
 
