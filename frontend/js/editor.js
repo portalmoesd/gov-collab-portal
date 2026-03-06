@@ -18,6 +18,21 @@
   const btnApprove = document.getElementById("btnApprove");
   const btnReturn = document.getElementById("btnReturn");
 
+  const actionButtons = [btnSave, btnSubmit, btnApprove, btnReturn];
+
+  function setActionLoading(activeBtn, loading){
+    actionButtons.forEach((btn) => {
+      if (!btn || btn.style.display === "none") return;
+      if (loading){
+        btn.disabled = true;
+        if (btn === activeBtn) btn.classList.add("is-loading");
+      } else {
+        btn.disabled = false;
+        btn.classList.remove("is-loading");
+      }
+    });
+  }
+
   function setStatus(status){
     statusEl.innerHTML = `<span class="pill ${status}">${status.replaceAll("_"," ")}</span>`;
   }
@@ -89,6 +104,7 @@
   }
 
   btnSave.addEventListener("click", async () => {
+    setActionLoading(btnSave, true);
     try{
       await window.GCP.apiFetch("/tp/save", {
         method:"POST",
@@ -98,10 +114,13 @@
       msg.textContent = "Saved.";
     }catch(err){
       msg.textContent = err.message || "Save failed";
+    } finally {
+      setActionLoading(btnSave, false);
     }
   });
 
   btnSubmit.addEventListener("click", async () => {
+    setActionLoading(btnSubmit, true);
     try{
       await window.GCP.apiFetch("/tp/submit", {
         method:"POST",
@@ -111,10 +130,13 @@
       msg.textContent = "Submitted.";
     }catch(err){
       msg.textContent = err.message || "Submit failed";
+    } finally {
+      setActionLoading(btnSubmit, false);
     }
   });
 
   btnApprove.addEventListener("click", async () => {
+    setActionLoading(btnApprove, true);
     try{
       if (role === "chairman"){
         await window.GCP.apiFetch("/tp/approve-section-chairman", {
@@ -131,12 +153,15 @@
       msg.textContent = "Approved.";
     }catch(err){
       msg.textContent = err.message || "Approve failed";
+    } finally {
+      setActionLoading(btnApprove, false);
     }
   });
 
   btnReturn.addEventListener("click", async () => {
     const comment = prompt("Return comment (required):", "");
     if (comment === null) return;
+    setActionLoading(btnReturn, true);
     try{
       await window.GCP.apiFetch("/tp/return", {
         method:"POST",
@@ -146,6 +171,8 @@
       msg.textContent = "Returned.";
     }catch(err){
       msg.textContent = err.message || "Return failed";
+    } finally {
+      setActionLoading(btnReturn, false);
     }
   });
 

@@ -4,8 +4,8 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>GOV COLLAB PORTAL • Editor</title>
-  <link rel="stylesheet" href="styles.css?v=20260306sb1" />
-  <link rel="stylesheet" href="styles/apple.css?v=20260306sb1" />
+  <link rel="stylesheet" href="styles.css?v=20260307ed2" />
+  <link rel="stylesheet" href="styles/apple.css?v=20260307ed2" />
   <style>
     /* Hide CKEditor security warning notification banner */
     .cke_notification, .cke_notifications_area { display:none !important; }
@@ -27,11 +27,23 @@
     <div class="row">
       <div><b>Status:</b> <span id="statusEl"></span></div>
     </div>
-    <div class="row">
-      <button class="btn" id="btnSave">Save</button>
-      <button class="btn primary" id="btnSubmit">Submit</button>
-      <button class="btn success" id="btnApprove">Approve</button>
-      <button class="btn danger" id="btnReturn">Return</button>
+    <div class="tp-actionbar" aria-label="Editor actions">
+      <button class="micro-action micro-action--save" id="btnSave" type="button" aria-label="Save">
+        <span class="micro-action__icon" aria-hidden="true"></span>
+        <span class="micro-action__label">Save</span>
+      </button>
+      <button class="micro-action micro-action--submit" id="btnSubmit" type="button" aria-label="Submit">
+        <span class="micro-action__icon" aria-hidden="true"></span>
+        <span class="micro-action__label">Submit</span>
+      </button>
+      <button class="micro-action micro-action--approve" id="btnApprove" type="button" aria-label="Approve">
+        <span class="micro-action__icon" aria-hidden="true"></span>
+        <span class="micro-action__label">Approve</span>
+      </button>
+      <button class="micro-action micro-action--return" id="btnReturn" type="button" aria-label="Return">
+        <span class="micro-action__icon" aria-hidden="true"></span>
+        <span class="micro-action__label">Return</span>
+      </button>
     </div>
   </div>
 
