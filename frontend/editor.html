@@ -22,10 +22,23 @@
     
 <section class="card col-12 editor-card">
   <div class="editor-head">
+    <div class="editor-head-top">
+      <div class="editor-head-copy">
+        <div class="editor-kicker">Document workspace</div>
+        <div class="editor-title-row">
+          <h2 class="editor-title">Talking Points Editor</h2>
+          <div class="editor-subtitle">Edit, review and move this section through the approval flow.</div>
+        </div>
+      </div>
+      <div class="editor-status-panel">
+        <div class="editor-status-label">Current status</div>
+        <div class="editor-status-line"><span id="statusEl"></span></div>
+      </div>
+    </div>
+
     <div id="meta" class="editor-meta"></div>
-    <div id="returnCommentBox" class="editor-return-box" style="display:none;"></div>
     <div class="editor-control-row">
-      <div class="editor-status-line"><b>Status:</b> <span id="statusEl"></span></div>
+      <div id="returnCommentBox" class="editor-return-box" style="display:none;"></div>
       <div class="tp-actionbar" aria-label="Editor actions">
         <button class="micro-action micro-action--save" id="btnSave" type="button" aria-label="Save">
           <span class="micro-action__icon" aria-hidden="true"></span>
@@ -47,7 +60,7 @@
     </div>
   </div>
 
-  <textarea id="editor"></textarea>
+  <div class="editor-frame"><textarea id="editor"></textarea></div>
 
   <div class="editor-foot">
     <div id="msg" class="small editor-msg"></div>

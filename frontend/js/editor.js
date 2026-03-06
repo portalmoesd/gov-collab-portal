@@ -78,10 +78,23 @@
     const tp = await window.GCP.apiFetch(`/tp?event_id=${encodeURIComponent(eventId)}&country_id=${encodeURIComponent(countryId)}&section_id=${encodeURIComponent(sectionId)}`, { method:"GET" });
 
     meta.innerHTML = `
-      <div><b>Event:</b> ${window.GCP.escapeHtml(tp.eventTitle)}</div>
-      <div><b>Country:</b> ${window.GCP.escapeHtml(tp.countryName)}</div>
-      <div><b>Section:</b> ${window.GCP.escapeHtml(tp.sectionLabel)}</div>
-      <div class="small muted">Last updated: ${tp.lastUpdatedAt ? window.GCP.escapeHtml(tp.lastUpdatedAt) : '—'} ${tp.lastUpdatedBy ? '• ' + window.GCP.escapeHtml(tp.lastUpdatedBy) : ''}</div>
+      <div class="editor-meta-card">
+        <div class="editor-meta-label">Event</div>
+        <div class="editor-meta-value">${window.GCP.escapeHtml(tp.eventTitle)}</div>
+      </div>
+      <div class="editor-meta-card">
+        <div class="editor-meta-label">Country</div>
+        <div class="editor-meta-value">${window.GCP.escapeHtml(tp.countryName)}</div>
+      </div>
+      <div class="editor-meta-card">
+        <div class="editor-meta-label">Section</div>
+        <div class="editor-meta-value">${window.GCP.escapeHtml(tp.sectionLabel)}</div>
+      </div>
+      <div class="editor-meta-card editor-meta-card--update">
+        <div class="editor-meta-label">Last updated</div>
+        <div class="editor-meta-value">${tp.lastUpdatedAt ? window.GCP.escapeHtml(tp.lastUpdatedAt) : '—'}</div>
+        <div class="editor-meta-note">${tp.lastUpdatedBy ? window.GCP.escapeHtml(tp.lastUpdatedBy) : 'No editor recorded yet'}</div>
+      </div>
     `;
     if (returnCommentBox){
       const note = (tp.statusComment || '').trim();
