@@ -116,23 +116,23 @@
           <div class="gp-brand">
             <div class="gp-brand__mark gp-brand__mark--logo">${iconSvg("logo")}</div>
             <div class="gp-brand__text">
-              <div class="gp-brand__title">Gov Collab</div>
+              <div class="gp-brand__title"><span class="gp-brand__title-main">Government Collaboration</span><span class="gp-brand__title-sub">Portal</span></div>
             </div>
           </div>
           <button class="gp-mobile-close" type="button" aria-label="Close menu">${iconSvg("close")}</button>
         </div>
 
-        <nav class="gp-nav">${navHtml}</nav>
-
-        <div class="gp-sidebar__spacer"></div>
-
-        <div class="gp-profile">
+        <div class="gp-profile gp-profile--top">
           <div class="gp-profile__avatar">${escapeHtml(initials)}</div>
           <div class="gp-profile__text">
             <div class="gp-profile__name">${escapeHtml(displayName)}</div>
             <div class="gp-profile__role">${escapeHtml(roleToTitle(role))}</div>
           </div>
         </div>
+
+        <nav class="gp-nav">${navHtml}</nav>
+
+        <div class="gp-sidebar__spacer"></div>
 
         <div class="gp-sidebar__footer">
           <button class="gp-logout" id="logoutBtn" type="button">
