@@ -245,4 +245,37 @@
   html += `</div>`;
   return html;
 };
+
+  window.GCP.getWorkflowSteps = function(submitterRole){
+    return window.GCP.getStatusSteps(submitterRole);
+  };
+
+  window.GCP.getWorkflowActiveIndex = function(status, submitterRole){
+    return window.GCP.statusToStepIndex(status, submitterRole);
+  };
+
+  window.GCP.renderWorkflowProgress = function(status, submitterRole){
+    const steps = window.GCP.getWorkflowSteps(submitterRole);
+    const activeIndex = window.GCP.getWorkflowActiveIndex(status, submitterRole);
+    const progressPct = steps.length <= 1 ? 0 : (activeIndex / (steps.length - 1)) * 100;
+
+    let html = `<div class="wf-progress wf-progress--compact" style="--wf-count:${steps.length}; --wf-progress:${progressPct}%;" role="group" aria-label="Document status progress">`;
+    html += `<div class="wf-progress__steps">`;
+    for (let i = 0; i < steps.length; i++) {
+      const state = i < activeIndex ? 'is-done' : (i === activeIndex ? 'is-active' : 'is-todo');
+      const circleText = String(i + 1);
+      html += `
+        <div class="wf-step ${state}">
+          <div class="wf-step__circle" aria-hidden="true">${circleText}</div>
+          <div class="wf-step__label">${escapeHtml(steps[i])}</div>
+        </div>`;
+    }
+    html += `</div>`;
+    html += `<div class="wf-progress__track" aria-hidden="true"><div class="wf-progress__fill"></div></div>`;
+    html += `</div>`;
+    return html;
+  };
+
+  window.GCP.renderStatusProgress = window.GCP.renderWorkflowProgress;
+
 })();

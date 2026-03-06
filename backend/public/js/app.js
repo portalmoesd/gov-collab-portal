@@ -241,19 +241,20 @@ function formatTbilisiDate(value) {
     const activeIndex = window.GCP.getWorkflowActiveIndex(status, submitterRole);
     const progressPct = steps.length <= 1 ? 0 : (activeIndex / (steps.length - 1)) * 100;
 
-    let html = `<div class="wf-progress wf-progress--compact" style="--wf-count:${steps.length}" role="group" aria-label="Document status progress">`;
-    html += `<div class="wf-progress__track" aria-hidden="true"><div class="wf-progress__fill" style="width:${progressPct}%;"></div></div>`;
+    let html = `<div class="wf-progress wf-progress--compact" style="--wf-count:${steps.length}; --wf-progress:${progressPct}%;" role="group" aria-label="Document status progress">`;
     html += `<div class="wf-progress__steps">`;
     for (let i = 0; i < steps.length; i++) {
       const state = i < activeIndex ? 'is-done' : (i === activeIndex ? 'is-active' : 'is-todo');
-      const circleText = i < activeIndex ? '✓' : String(i + 1);
+      const circleText = String(i + 1);
       html += `
         <div class="wf-step ${state}">
           <div class="wf-step__circle" aria-hidden="true">${circleText}</div>
           <div class="wf-step__label">${escapeHtml(steps[i])}</div>
         </div>`;
     }
-    html += `</div></div>`;
+    html += `</div>`;
+    html += `<div class="wf-progress__track" aria-hidden="true"><div class="wf-progress__fill"></div></div>`;
+    html += `</div>`;
     return html;
   };
 
