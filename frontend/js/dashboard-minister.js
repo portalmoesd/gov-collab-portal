@@ -53,19 +53,9 @@
 
   function renderProgress(steps, activeLabel){
     const idx = Math.max(0, steps.indexOf(activeLabel));
-    return `
-      <div class="gcp-progress" role="list">
-        ${steps.map((label,i)=>{
-          const cls = i < idx ? 'done' : (i===idx ? 'active' : 'todo');
-          return `
-            <div class="gcp-step ${cls}" role="listitem">
-              <div class="gcp-dot"></div>
-              <div class="gcp-label">${window.GCP.escapeHtml(label)}</div>
-            </div>
-          `;
-        }).join('')}
-      </div>
-    `;
+    const status = idx >= steps.length - 1 ? 'approved' : (idx === 3 ? 'submitted_to_minister' : (idx === 2 ? 'submitted_to_chairman' : (idx === 1 ? 'submitted_to_supervisor' : 'draft')));
+    const submitterRole = steps.includes('Minister') ? 'minister' : (steps.includes('Deputy') ? 'deputy' : 'supervisor');
+    return window.GCP.renderStatusProgress(status, submitterRole);
   }
 
   function setMsg(text, isError=false){

@@ -214,4 +214,56 @@ function formatTbilisiDate(value) {
   window.GCP.roleToTitle = roleToTitle;
   window.GCP.formatDate = formatTbilisiDate;
   window.GCP.formatDateTime = formatTbilisiDateTime;
+
+  // ------------------------------
+  // Dynamic document status progress bar
+  // ------------------------------
+  window.GCP.getStatusSteps = function(submitterRole){
+    const raw = String(submitterRole || '').toLowerCase();
+    const r = raw === 'chairman' ? 'deputy' : raw;
+    if (r === 'supervisor') return ['Draft','Supervisor','Approved'];
+    if (r === 'minister') return ['Draft','Supervisor','Deputy','Minister','Approved'];
+    return ['Draft','Supervisor','Deputy','Approved'];
+  };
+
+  window.GCP.statusToStepIndex = function(status, submitterRole){
+    const s = String(status || '').toLowerCase();
+    const rawRole = String(submitterRole || '').toLowerCase();
+    const r = rawRole === 'chairman' ? 'deputy' : rawRole;
+
+    if (!s || s === 'draft' || s === 'returned') return 0;
+    if (s === 'submitted_to_supervisor') return 1;
+    if (s === 'submitted_to_chairman') return r === 'supervisor' ? 1 : 2;
+    if (s === 'submitted_to_minister') return r === 'minister' ? 3 : 0;
+    if (s === 'approved') return window.GCP.getStatusSteps(r).length - 1;
+    return 0;
+  };
+
+
+  window.GCP.renderStatusProgress = function(status, submitterRole){
+    const steps = window.GCP.getStatusSteps(submitterRole);
+    const active = window.GCP.statusToStepIndex(status, submitterRole);
+    const n = Math.max(steps.length, 1);
+    const progressPct = n <= 1 ? 100 : Math.max(0, Math.min(100, (active / (n - 1)) * 100));
+
+    const nodeHtml = (label, idx) => {
+      const cls = idx <= active ? 'gcp-node active-or-done' : 'gcp-node todo';
+      return `
+        <div class="${cls}">
+          <div class="gcp-circle" aria-hidden="true">${idx + 1}</div>
+          <div class="gcp-label">${escapeHtml(label)}</div>
+        </div>
+      `;
+    };
+
+    return `
+      <div class="gcp-progress gcp-progress-v4" role="group" aria-label="Document status">
+        <div class="gcp-progress-v4-steps">${steps.map((label, idx) => nodeHtml(label, idx)).join('')}</div>
+        <div class="gcp-progress-v4-track" aria-hidden="true">
+          <div class="gcp-progress-v4-fill" style="width:${progressPct}%;"></div>
+        </div>
+      </div>
+    `;
+  };
+
 })();

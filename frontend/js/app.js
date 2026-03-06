@@ -207,42 +207,25 @@
   const steps = window.GCP.getStatusSteps(submitterRole);
   const active = window.GCP.statusToStepIndex(status, submitterRole);
   const n = Math.max(steps.length, 1);
+  const progressPct = n <= 1 ? 100 : Math.max(0, Math.min(100, (active / (n - 1)) * 100));
 
   const nodeHtml = (label, idx) => {
-    const isDone = idx < active;
-    const isActive = idx === active;
-    const cls = isActive ? 'gcp-node active' : (isDone ? 'gcp-node done' : 'gcp-node todo');
-    const circleInner = isDone ? '<span class="gcp-check">✓</span>' : '';
+    const cls = idx <= active ? 'gcp-node active-or-done' : 'gcp-node todo';
     return `
       <div class="${cls}">
-        <div class="gcp-circle" aria-hidden="true">${circleInner}</div>
+        <div class="gcp-circle" aria-hidden="true">${idx + 1}</div>
         <div class="gcp-label">${escapeHtml(label)}</div>
       </div>
     `;
   };
 
-  const connHtml = (idx) => {
-    // connector AFTER node idx (between idx and idx+1)
-    let cls = 'gcp-conn todo';
-    let fill = '';
-    if (idx < active - 1) {
-      cls = 'gcp-conn done';
-    } else if (idx === active - 1) {
-      // segment leading into the active node is considered done
-      cls = 'gcp-conn done';
-    } else if (idx === active) {
-      cls = 'gcp-conn active';
-      fill = '<span class="gcp-conn-fill"></span>';
-    }
-    return `<div class="${cls}" aria-hidden="true">${fill}</div>`;
-  };
-
-  let html = `<div class="gcp-progress gcp-progress-v3" role="group" aria-label="Document status">`;
-  for (let i = 0; i < n; i++) {
-    html += nodeHtml(steps[i], i);
-    if (i < n - 1) html += connHtml(i);
-  }
-  html += `</div>`;
-  return html;
+  return `
+    <div class="gcp-progress gcp-progress-v4" role="group" aria-label="Document status">
+      <div class="gcp-progress-v4-steps">${steps.map((label, idx) => nodeHtml(label, idx)).join('')}</div>
+      <div class="gcp-progress-v4-track" aria-hidden="true">
+        <div class="gcp-progress-v4-fill" style="width:${progressPct}%;"></div>
+      </div>
+    </div>
+  `;
 };
 })();

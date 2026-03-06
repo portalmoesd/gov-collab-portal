@@ -714,3 +714,82 @@ hr, .divider{
 
 /* Status bar: remove background line above circles (per request) */
 .gcp-progress .gcp-line{ display:none !important; }
+
+
+.gcp-progress.gcp-progress-v4{
+  position: relative;
+  padding: 4px 8px 22px;
+}
+.gcp-progress-v4 .gcp-progress-v4-steps{
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap: 28px;
+  position: relative;
+  z-index: 2;
+}
+.gcp-progress-v4 .gcp-node{
+  flex:1 1 0;
+  min-width:0;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  text-align:center;
+}
+.gcp-progress-v4 .gcp-circle{
+  width: 46px;
+  height: 46px;
+  border-radius: 999px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-size: 20px;
+  font-weight: 800;
+  line-height: 1;
+  box-sizing:border-box;
+  background:#fff;
+  color:#8a90a2;
+  border: 3px solid #cfd4df;
+}
+.gcp-progress-v4 .gcp-node.active-or-done .gcp-circle{
+  background:#1f2f96;
+  border-color:#1f2f96;
+  color:#fff;
+}
+.gcp-progress-v4 .gcp-label{
+  margin-top: 10px;
+  font-size: 14px;
+  line-height: 1.2;
+  font-weight: 700;
+  color:#8890a3;
+}
+.gcp-progress-v4 .gcp-node.active-or-done .gcp-label{
+  color:#1f2340;
+}
+.gcp-progress-v4 .gcp-progress-v4-track{
+  position:absolute;
+  left: calc(8px + 23px);
+  right: calc(8px + 23px);
+  bottom: 0;
+  height: 10px;
+  border-radius: 999px;
+  background:#e8e9f8;
+  overflow:hidden;
+  z-index: 1;
+}
+.gcp-progress-v4 .gcp-progress-v4-fill{
+  height:100%;
+  border-radius:999px;
+  background:#1f2f96;
+}
+@media (max-width: 900px){
+  .gcp-progress.gcp-progress-v4{ padding-bottom:18px; }
+  .gcp-progress-v4 .gcp-progress-v4-steps{ gap:16px; }
+  .gcp-progress-v4 .gcp-circle{ width:40px; height:40px; font-size:18px; }
+  .gcp-progress-v4 .gcp-label{ font-size:13px; }
+  .gcp-progress-v4 .gcp-progress-v4-track{
+    left: calc(8px + 20px);
+    right: calc(8px + 20px);
+    height: 8px;
+  }
+}
