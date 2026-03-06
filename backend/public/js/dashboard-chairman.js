@@ -53,39 +53,6 @@
     return map[s] || String(s);
   }
 
-  function workflowSteps(submitterRole){
-    const steps = ['Draft','Supervisor'];
-    if(submitterRole === 'deputy' || submitterRole === 'minister') steps.push('Deputy');
-    if(submitterRole === 'minister') steps.push('Minister');
-    steps.push('Approved');
-    return steps;
-  }
-
-  function statusStage(status){
-    const s = String(status||'').toLowerCase();
-    if(s === 'approved' || s === 'locked') return 'Approved';
-    if(s.includes('minister')) return 'Minister';
-    if(s.includes('chairman')) return 'Deputy';
-    if(s.includes('supervisor')) return 'Supervisor';
-    return 'Draft';
-  }
-
-  function renderProgress(steps, activeLabel){
-    const idx = Math.max(0, steps.indexOf(activeLabel));
-    return `
-      <div class="gcp-progress" role="list">
-        ${steps.map((label,i)=>{
-          const cls = i < idx ? 'done' : (i===idx ? 'active' : 'todo');
-          return `
-            <div class="gcp-step ${cls}" role="listitem">
-              <div class="gcp-dot"></div>
-              <div class="gcp-label">${window.GCP.escapeHtml(label)}</div>
-            </div>
-          `;
-        }).join('')}
-      </div>
-    `;
-  }
 
   function setMsg(text, isError=false){
     msg.textContent = text || '';
@@ -156,8 +123,7 @@
     const last = ds.updatedAt ? window.GCP.formatDateTime(ds.updatedAt) : '';
     const ev = eventsById.get(currentEventId);
     const submitterRole = (ds.submitterRole || ev?.submitter_role || 'deputy');
-    const steps = workflowSteps(submitterRole);
-    const active = statusStage(ds.status);
+
     // Back-compat: the DB column is still "occasion" but UI now calls it "task"
     const task = ((ev?.task ?? ev?.occasion) || '').trim();
 
@@ -166,7 +132,7 @@
         <div><b>Status:</b> ${window.GCP.escapeHtml(humanStatus(ds.status) || '')}</div>
         ${last ? `<div class="muted">${window.GCP.escapeHtml(last)}</div>` : ''}
       </div>
-      ${renderProgress(steps, active)}
+      ${window.GCP.renderWorkflowProgress(ds.status, submitterRole)}
       ${task ? `<div style="margin-top:10px;"><b>Task:</b> ${window.GCP.escapeHtml(task)}</div>` : ''}
       ${ds.chairmanComment ? `<div class="muted" style="margin-top:8px;"><b>Comment:</b> ${window.GCP.escapeHtml(ds.chairmanComment)}</div>` : ''}
     `;

@@ -36,41 +36,6 @@
     return map[s] || (s || '');
   }
 
-  function getWorkflowSteps(submitterRole){
-    const role = String(submitterRole || 'chairman').toLowerCase();
-    if (role === 'minister') return ['Draft','Supervisor','Deputy','Minister','Approved'];
-    if (role === 'supervisor') return ['Draft','Supervisor','Approved'];
-    // default: deputy (chairman)
-    return ['Draft','Supervisor','Deputy','Approved'];
-  }
-
-  function stageIndexForStatus(status, steps){
-    if (!status) return 0;
-    const s = String(status).toLowerCase();
-    if (s === 'approved' || s.includes('approved')) return steps.length - 1;
-    if (s === 'submitted_to_minister') return Math.max(0, steps.indexOf('Minister'));
-    if (s === 'submitted_to_chairman' || s === 'submitted_to_deputy') return Math.max(0, steps.indexOf('Deputy'));
-    if (s === 'submitted_to_supervisor' || s === 'submitted') return Math.max(0, steps.indexOf('Supervisor'));
-    return 0;
-  }
-
-  function renderStatusProgress(status, submitterRole){
-    const steps = getWorkflowSteps(submitterRole);
-    const idx = stageIndexForStatus(status, steps);
-    return `
-      <div class="gcp-progress" role="list" aria-label="Document status progress">
-        ${steps.map((label,i)=>{
-          const state = i < idx ? 'done' : (i === idx ? 'active' : 'todo');
-          return `
-            <div class="gcp-step ${state}" role="listitem">
-              <div class="gcp-dot" aria-hidden="true"></div>
-              <div class="gcp-label">${window.GCP.escapeHtml(label)}</div>
-            </div>
-          `;
-        }).join('')}
-      </div>
-    `;
-  }
 
   function showSectionStatus(tp, taskText, docStatus){
     if (!sectionStatusBox) return;
@@ -86,7 +51,7 @@
     sectionStatusBox.style.display = 'block';
     sectionStatusBox.innerHTML = `
       <div style="margin-bottom:8px;"><b>Status:</b> ${window.GCP.escapeHtml(humanStatus(docStatusKey))}</div>
-      <div>${renderStatusProgress(docStatusKey, submitterRole)}</div>
+      <div>${window.GCP.renderWorkflowProgress(docStatusKey, submitterRole)}</div>
             ${note ? `<div style="margin-top:10px; padding:8px 10px; border-radius:10px; border:1px solid rgba(220,38,38,.25); background: rgba(254,226,226,.55);"><b>Supervisor/Deputy comment:</b> ${window.GCP.escapeHtml(note)}</div>` : ''}
       <div style="margin-top:12px;"><b>Task:</b> ${window.GCP.escapeHtml((taskText || '').trim() || '—')}</div>
     `;

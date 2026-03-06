@@ -714,3 +714,83 @@ hr, .divider{
 
 /* Status bar: remove background line above circles (per request) */
 .gcp-progress .gcp-line{ display:none !important; }
+
+
+/* ===== Unified workflow progress bar ===== */
+.wf-progress{
+  position:relative;
+  width:100%;
+  padding:10px 6px 0;
+  margin-top:14px;
+}
+.wf-progress__track{
+  position:absolute;
+  left:36px;
+  right:36px;
+  top:34px;
+  height:8px;
+  border-radius:999px;
+  background:#dfe7fb;
+  overflow:hidden;
+  z-index:1;
+}
+.wf-progress__fill{
+  height:100%;
+  border-radius:inherit;
+  background:#1f3fbf;
+  transition:width .25s ease;
+}
+.wf-progress__steps{
+  position:relative;
+  z-index:2;
+  display:grid;
+  grid-template-columns:repeat(var(--wf-count, 4), minmax(0, 1fr));
+  gap:12px;
+}
+.wf-progress .wf-progress__steps{ grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); }
+.wf-step{
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  text-align:center;
+  gap:12px;
+}
+.wf-step__circle{
+  width:42px;
+  height:42px;
+  border-radius:999px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-weight:800;
+  font-size:18px;
+  line-height:1;
+  border:3px solid #c8d2ea;
+  background:#fff;
+  color:#7b879d;
+  box-shadow:0 2px 8px rgba(15,23,42,.06);
+}
+.wf-step__label{
+  font-size:15px;
+  line-height:1.25;
+  font-weight:800;
+  color:#667085;
+}
+.wf-step.is-done .wf-step__circle,
+.wf-step.is-active .wf-step__circle{
+  border-color:#1f3fbf;
+  background:#1f3fbf;
+  color:#fff;
+}
+.wf-step.is-active .wf-step__circle{
+  box-shadow:0 0 0 5px rgba(31,63,191,.14), 0 8px 18px rgba(31,63,191,.18);
+}
+.wf-step.is-done .wf-step__label,
+.wf-step.is-active .wf-step__label{ color:#1f2937; }
+
+@media (max-width: 900px){
+  .wf-progress{ padding-top:6px; }
+  .wf-progress__track{ left:22px; right:22px; top:30px; height:6px; }
+  .wf-step__circle{ width:36px; height:36px; font-size:16px; border-width:2px; }
+  .wf-step__label{ font-size:13px; }
+}

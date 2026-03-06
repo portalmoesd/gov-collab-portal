@@ -204,24 +204,45 @@
   };
 
   window.GCP.renderStatusProgress = function(status, submitterRole){
-    const steps = window.GCP.getStatusSteps(submitterRole);
-    const active = window.GCP.statusToStepIndex(status, submitterRole);
-    const maxIndex = Math.max(steps.length - 1, 1);
-    const progressPct = (active / maxIndex) * 100;
+  const steps = window.GCP.getStatusSteps(submitterRole);
+  const active = window.GCP.statusToStepIndex(status, submitterRole);
+  const n = Math.max(steps.length, 1);
 
-    let html = `<div class="gcp-progress gcp-progress-v4" role="group" aria-label="Document status">`;
-    html += `<div class="gcp-progress-track" aria-hidden="true"><div class="gcp-progress-fill" style="width:${progressPct}%;"></div></div>`;
-    html += `<div class="gcp-progress-steps">`;
-    for (let i = 0; i < steps.length; i++) {
-      const state = i < active ? 'done' : (i === active ? 'active' : 'todo');
-      html += `
-        <div class="gcp-step ${state}">
-          <div class="gcp-step-circle" aria-hidden="true">${i + 1}</div>
-          <div class="gcp-step-label">${escapeHtml(steps[i])}</div>
-        </div>
-      `;
-    }
-    html += `</div></div>`;
-    return html;
+  const nodeHtml = (label, idx) => {
+    const isDone = idx < active;
+    const isActive = idx === active;
+    const cls = isActive ? 'gcp-node active' : (isDone ? 'gcp-node done' : 'gcp-node todo');
+    const circleInner = isDone ? '<span class="gcp-check">✓</span>' : '';
+    return `
+      <div class="${cls}">
+        <div class="gcp-circle" aria-hidden="true">${circleInner}</div>
+        <div class="gcp-label">${escapeHtml(label)}</div>
+      </div>
+    `;
   };
+
+  const connHtml = (idx) => {
+    // connector AFTER node idx (between idx and idx+1)
+    let cls = 'gcp-conn todo';
+    let fill = '';
+    if (idx < active - 1) {
+      cls = 'gcp-conn done';
+    } else if (idx === active - 1) {
+      // segment leading into the active node is considered done
+      cls = 'gcp-conn done';
+    } else if (idx === active) {
+      cls = 'gcp-conn active';
+      fill = '<span class="gcp-conn-fill"></span>';
+    }
+    return `<div class="${cls}" aria-hidden="true">${fill}</div>`;
+  };
+
+  let html = `<div class="gcp-progress gcp-progress-v3" role="group" aria-label="Document status">`;
+  for (let i = 0; i < n; i++) {
+    html += nodeHtml(steps[i], i);
+    if (i < n - 1) html += connHtml(i);
+  }
+  html += `</div>`;
+  return html;
+};
 })();
