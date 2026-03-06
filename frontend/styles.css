@@ -403,3 +403,6 @@ textarea{min-height:120px; resize:vertical}
 .gcp-progress.gcp-progress-v2 .gcp-step.active .gcp-label{
   color: rgba(11,11,15,0.78);
 }
+
+/* v3 statusbar: disable legacy full-width line */
+.gcp-progress.gcp-progress-v3::before{content:none!important;display:none!important;}

@@ -55,8 +55,21 @@
   }
 
   function renderStatusProgress(status, submitterRole){
-    // Use the shared v3 renderer (segmented connectors)
-    return window.GCP.renderStatusProgress(status, submitterRole);
+    const steps = getWorkflowSteps(submitterRole);
+    const idx = stageIndexForStatus(status, steps);
+    return `
+      <div class="gcp-progress" role="list" aria-label="Document status progress">
+        ${steps.map((label,i)=>{
+          const state = i < idx ? 'done' : (i === idx ? 'active' : 'todo');
+          return `
+            <div class="gcp-step ${state}" role="listitem">
+              <div class="gcp-dot" aria-hidden="true"></div>
+              <div class="gcp-label">${window.GCP.escapeHtml(label)}</div>
+            </div>
+          `;
+        }).join('')}
+      </div>
+    `;
   }
 
   function showSectionStatus(tp, taskText, docStatus){
