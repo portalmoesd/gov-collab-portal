@@ -215,47 +215,52 @@ function formatTbilisiDate(value) {
   window.GCP.formatDate = formatTbilisiDate;
   window.GCP.formatDateTime = formatTbilisiDateTime;
 
-  // Unified workflow progress bar renderer used by all dashboards.
-  // Uses a dedicated class name so older .gcp-progress CSS cannot override it.
-  window.GCP.getWorkflowSteps = function(submitterRole){
+  // ------------------------------
+  // Dynamic document status progress bar
+  // ------------------------------
+  window.GCP.getStatusSteps = function(submitterRole){
     const raw = String(submitterRole || '').toLowerCase();
-    const role = raw === 'chairman' ? 'deputy' : raw;
-    if (role === 'minister') return ['Draft','Supervisor','Deputy','Minister','Approved'];
-    if (role === 'supervisor') return ['Draft','Supervisor','Approved'];
+    const r = raw === 'chairman' ? 'deputy' : raw;
+    if (r === 'supervisor') return ['Draft','Supervisor','Approved'];
+    if (r === 'minister') return ['Draft','Supervisor','Deputy','Minister','Approved'];
     return ['Draft','Supervisor','Deputy','Approved'];
   };
 
-  window.GCP.getWorkflowActiveIndex = function(status, submitterRole){
-    const steps = window.GCP.getWorkflowSteps(submitterRole);
+  window.GCP.statusToStepIndex = function(status, submitterRole){
     const s = String(status || '').toLowerCase();
-    if (!s || s === 'draft' || s === 'in_progress' || s === 'returned' || s.startsWith('returned_')) return 0;
-    if (s === 'submitted_to_supervisor' || s === 'approved_by_supervisor') return Math.max(0, steps.indexOf('Supervisor'));
-    if (s === 'submitted_to_chairman' || s === 'submitted_to_deputy' || s === 'approved_by_chairman') return Math.max(0, steps.indexOf('Deputy'));
-    if (s === 'submitted_to_minister' || s === 'approved_by_minister') return Math.max(0, steps.indexOf('Minister'));
-    if (s === 'approved' || s === 'locked') return Math.max(0, steps.indexOf('Approved'));
+    const rawRole = String(submitterRole || '').toLowerCase();
+    const r = rawRole === 'chairman' ? 'deputy' : rawRole;
+
+    if (!s || s === 'draft' || s === 'returned' || s === 'in_progress') return 0;
+    if (s === 'submitted_to_supervisor' || s === 'approved_by_supervisor') return 1;
+    if (s === 'submitted_to_chairman' || s === 'submitted_to_deputy' || s === 'approved_by_chairman') return r === 'supervisor' ? 1 : 2;
+    if (s === 'submitted_to_minister' || s === 'approved_by_minister') return r === 'minister' ? 3 : 0;
+    if (s === 'approved' || s === 'locked') return window.GCP.getStatusSteps(r).length - 1;
     return 0;
   };
 
   window.GCP.renderWorkflowProgress = function(status, submitterRole){
-    const steps = window.GCP.getWorkflowSteps(submitterRole);
-    const activeIndex = window.GCP.getWorkflowActiveIndex(status, submitterRole);
-    const progressPct = steps.length <= 1 ? 0 : (activeIndex / (steps.length - 1)) * 100;
-
-    let html = `<div class="wf-progress wf-progress--compact" style="--wf-count:${steps.length}; --wf-progress:${progressPct}%;" role="group" aria-label="Document status progress">`;
-    html += `<div class="wf-progress__steps">`;
-    for (let i = 0; i < steps.length; i++) {
-      const state = i < activeIndex ? 'is-done' : (i === activeIndex ? 'is-active' : 'is-todo');
-      const circleText = String(i + 1);
-      html += `
-        <div class="wf-step ${state}">
-          <div class="wf-step__circle" aria-hidden="true">${circleText}</div>
-          <div class="wf-step__label">${escapeHtml(steps[i])}</div>
-        </div>`;
-    }
-    html += `</div>`;
-    html += `<div class="wf-progress__track" aria-hidden="true"><div class="wf-progress__fill"></div></div>`;
-    html += `</div>`;
-    return html;
+    const steps = window.GCP.getStatusSteps(submitterRole);
+    const active = window.GCP.statusToStepIndex(status, submitterRole);
+    const maxIndex = Math.max(steps.length - 1, 1);
+    const fillPercent = (active / maxIndex) * 100;
+    const stepHtml = steps.map((label, idx) => {
+      const state = idx < active ? 'done' : (idx === active ? 'active' : 'todo');
+      return `
+        <div class="wf-step ${state}" role="listitem" aria-current="${idx === active ? 'step' : 'false'}">
+          <div class="wf-step__circle" aria-hidden="true">${idx + 1}</div>
+          <div class="wf-step__label">${escapeHtml(label)}</div>
+        </div>
+      `;
+    }).join('');
+    return `
+      <div class="wf-progress" style="--wf-count:${steps.length};" role="group" aria-label="Document status progress">
+        <div class="wf-progress__steps" role="list">${stepHtml}</div>
+        <div class="wf-progress__track" aria-hidden="true">
+          <div class="wf-progress__fill" style="width:${fillPercent}%;"></div>
+        </div>
+      </div>
+    `;
   };
 
   window.GCP.renderStatusProgress = window.GCP.renderWorkflowProgress;

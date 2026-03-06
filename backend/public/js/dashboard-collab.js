@@ -36,6 +36,23 @@
     return map[s] || (s || '');
   }
 
+  function getWorkflowSteps(submitterRole){
+    const role = String(submitterRole || 'chairman').toLowerCase();
+    if (role === 'minister') return ['Draft','Supervisor','Deputy','Minister','Approved'];
+    if (role === 'supervisor') return ['Draft','Supervisor','Approved'];
+    // default: deputy (chairman)
+    return ['Draft','Supervisor','Deputy','Approved'];
+  }
+
+  function stageIndexForStatus(status, steps){
+    if (!status) return 0;
+    const s = String(status).toLowerCase();
+    if (s === 'approved' || s.includes('approved')) return steps.length - 1;
+    if (s === 'submitted_to_minister') return Math.max(0, steps.indexOf('Minister'));
+    if (s === 'submitted_to_chairman' || s === 'submitted_to_deputy') return Math.max(0, steps.indexOf('Deputy'));
+    if (s === 'submitted_to_supervisor' || s === 'submitted') return Math.max(0, steps.indexOf('Supervisor'));
+    return 0;
+  }
 
   function showSectionStatus(tp, taskText, docStatus){
     if (!sectionStatusBox) return;

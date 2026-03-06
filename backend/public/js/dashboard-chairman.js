@@ -53,7 +53,6 @@
     return map[s] || String(s);
   }
 
-
   function setMsg(text, isError=false){
     msg.textContent = text || '';
     msg.style.color = isError ? 'crimson' : '#2b445b';
@@ -123,7 +122,6 @@
     const last = ds.updatedAt ? window.GCP.formatDateTime(ds.updatedAt) : '';
     const ev = eventsById.get(currentEventId);
     const submitterRole = (ds.submitterRole || ev?.submitter_role || 'deputy');
-
     // Back-compat: the DB column is still "occasion" but UI now calls it "task"
     const task = ((ev?.task ?? ev?.occasion) || '').trim();
 
