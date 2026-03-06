@@ -629,27 +629,40 @@ hr, .divider{
 
 /* ===== Status Progress v3 (segment connectors like reference) ===== */
 .gcp-progress.gcp-progress-v3{
-  display:flex;
-  align-items:flex-start;
-  gap:0;
-  padding: 10px 6px 2px;
+  /* hard override to avoid legacy .gcp-progress rules */
+  display:flex !important;
+  align-items:flex-start !important;
+  justify-content:center !important;
+  gap: 0 !important;
+  padding: 8px 0 2px !important;
+
+  /* sizing tokens */
+  --dot: 18px;
+  --line: 4px;
+  --seg: 140px;
 }
+
 .gcp-progress-v3 .gcp-node{
   display:flex;
   flex-direction:column;
   align-items:center;
   justify-content:flex-start;
-  min-width: 110px;
+  /* keep labels readable without forcing huge spacing */
+  width: 92px;
+  min-width: 92px;
+  text-align:center;
 }
+
 .gcp-progress-v3 .gcp-label{
   margin-top: 10px;
   font-size: 14px;
   font-weight: 600;
   color: rgba(0,0,0,.62);
 }
+
 .gcp-progress-v3 .gcp-circle{
-  width: 26px;
-  height: 26px;
+  width: var(--dot);
+  height: var(--dot);
   border-radius: 999px;
   display:flex;
   align-items:center;
@@ -657,21 +670,20 @@ hr, .divider{
   background: rgba(10,132,255,.28);
   position:relative;
 }
-.gcp-progress-v3 .gcp-node.todo .gcp-circle{
-  background: rgba(10,132,255,.26);
-}
-.gcp-progress-v3 .gcp-node.done .gcp-circle{
-  background: rgba(34,197,94,.95);
-}
+
+.gcp-progress-v3 .gcp-node.todo .gcp-circle{ background: rgba(10,132,255,.26); }
+.gcp-progress-v3 .gcp-node.done .gcp-circle{ background: rgba(34,197,94,.95); }
 .gcp-progress-v3 .gcp-node.done .gcp-check{
   color:#fff;
-  font-size: 16px;
+  font-size: 12px;
   line-height: 1;
   font-weight: 900;
 }
+
+/* current step: double-ring */
 .gcp-progress-v3 .gcp-node.active .gcp-circle{
   background: rgba(10,132,255,1);
-  box-shadow: 0 0 0 4px rgba(10,132,255,.20);
+  box-shadow: 0 0 0 4px rgba(10,132,255,.18);
 }
 .gcp-progress-v3 .gcp-node.active .gcp-circle::before{
   content:"";
@@ -682,17 +694,30 @@ hr, .divider{
   pointer-events:none;
 }
 
+/* connector segments ONLY between circles (no stretching) */
 .gcp-progress-v3 .gcp-conn{
-  flex: 1 1 auto;
-  height: 6px;
+  flex: 0 0 var(--seg);
+  height: var(--line);
   border-radius: 999px;
-  margin-top: 10px; /* centers the line through the circles */
+  /* vertically align through the circle center */
+  margin-top: calc((var(--dot) / 2) - (var(--line) / 2));
   background: rgba(10,132,255,.30);
   position:relative;
 }
-.gcp-progress-v3 .gcp-conn.done{
-  background: rgba(34,197,94,.95);
+
+/* small gap so the segment doesn't touch the circles */
+.gcp-progress-v3 .gcp-conn::before,
+.gcp-progress-v3 .gcp-conn::after{
+  content:"";
+  position:absolute;
+  top:0; bottom:0;
+  width: 10px;
+  background: transparent;
 }
+.gcp-progress-v3 .gcp-conn::before{ left:-10px; }
+.gcp-progress-v3 .gcp-conn::after{ right:-10px; }
+
+.gcp-progress-v3 .gcp-conn.done{ background: rgba(34,197,94,.95); }
 .gcp-progress-v3 .gcp-conn.active{
   background: rgba(10,132,255,.30);
   overflow:hidden;
@@ -705,7 +730,7 @@ hr, .divider{
   border-radius: 999px;
 }
 
-/* Make sure legacy v2 line doesn't show when v3 is used */
+/* Make sure legacy full-width lines never appear in v3 */
 .gcp-progress-v3 .gcp-line,
 .gcp-progress-v3 .gcp-line-done,
 .gcp-progress-v3 .gcp-line-after{
