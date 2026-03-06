@@ -194,6 +194,15 @@ function formatTbilisiDate(value) {
     const body = document.body;
     const openMenu = () => body.classList.add('gp-menu-open');
     const closeMenu = () => body.classList.remove('gp-menu-open');
+    const expandSidebar = () => body.classList.add('gp-sidebar-expanded');
+    const collapseSidebar = () => body.classList.remove('gp-sidebar-expanded');
+
+    sidebar.addEventListener('mouseenter', expandSidebar);
+    sidebar.addEventListener('mouseleave', collapseSidebar);
+    sidebar.addEventListener('focusin', expandSidebar);
+    sidebar.addEventListener('focusout', (event) => {
+      if (!sidebar.contains(event.relatedTarget)) collapseSidebar();
+    });
 
     sidebar.querySelector('.gp-mobile-toggle')?.addEventListener('click', openMenu);
     sidebar.querySelector('.gp-mobile-close')?.addEventListener('click', closeMenu);
