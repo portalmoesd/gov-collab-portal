@@ -682,36 +682,11 @@ hr, .divider{
   pointer-events:none;
 }
 
-.gcp-progress.gcp-progress-v3{
-  display:flex;
-  align-items:flex-start;
-  justify-content:center;
-  gap:0;
-  padding: 10px 6px 2px;
-}
-.gcp-progress-v3 .gcp-node{
-  display:flex;
-  flex-direction:column;
-  align-items:center;
-  justify-content:flex-start;
-  min-width: 92px;
-}
-.gcp-progress-v3 .gcp-circle{
-  width: 16px;
-  height: 16px;
-  border-radius: 999px;
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  position:relative;
-  background: rgba(10,132,255,.28);
-}
 .gcp-progress-v3 .gcp-conn{
-  flex: 0 0 120px;
-  width: 120px;
-  height: 4px;
+  flex: 1 1 auto;
+  height: 6px;
   border-radius: 999px;
-  margin-top: 6px; /* centers the line through the circles */
+  margin-top: 10px; /* centers the line through the circles */
   background: rgba(10,132,255,.30);
   position:relative;
 }
