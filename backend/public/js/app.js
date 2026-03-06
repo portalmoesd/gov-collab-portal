@@ -110,23 +110,26 @@ function formatTbilisiDate(value) {
     const sidebar = document.querySelector(".sidebar");
     if (!sidebar) return;
 
-    // Dock-style collapsible sidebar (hover to expand)
-    sidebar.classList.add("sidebar-dock");
+    document.body.classList.add("gp-shell-ready");
+    sidebar.classList.add("gp-sidebar");
 
     const role = String(user.role || "").toLowerCase();
     const items = ROLE_NAV[role] || [];
     const activeFile = location.pathname.split("/").pop();
-
-    const initials = (user.fullName || user.username || "U").trim().split(/\s+/).slice(0,2).map(s=>s[0]?.toUpperCase()||"").join("") || "U";
+    const displayName = user.fullName || user.username || "User";
+    const initials = displayName.trim().split(/\s+/).slice(0,2).map(s=>s[0]?.toUpperCase()||"").join("") || "U";
 
     function iconSvg(name){
       const svgs = {
-        dashboard: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 13.5a2 2 0 0 0 2 2h4.5v4.5a2 2 0 0 0 2 2h3.5a2 2 0 0 0 2-2v-8a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v1.5zM4 4a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v3.5a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4z"/></svg>`,
-        calendar: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 2a1 1 0 0 1 1 1v1h8V3a1 1 0 1 1 2 0v1h1a3 3 0 0 1 3 3v12a3 3 0 0 1-3 3H5a3 3 0 0 1-3-3V7a3 3 0 0 1 3-3h1V3a1 1 0 0 1 1-1zm14 8H3v9a1 1 0 0 0 1 1h16a1 1 0 0 0 1-1v-9z"/></svg>`,
-        library: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 3h10a3 3 0 0 1 3 3v15a1 1 0 0 1-1.5.86L11 19.5l-4.5 2.36A1 1 0 0 1 5 21V6a3 3 0 0 1-1-2.22V3zM18 6h2a2 2 0 0 1 2 2v13a1 1 0 0 1-1.5.86L18 20.5V6z"/></svg>`,
-        stats: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 21a1 1 0 0 1-1-1V4a1 1 0 0 1 2 0v15h16a1 1 0 1 1 0 2H4zm4-4a1 1 0 0 1-1-1V11a1 1 0 1 1 2 0v5a1 1 0 0 1-1 1zm5 0a1 1 0 0 1-1-1V7a1 1 0 1 1 2 0v9a1 1 0 0 1-1 1zm5 0a1 1 0 0 1-1-1V9a1 1 0 1 1 2 0v7a1 1 0 0 1-1 1z"/></svg>`,
-        admin: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 1a2 2 0 0 1 2 2v1.06a7.01 7.01 0 0 1 2.09.87l.75-.75a2 2 0 1 1 2.83 2.83l-.75.75c.36.66.64 1.36.82 2.1H21a2 2 0 1 1 0 4h-1.06a7.01 7.01 0 0 1-.87 2.09l.75.75a2 2 0 1 1-2.83 2.83l-.75-.75A7.01 7.01 0 0 1 14 19.94V21a2 2 0 1 1-4 0v-1.06a7.01 7.01 0 0 1-2.09-.87l-.75.75a2 2 0 1 1-2.83-2.83l.75-.75A7.01 7.01 0 0 1 4.06 14H3a2 2 0 1 1 0-4h1.06c.18-.74.46-1.44.82-2.1l-.75-.75A2 2 0 1 1 6.96 4.3l.75.75A7.01 7.01 0 0 1 10 4.06V3a2 2 0 0 1 2-2zm0 7a4 4 0 1 0 0 8 4 4 0 0 0 0-8z"/></svg>`,
-        logout: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 17a1 1 0 0 1-1-1v-1H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h5V3a1 1 0 0 1 1-1h7a3 3 0 0 1 3 3v14a3 3 0 0 1-3 3h-7zm9-5a1 1 0 0 0-1-1h-6a1 1 0 1 0 0 2h6a1 1 0 0 0 1-1z"/></svg>`
+        dashboard: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 13.5A2.5 2.5 0 0 1 5.5 11H11v10H5.5A2.5 2.5 0 0 1 3 18.5v-5ZM13 3h5.5A2.5 2.5 0 0 1 21 5.5V11h-8V3Zm0 10h8v5.5A2.5 2.5 0 0 1 18.5 21H13V13ZM3 5.5A2.5 2.5 0 0 1 5.5 3H11v6H3V5.5Z"/></svg>`,
+        calendar: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 2a1 1 0 0 1 1 1v1h8V3a1 1 0 1 1 2 0v1h1a3 3 0 0 1 3 3v11a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V7a3 3 0 0 1 3-3h1V3a1 1 0 0 1 1-1Zm13 8H4v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8Z"/></svg>`,
+        library: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3.5A2.5 2.5 0 0 1 8.5 1H19v18.5a1.5 1.5 0 0 1-2.4 1.2L13 18l-3.6 2.7A1.5 1.5 0 0 1 7 19.5V6H6a3 3 0 0 1 0-6h1v3.5ZM9 4v13l3-2.25L15 17V4H9Z"/></svg>`,
+        stats: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20a1 1 0 0 1-1-1V5a1 1 0 1 1 2 0v13h15a1 1 0 1 1 0 2H4Zm4-3a1 1 0 0 1-1-1v-4a1 1 0 1 1 2 0v4a1 1 0 0 1-1 1Zm5 0a1 1 0 0 1-1-1V8a1 1 0 1 1 2 0v8a1 1 0 0 1-1 1Zm5 0a1 1 0 0 1-1-1v-6a1 1 0 1 1 2 0v6a1 1 0 0 1-1 1Z"/></svg>`,
+        admin: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10.6 2h2.8l.5 2a7.7 7.7 0 0 1 1.8.8l1.8-1.1 2 2-1.1 1.8a7.7 7.7 0 0 1 .8 1.8l2 .5v2.8l-2 .5a7.7 7.7 0 0 1-.8 1.8l1.1 1.8-2 2-1.8-1.1a7.7 7.7 0 0 1-1.8.8l-.5 2h-2.8l-.5-2a7.7 7.7 0 0 1-1.8-.8l-1.8 1.1-2-2 1.1-1.8a7.7 7.7 0 0 1-.8-1.8l-2-.5V10l2-.5a7.7 7.7 0 0 1 .8-1.8L3.9 5.9l2-2 1.8 1.1a7.7 7.7 0 0 1 1.8-.8l.5-2ZM12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6Z"/></svg>`,
+        logout: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 3a1 1 0 0 1 1 1v2h6a3 3 0 0 1 3 3v7a3 3 0 0 1-3 3h-6v2a1 1 0 1 1-2 0V4a1 1 0 0 1 1-1Zm-1 8H4a1 1 0 1 0 0 2h5v2.5a1 1 0 0 0 1.7.7l3.2-3.2a1 1 0 0 0 0-1.4l-3.2-3.2A1 1 0 0 0 9 9.5V11Z"/></svg>`,
+        user: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 12a4.5 4.5 0 1 0-4.5-4.5A4.5 4.5 0 0 0 12 12Zm0 2c-4.4 0-8 2.2-8 5a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1c0-2.8-3.6-5-8-5Z"/></svg>`,
+        menu: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7a1 1 0 0 1 1-1h14a1 1 0 1 1 0 2H5A1 1 0 0 1 4 7Zm0 5a1 1 0 0 1 1-1h14a1 1 0 1 1 0 2H5a1 1 0 0 1-1-1Zm1 4a1 1 0 1 0 0 2h14a1 1 0 1 0 0-2H5Z"/></svg>`,
+        close: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6.7 5.3a1 1 0 0 0-1.4 1.4L10.6 12l-5.3 5.3a1 1 0 0 0 1.4 1.4l5.3-5.3 5.3 5.3a1 1 0 0 0 1.4-1.4L13.4 12l5.3-5.3a1 1 0 0 0-1.4-1.4L12 10.6 6.7 5.3Z"/></svg>`
       };
       return svgs[name] || svgs.dashboard;
     }
@@ -140,47 +143,64 @@ function formatTbilisiDate(value) {
       return "dashboard";
     }
 
+    const navHtml = items.map((it) => {
+      const active = activeFile === it.href ? ' active' : '';
+      return `<a href="${escapeHtml(it.href)}" class="gp-nav__link${active}"><span class="gp-nav__icon">${iconSvg(iconForLabel(it.label))}</span><span class="gp-nav__label">${escapeHtml(it.label)}</span></a>`;
+    }).join('');
+
     sidebar.innerHTML = `
-      <div class="dock-top">
-        <div class="dock-brand">
-          <div class="dock-logo" aria-hidden="true"></div>
-          <div class="dock-wordmark">
-            <div class="dock-title">GOV COLLAB</div>
-            <div class="dock-subtitle">Portal</div>
+      <button class="gp-mobile-toggle" type="button" aria-label="Open menu">
+        <span class="gp-mobile-toggle__icon">${iconSvg("menu")}</span>
+      </button>
+      <div class="gp-sidebar__scrim"></div>
+      <div class="gp-sidebar__panel">
+        <div class="gp-sidebar__top">
+          <div class="gp-brand">
+            <div class="gp-brand__mark">G</div>
+            <div class="gp-brand__text">
+              <div class="gp-brand__title">Gov Collab</div>
+              <div class="gp-brand__sub">Portal</div>
+            </div>
+          </div>
+          <button class="gp-mobile-close" type="button" aria-label="Close menu">${iconSvg("close")}</button>
+        </div>
+
+        <div class="gp-profile">
+          <div class="gp-profile__avatar">${escapeHtml(initials)}</div>
+          <div class="gp-profile__text">
+            <div class="gp-profile__name">${escapeHtml(displayName)}</div>
+            <div class="gp-profile__role">${escapeHtml(roleToTitle(role))}</div>
           </div>
         </div>
-      </div>
 
-      <div class="dock-user">
-        <div class="dock-avatar" title="${escapeHtml(user.fullName || user.username || "")}">${escapeHtml(initials)}</div>
-        <div class="dock-usertext">
-          <div class="dock-name">${escapeHtml(user.fullName || user.username || "")}</div>
-          <div class="dock-role">${escapeHtml(roleToTitle(role))}</div>
+        <nav class="gp-nav">${navHtml}</nav>
+
+        <div class="gp-sidebar__footer">
+          <div class="gp-account">
+            <span class="gp-account__icon">${iconSvg("user")}</span>
+            <div class="gp-account__text">
+              <div class="gp-account__title">Signed in</div>
+              <div class="gp-account__sub">${escapeHtml(roleToTitle(role))}</div>
+            </div>
+          </div>
+          <button class="gp-logout" id="logoutBtn" type="button">
+            <span class="gp-nav__icon">${iconSvg("logout")}</span>
+            <span class="gp-nav__label">Logout</span>
+          </button>
         </div>
-      </div>
-
-      <nav class="dock-nav" id="nav"></nav>
-
-      <div class="dock-bottom">
-        <button class="dock-link dock-logout" id="logoutBtn" type="button">
-          <span class="dock-ic">${iconSvg("logout")}</span>
-          <span class="dock-label">Logout</span>
-        </button>
       </div>
     `;
 
-    const nav = sidebar.querySelector("#nav");
-    for (const it of items){
-      const a = document.createElement("a");
-      a.href = it.href;
-      a.className = "dock-link";
-      const ic = iconForLabel(it.label);
-      a.innerHTML = `<span class="dock-ic">${iconSvg(ic)}</span><span class="dock-label">${escapeHtml(it.label)}</span>`;
-      if (activeFile === it.href) a.classList.add("active");
-      nav.appendChild(a);
-    }
+    const body = document.body;
+    const openMenu = () => body.classList.add('gp-menu-open');
+    const closeMenu = () => body.classList.remove('gp-menu-open');
 
-    sidebar.querySelector("#logoutBtn").addEventListener("click", () => {
+    sidebar.querySelector('.gp-mobile-toggle')?.addEventListener('click', openMenu);
+    sidebar.querySelector('.gp-mobile-close')?.addEventListener('click', closeMenu);
+    sidebar.querySelector('.gp-sidebar__scrim')?.addEventListener('click', closeMenu);
+    sidebar.querySelectorAll('.gp-nav__link').forEach((link) => link.addEventListener('click', closeMenu));
+
+    sidebar.querySelector('#logoutBtn').addEventListener('click', () => {
       localStorage.removeItem("gcp_token");
       location.href = "login.html";
     });
