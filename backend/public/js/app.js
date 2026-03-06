@@ -241,7 +241,7 @@ function formatTbilisiDate(value) {
     const activeIndex = window.GCP.getWorkflowActiveIndex(status, submitterRole);
     const progressPct = steps.length <= 1 ? 0 : (activeIndex / (steps.length - 1)) * 100;
 
-    let html = `<div class="wf-progress" role="group" aria-label="Document status progress">`;
+    let html = `<div class="wf-progress wf-progress--compact" style="--wf-count:${steps.length}" role="group" aria-label="Document status progress">`;
     html += `<div class="wf-progress__track" aria-hidden="true"><div class="wf-progress__fill" style="width:${progressPct}%;"></div></div>`;
     html += `<div class="wf-progress__steps">`;
     for (let i = 0; i < steps.length; i++) {
