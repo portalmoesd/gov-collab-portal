@@ -1685,6 +1685,11 @@ body.gp-shell-ready .gp-sidebar__scrim{
   font-size: 11px;
   letter-spacing: .14em;
 }
+.micro-action.is-expanded .micro-action__label{
+  opacity: 1;
+  transform: translateX(0);
+  color: inherit;
+}
 .micro-action:hover,
 .micro-action:focus-visible,
 .micro-action.is-expanded{
@@ -1705,6 +1710,11 @@ body.gp-shell-ready .gp-sidebar__scrim{
   .micro-action:hover,
   .micro-action:focus-visible,
   .micro-action.is-expanded{ width: 132px; }
+  .micro-action__label{
+    opacity: 1;
+    transform: translateX(0);
+    color: inherit;
+  }
 }
 @media (max-width: 640px){
   .micro-action,
