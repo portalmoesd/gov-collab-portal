@@ -1210,7 +1210,8 @@ body.gp-shell-ready .gp-sidebar__scrim{
   transition: opacity .18s ease, transform .18s ease;
 }
 .micro-action:hover .micro-action__label,
-.micro-action:focus-visible .micro-action__label{
+.micro-action:focus-visible .micro-action__label,
+.micro-action.is-expanded .micro-action__label{
   opacity:1;
   transform:translateX(0);
 }
@@ -1679,6 +1680,7 @@ body.gp-shell-ready .gp-sidebar__scrim{
   height: 22px;
 }
 .micro-action__label{
+  display:block;
   color: inherit;
   font-size: 11px;
   letter-spacing: .14em;
@@ -1697,10 +1699,17 @@ body.gp-shell-ready .gp-sidebar__scrim{
   .editor-page-topbar .page-title{ font-size: 18px; }
   .editor-task-title{ font-size: 18px; }
 }
-@media (max-width: 640px){
+@media (max-width: 900px){
   .editor-task-updated{ font-size: 12px; }
   .micro-action,
   .micro-action:hover,
   .micro-action:focus-visible,
+  .micro-action.is-expanded{ width: 132px; }
+}
+@media (max-width: 640px){
+  .micro-action,
+  .micro-action:hover,
+  .micro-action:focus-visible,
   .micro-action.is-expanded{ width: 50px; }
+  .micro-action__label{ display:none; }
 }
