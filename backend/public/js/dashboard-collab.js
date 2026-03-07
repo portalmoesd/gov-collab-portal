@@ -14,76 +14,200 @@
   const openBtn = document.getElementById('openEditorBtn');
   const msg = document.getElementById('msg');
   const sectionStatusBox = document.getElementById('sectionStatusBox');
-  const eventsById = new Map();
+
+  let eventMeta = {}; // { [eventId]: { taskText, submitterRole } }
+  let taskText = '';
+  let submitterRole = 'deputy';
 
 
-  function humanStatus(s){
+  // --- Portal custom dropdowns ---
+  const dropdownRegistry = new Map();
+
+  function closeAllCustomDropdowns(exceptSelect = null){
+    dropdownRegistry.forEach((entry, key) => {
+      if (key !== exceptSelect) entry.close();
+    });
+  }
+
+  function refreshCustomDropdown(select){
+    const entry = dropdownRegistry.get(select);
+    if (entry) entry.refresh();
+  }
+
+  function setupCustomDropdown(select){
+    if (!select || dropdownRegistry.has(select)) return;
+
+    select.classList.add('portal-select-native');
+
+    const wrap = document.createElement('div');
+    wrap.className = 'portal-dropdown';
+
+    const trigger = document.createElement('button');
+    trigger.type = 'button';
+    trigger.className = 'portal-dropdown__trigger';
+    trigger.setAttribute('aria-haspopup', 'listbox');
+    trigger.setAttribute('aria-expanded', 'false');
+
+    const triggerText = document.createElement('span');
+    triggerText.className = 'portal-dropdown__text';
+
+    const triggerArrow = document.createElement('span');
+    triggerArrow.className = 'portal-dropdown__arrow';
+    triggerArrow.setAttribute('aria-hidden', 'true');
+
+    trigger.appendChild(triggerText);
+    trigger.appendChild(triggerArrow);
+
+    const panel = document.createElement('div');
+    panel.className = 'portal-dropdown__panel';
+    panel.hidden = true
+
+    select.parentNode.insertBefore(wrap, select.nextSibling);
+    wrap.appendChild(trigger);
+    wrap.appendChild(panel);
+
+    let isOpen = false;
+
+    function getSelectedOption(){
+      return select.options[select.selectedIndex] || select.options[0] || null;
+    }
+
+    function updateTrigger(){
+      const selected = getSelectedOption();
+      const label = selected ? selected.textContent : '';
+      triggerText.textContent = label || select.getAttribute('placeholder') || 'Select...';
+      const isPlaceholder = !select.value;
+      trigger.classList.toggle('is-placeholder', isPlaceholder);
+      trigger.disabled = !!select.disabled;
+      wrap.classList.toggle('is-disabled', !!select.disabled);
+    }
+
+    function buildOptions(){
+      panel.innerHTML = '';
+      Array.from(select.options).forEach((opt, idx) => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'portal-dropdown__option';
+        btn.setAttribute('role', 'option');
+        btn.dataset.value = opt.value;
+        btn.dataset.index = String(idx);
+        btn.disabled = !!opt.disabled;
+
+        const label = document.createElement('span');
+        label.className = 'portal-dropdown__option-label';
+        label.textContent = opt.textContent || '';
+        btn.appendChild(label);
+
+        if (!opt.value) btn.classList.add('is-placeholder');
+        if (opt.value === select.value) {
+          btn.classList.add('is-selected');
+          btn.setAttribute('aria-selected', 'true');
+        }
+
+        btn.addEventListener('click', () => {
+          if (opt.disabled) return;
+          select.value = opt.value;
+          select.dispatchEvent(new Event('change', { bubbles: true }));
+          refresh();
+          close();
+          trigger.focus();
+        });
+
+        panel.appendChild(btn);
+      });
+    }
+
+    function open(){
+      if (select.disabled) return;
+      closeAllCustomDropdowns(select);
+      isOpen = true;
+      wrap.classList.add('is-open');
+      panel.hidden = false;
+      trigger.setAttribute('aria-expanded', 'true');
+    }
+
+    function close(){
+      isOpen = false;
+      wrap.classList.remove('is-open');
+      panel.hidden = true;
+      trigger.setAttribute('aria-expanded', 'false');
+    }
+
+    function refresh(){
+      buildOptions();
+      updateTrigger();
+    }
+
+    trigger.addEventListener('click', () => {
+      if (isOpen) close();
+      else open();
+    });
+
+    trigger.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowDown' || e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        open();
+      }
+      if (e.key === 'Escape') close();
+    });
+
+    dropdownRegistry.set(select, { refresh, close, open });
+    refresh();
+  }
+
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('.portal-dropdown')) closeAllCustomDropdowns();
+  });
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') closeAllCustomDropdowns();
+  });
+
+
+  function humanDocStatus(s){
     const map = {
-      // document workflow
-      in_progress: 'Draft',
       draft: 'Draft',
       returned: 'Returned',
-      submitted_to_supervisor: 'Submitted',
-      submitted_to_chairman: 'Submitted',
-      submitted_to_deputy: 'Submitted',
-      submitted_to_minister: 'Submitted',
-      approved: 'Approved',
-
-      // legacy section values (fallback)
-      submitted: 'Submitted',
-      approved_by_supervisor: 'Approved',
-      approved_by_chairman: 'Approved'
+      submitted_to_supervisor: 'Submitted to Supervisor',
+      submitted_to_chairman: 'Submitted to Deputy',
+      submitted_to_minister: 'Submitted to Minister',
+      approved: 'Approved'
     };
     return map[s] || (s || '');
   }
 
-  function getWorkflowSteps(submitterRole){
-    const role = String(submitterRole || 'chairman').toLowerCase();
-    if (role === 'minister') return ['Draft','Supervisor','Deputy','Minister','Approved'];
-    if (role === 'supervisor') return ['Draft','Supervisor','Approved'];
-    // default: deputy (chairman)
-    return ['Draft','Supervisor','Deputy','Approved'];
+  function normalizeSubmitterRole(r){
+    const v = String(r || '').toLowerCase();
+    return v === 'chairman' ? 'deputy' : v;
   }
 
-  function stageIndexForStatus(status, steps){
-    if (!status) return 0;
-    const s = String(status).toLowerCase();
-    if (s === 'approved' || s.includes('approved')) return steps.length - 1;
-    if (s === 'submitted_to_minister') return Math.max(0, steps.indexOf('Minister'));
-    if (s === 'submitted_to_chairman' || s === 'submitted_to_deputy') return Math.max(0, steps.indexOf('Deputy'));
-    if (s === 'submitted_to_supervisor' || s === 'submitted') return Math.max(0, steps.indexOf('Supervisor'));
-    return 0;
-  }
-
-  function showSectionStatus(tp, taskText, docStatus){
+  async function showSectionStatus(eventId, tp){
     if (!sectionStatusBox) return;
     if (!tp){
       sectionStatusBox.style.display = 'none';
       sectionStatusBox.textContent = '';
       return;
     }
+
+    // Document status is per-event; fetch it so the progress bar matches the selected submitter flow.
+    let doc = null;
+    try{
+      doc = await window.GCP.apiFetch(`/tp/document-status?event_id=${encodeURIComponent(eventId)}`, { method:'GET' });
+    }catch(e){
+      // keep going; we'll render without it
+    }
+
     const note = (tp.statusComment || '').trim();
-    const last = tp.lastUpdatedAt ? window.GCP.formatDateTime(tp.lastUpdatedAt) : '';
-    const docStatusKey = String(docStatus?.status || 'in_progress').toLowerCase();
-    const submitterRole = docStatus?.submitterRole || docStatus?.submitter_role || 'chairman';
+    const last = (doc && doc.updatedAt) ? window.GCP.formatDateTime(doc.updatedAt) : (tp.lastUpdatedAt ? window.GCP.formatDateTime(tp.lastUpdatedAt) : '');
+    const docStatus = doc ? doc.status : 'draft';
+
     sectionStatusBox.style.display = 'block';
     sectionStatusBox.innerHTML = `
-      <div style="margin-bottom:8px;"><b>Status:</b> ${window.GCP.escapeHtml(humanStatus(docStatusKey))}</div>
+      <div style="margin-bottom:8px;"><b>Status:</b> ${window.GCP.escapeHtml(humanDocStatus(docStatus))}</div>
       <div>${window.GCP.renderWorkflowProgress(docStatus, submitterRole)}</div>
             ${note ? `<div style="margin-top:10px; padding:8px 10px; border-radius:10px; border:1px solid rgba(220,38,38,.25); background: rgba(254,226,226,.55);"><b>Supervisor/Deputy comment:</b> ${window.GCP.escapeHtml(note)}</div>` : ''}
       <div style="margin-top:12px;"><b>Task:</b> ${window.GCP.escapeHtml((taskText || '').trim() || '—')}</div>
     `;
-  }
-
-  async function fetchDocStatus(eventId){
-    if (!Number.isFinite(eventId)) return null;
-    try{
-      return await window.GCP.apiFetch(`/tp/document-status?event_id=${encodeURIComponent(eventId)}`, { method: 'GET' });
-    }catch(e){
-      return null;
-    }
-    refreshCustomDropdown(eventSelect);
-    refreshCustomDropdown(sectionSelect);
   }
 
 
@@ -99,9 +223,7 @@
 
   async function loadUpcoming(){
     const events = await window.GCP.apiFetch('/events/upcoming', { method:'GET' });
-    eventsById.clear();
-    for (const ev of (events || [])) eventsById.set(Number(ev.id), ev);
-
+    eventMeta = {};
     if (eventsGrid) eventsGrid.innerHTML = '';
     eventSelect.innerHTML = `<option value="">Select event...</option>`;
     if (countrySelect){
@@ -113,6 +235,11 @@
     sectionSelect.disabled = true;
 
     for (const ev of (events || [])) {
+      eventMeta[ev.id] = {
+        taskText: ev.task || ev.occasion || '',
+        submitterRole: normalizeSubmitterRole(ev.submitter_role),
+        country: ev.country_name_en || ''
+      };
       if (eventsGrid){
         const card = document.createElement('div');
         card.className = 'event-card';
@@ -147,6 +274,8 @@
       opt.textContent = `${ev.title || 'Event'} (${ev.country_name_en || ''}${ev.deadline_date ? ', ' + window.GCP.formatDate(ev.deadline_date) : ''})`;
       eventSelect.appendChild(opt);
     }
+    refreshCustomDropdown(eventSelect);
+    refreshCustomDropdown(sectionSelect);
   }
 
   async function loadSectionsForEvent(eventId){
@@ -171,7 +300,7 @@
     refreshCustomDropdown(sectionSelect);
 
     // reset status box
-    showSectionStatus(null, (eventsById.get(Number(eventSelect.value))||{}).occasion||'');
+    showSectionStatus(null);
   }
 
   eventSelect.addEventListener('change', async () => {
@@ -197,6 +326,9 @@
       refreshCustomDropdown(countrySelect);
     }
     try{
+      // Cache event meta for status bar
+      taskText = (eventMeta[eventId] && eventMeta[eventId].taskText) || '';
+      submitterRole = (eventMeta[eventId] && eventMeta[eventId].submitterRole) || 'deputy';
       await loadSectionsForEvent(eventId);
     }catch(e){
       setMsg(e.message || 'Failed to load event', true);
@@ -211,16 +343,14 @@
     const eventId = Number(eventSelect.value);
     const sectionId = Number(sectionSelect.value);
     if (!Number.isFinite(eventId) || !Number.isFinite(sectionId)) {
+      await showSectionStatus(eventId, null);
       return;
     }
     try{
-      const [tp, ds] = await Promise.all([
-        window.GCP.apiFetch(`/tp?event_id=${encodeURIComponent(eventId)}&section_id=${encodeURIComponent(sectionId)}`, { method:'GET' }),
-        fetchDocStatus(eventId),
-      ]);
-      showSectionStatus(tp, (eventsById.get(eventId)||{}).occasion||'', ds);
+      const tp = await window.GCP.apiFetch(`/tp?event_id=${encodeURIComponent(eventId)}&section_id=${encodeURIComponent(sectionId)}`, { method:'GET' });
+      await showSectionStatus(eventId, tp);
     }catch(e){
-      console.warn(e);
+      await showSectionStatus(eventId, null);
     }
   });
 
