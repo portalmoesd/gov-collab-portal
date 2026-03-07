@@ -2147,6 +2147,19 @@ body.gp-shell-ready .gp-sidebar__scrim{
 
 
 /* === Collaborator dashboard custom dropdowns === */
+
+#openEditorSection{
+  position:relative;
+  z-index:1;
+  overflow:visible;
+}
+#openEditorSection.dropdown-open{
+  z-index:40;
+}
+#openEditorSection .row,
+#openEditorSection .field{
+  overflow:visible;
+}
 #openEditorSection .field .portal-select-native{
   position:absolute !important;
   pointer-events:none !important;

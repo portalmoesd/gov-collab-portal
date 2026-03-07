@@ -14,6 +14,7 @@
   const openBtn = document.getElementById('openEditorBtn');
   const msg = document.getElementById('msg');
   const sectionStatusBox = document.getElementById('sectionStatusBox');
+  const openEditorSection = document.getElementById('openEditorSection');
 
   let eventMeta = {}; // { [eventId]: { taskText, submitterRole } }
   let taskText = '';
@@ -23,10 +24,17 @@
   // --- Portal custom dropdowns ---
   const dropdownRegistry = new Map();
 
+  function syncDropdownOpenState(){
+    if (!openEditorSection) return;
+    const hasOpen = Array.from(dropdownRegistry.values()).some(entry => entry && entry.isOpen && entry.isOpen());
+    openEditorSection.classList.toggle('dropdown-open', hasOpen);
+  }
+
   function closeAllCustomDropdowns(exceptSelect = null){
     dropdownRegistry.forEach((entry, key) => {
       if (key !== exceptSelect) entry.close();
     });
+    syncDropdownOpenState();
   }
 
   function refreshCustomDropdown(select){
@@ -124,6 +132,7 @@
       wrap.classList.add('is-open');
       panel.hidden = false;
       trigger.setAttribute('aria-expanded', 'true');
+      syncDropdownOpenState();
     }
 
     function close(){
@@ -131,6 +140,7 @@
       wrap.classList.remove('is-open');
       panel.hidden = true;
       trigger.setAttribute('aria-expanded', 'false');
+      syncDropdownOpenState();
     }
 
     function refresh(){
@@ -151,7 +161,7 @@
       if (e.key === 'Escape') close();
     });
 
-    dropdownRegistry.set(select, { refresh, close, open });
+    dropdownRegistry.set(select, { refresh, close, open, isOpen: () => isOpen });
     refresh();
   }
 
