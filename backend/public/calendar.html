@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>GOV COLLAB PORTAL • Calendar</title>
   <link rel="stylesheet" href="styles.css?v=20260306sb1" />
-  <link rel="stylesheet" href="styles/apple.css?v=20260306sb1" />
+  <link rel="stylesheet" href="styles/apple.css?v=20260307cal1" />
 </head>
 <body>
 
@@ -15,69 +15,81 @@
     <div class="topbar">
       <div class="page-title">Calendar</div>
     </div>
-    
-<div class="grid">
-  <section class="card col-12" id="formCard">
-    <div style="font-weight:900; margin-bottom:10px;">Create / Edit event</div>
-    <form id="eventForm" class="calendar-event-form">
-      <div class="calendar-form-col calendar-form-col--left">
-        <div class="field">
-          <label>Country</label>
-          <select id="countryId"></select>
-        </div>
-        <div class="field">
-          <label>Title</label>
-          <input id="title" required />
-        </div>
-        <div class="field">
-          <label>Document submitter</label>
-          <select id="submitterRole">
-            <option value="supervisor">Supervisor</option>
-            <option value="chairman" selected>Deputy</option>
-            <option value="minister">Minister</option>
-          </select>
-        </div>
-        <div class="field">
-          <label>Deadline</label>
-          <input id="deadlineDate" type="date" />
-        </div>
-      </div>
 
-      <div class="calendar-form-col calendar-form-col--middle">
-        <div class="field field-sections">
-          <label>Required sections</label>
-          <div id="requiredSectionsBox" class="checklist calendar-sections-grid"></div>
+    <div class="grid">
+      <section class="card col-12" id="formCard">
+        <div class="calendar-card-head">
+          <div class="calendar-eyebrow">Calendar workspace</div>
+          <div class="calendar-section-title">Create / Edit event</div>
         </div>
-      </div>
 
-      <div class="calendar-form-col calendar-form-col--right">
-        <div class="field field-task">
-          <label>Task</label>
-          <textarea id="occasion" rows="8"></textarea>
-        </div>
-        <div class="row calendar-form-actions">
-          <button class="btn primary" id="saveEventBtn" type="submit">Create event</button>
-          <button class="btn" id="resetFormBtn">Reset</button>
-        </div>
-      </div>
-    </form>
-    <div id="msg" class="small" style="color:var(--danger); font-weight:800; margin-top:10px;"></div>
-  </section>
+        <form id="eventForm" class="calendar-event-form">
+          <div class="calendar-event-grid">
+            <div class="calendar-form-col calendar-form-col--left">
+              <div class="field">
+                <label for="countryId">Country</label>
+                <select id="countryId" class="portal-select"></select>
+              </div>
 
-  <section class="card col-12">
-    <div style="font-weight:900; margin-bottom:10px;">Events</div>
-    <table class="table">
-      <thead><tr><th>Title</th><th>Country</th><th>Deadline</th><th>Active</th><th></th></tr></thead>
-      <tbody id="eventsTbody"></tbody>
-    </table>
-  </section>
-</div></div>
+              <div class="field">
+                <label for="title">Title</label>
+                <input id="title" required placeholder="Meeting title" />
+              </div>
+
+              <div class="field">
+                <label for="submitterRole">Document submitter</label>
+                <select id="submitterRole" class="portal-select">
+                  <option value="chairman" selected>Deputy</option>
+                  <option value="supervisor">Supervisor</option>
+                  <option value="minister">Minister</option>
+                </select>
+              </div>
+
+              <div class="field">
+                <label for="deadlineDate">Deadline</label>
+                <input id="deadlineDate" type="date" />
+              </div>
+            </div>
+
+            <div class="calendar-form-col calendar-form-col--middle">
+              <div class="field field-sections">
+                <label for="requiredSectionsBox">Required sections</label>
+                <div id="requiredSectionsBox" class="calendar-sections-box checklist"></div>
+              </div>
+            </div>
+
+            <div class="calendar-form-col calendar-form-col--right">
+              <div class="field field-task">
+                <label for="occasion">Task</label>
+                <textarea id="occasion" placeholder="Write clear, detailed task instructions here..."></textarea>
+              </div>
+
+              <div class="calendar-actions">
+                <button class="btn primary" id="saveEventBtn" type="submit">Create event</button>
+                <button class="btn" id="resetFormBtn">Reset</button>
+              </div>
+            </div>
+          </div>
+        </form>
+        <div id="msg" class="small calendar-form-msg"></div>
+      </section>
+
+      <section class="card col-12" id="eventsSection">
+        <div class="calendar-table-head">
+          <div style="font-weight:900;">Events</div>
+        </div>
+        <table class="table">
+          <thead><tr><th>Title</th><th>Country</th><th>Deadline</th><th>Active</th><th></th></tr></thead>
+          <tbody id="eventsTbody"></tbody>
+        </table>
+      </section>
+    </div>
 
   </main>
 </div>
   <script src="js/config.js"></script>
   <script src="js/api.js"></script>
   <script src="js/app.js"></script>
-  <script src="js/calendar.js"></script>
+  <script src="js/calendar.js?v=20260307cal1"></script>
 </body>
 </html>

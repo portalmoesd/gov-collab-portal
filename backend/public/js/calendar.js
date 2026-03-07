@@ -18,7 +18,6 @@
   const occasionInput = document.getElementById("occasion");
   const submitterRoleInput = document.getElementById("submitterRole");
   const deadlineInput = document.getElementById("deadlineDate");
-  const submitterSelect = document.getElementById("submitterRole");
   const requiredBox = document.getElementById("requiredSectionsBox");
   const saveBtn = document.getElementById("saveEventBtn");
   const resetBtn = document.getElementById("resetFormBtn");
@@ -83,7 +82,6 @@ ${(labels.length ? labels.join('\n') : '—')}`);
           occasionInput.value = details.occasion || "";
           if (submitterRoleInput) submitterRoleInput.value = (details.submitter_role || details.submitterRole || 'chairman');
           deadlineInput.value = formatDate(details.deadline_date);
-          if (submitterSelect) submitterSelect.value = String(details.submitterRole || details.submitter_role || "chairman");
           // select required sections
           const req = (details.required_sections || details.requiredSections || []);
           const reqIds = new Set((Array.isArray(req) ? req : []).map(s => String(s.id)));
@@ -114,7 +112,6 @@ ${(labels.length ? labels.join('\n') : '—')}`);
   function resetForm(){
     editEventId = null;
     form.reset();
-    if (submitterSelect) submitterSelect.value = "chairman";
     saveBtn.textContent = "Create event";
     msg.textContent = "";
   }
@@ -135,7 +132,6 @@ ${(labels.length ? labels.join('\n') : '—')}`);
       occasion: occasionInput.value.trim() || null,
       submitterRole: (submitterRoleInput?.value || 'chairman'),
       deadlineDate: deadlineInput.value || null,
-      submitterRole: submitterSelect ? submitterSelect.value : "chairman",
       requiredSectionIds,
     };
 
