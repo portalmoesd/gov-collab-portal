@@ -2082,3 +2082,65 @@ body.gp-shell-ready .gp-sidebar__scrim{
     border-color: rgba(10,132,255,0.28);
   }
 }
+
+
+/* === Collaborator dashboard portal-style selects === */
+#openEditorSection .field .portal-select{
+  -webkit-appearance:none;
+  appearance:none;
+  width:100%;
+  min-height:54px;
+  padding:15px 48px 15px 18px;
+  border-radius:18px;
+  border:1px solid rgba(43,68,91,.14);
+  background-color: rgba(255,255,255,.96);
+  background-image:
+    linear-gradient(180deg, rgba(255,255,255,.98), rgba(247,250,253,.98)),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16' fill='none'%3E%3Cpath d='M4 6.5L8 10L12 6.5' stroke='%232B445B' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat:no-repeat, no-repeat;
+  background-position: 0 0, right 16px center;
+  background-size:auto, 16px 16px;
+  color:#2b445b;
+  font-size:14px;
+  font-weight:700;
+  letter-spacing:-0.01em;
+  line-height:1.2;
+  box-shadow: 0 10px 28px rgba(24,39,75,.06), inset 0 1px 0 rgba(255,255,255,.75);
+  transition:border-color .18s ease, box-shadow .18s ease, transform .18s ease, background-color .18s ease;
+  cursor:pointer;
+}
+#openEditorSection .field .portal-select:hover{
+  border-color: rgba(43,68,91,.24);
+  box-shadow: 0 12px 30px rgba(24,39,75,.08), inset 0 1px 0 rgba(255,255,255,.82);
+}
+#openEditorSection .field .portal-select:focus{
+  outline:none;
+  border-color: rgba(10,132,255,.42);
+  box-shadow: 0 0 0 4px rgba(10,132,255,.15), 0 14px 32px rgba(24,39,75,.10), inset 0 1px 0 rgba(255,255,255,.9);
+}
+#openEditorSection .field .portal-select:disabled{
+  color: rgba(43,68,91,.48);
+  background-color: rgba(245,247,250,.95);
+  background-image:
+    linear-gradient(180deg, rgba(248,249,251,.98), rgba(242,245,248,.98)),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16' fill='none'%3E%3Cpath d='M4 6.5L8 10L12 6.5' stroke='%2390A0AF' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  border-color: rgba(43,68,91,.10);
+  box-shadow:none;
+  cursor:not-allowed;
+}
+#openEditorSection .field .portal-select option{
+  color:#2b445b;
+  background:#fff;
+}
+#openEditorSection .field label{
+  margin-bottom:8px;
+}
+@media (max-width: 980px){
+  #openEditorSection .field .portal-select{
+    min-height:50px;
+    border-radius:16px;
+    padding:14px 44px 14px 16px;
+    font-size:13px;
+    background-position: 0 0, right 14px center;
+  }
+}
