@@ -4,7 +4,7 @@
   if (!me) return;
 
   const role = String(me.role).toLowerCase();
-  const canManage = ['admin','chairman','supervisor','protocol','super_collaborator'].includes(role);
+  const canManage = ['admin','chairman','supervisor','protocol'].includes(role);
   const canEnd = ['admin','chairman','supervisor','protocol'].includes(role);
 
   const msg = document.getElementById("msg");
@@ -15,8 +15,8 @@
   const countrySelect = document.getElementById("countryId");
   const titleInput = document.getElementById("title");
   const occasionInput = document.getElementById("occasion");
-  const submitterRoleInput = document.getElementById("submitterRole");
   const deadlineInput = document.getElementById("deadlineDate");
+  const submitterSelect = document.getElementById("submitterRole");
   const requiredBox = document.getElementById("requiredSectionsBox");
   const saveBtn = document.getElementById("saveEventBtn");
   const resetBtn = document.getElementById("resetFormBtn");
@@ -27,165 +27,42 @@
     formCard.style.display = "none";
   }
 
-  const dropdownRegistry = new Map();
-
-  function setupCustomDropdown(select){
-    if (!select || dropdownRegistry.has(select)) return;
-
-    select.classList.add('portal-select-native');
-
-    const wrap = document.createElement('div');
-    wrap.className = 'portal-dropdown';
-
-    const trigger = document.createElement('button');
-    trigger.type = 'button';
-    trigger.className = 'portal-dropdown__trigger';
-    trigger.setAttribute('aria-haspopup', 'listbox');
-    trigger.setAttribute('aria-expanded', 'false');
-
-    const triggerText = document.createElement('span');
-    triggerText.className = 'portal-dropdown__text';
-
-    const triggerArrow = document.createElement('span');
-    triggerArrow.className = 'portal-dropdown__arrow';
-    triggerArrow.setAttribute('aria-hidden', 'true');
-
-    trigger.appendChild(triggerText);
-    trigger.appendChild(triggerArrow);
-
-    const panel = document.createElement('div');
-    panel.className = 'portal-dropdown__panel';
-    panel.hidden = true;
-
-    select.parentNode.insertBefore(wrap, select.nextSibling);
-    wrap.appendChild(trigger);
-    wrap.appendChild(panel);
-
-    let isOpen = false;
-
-    function updateTrigger(){
-      const selected = select.options[select.selectedIndex] || null;
-      const label = selected ? selected.textContent : '';
-      triggerText.textContent = label || 'Select...';
-      const isPlaceholder = !select.value;
-      trigger.classList.toggle('is-placeholder', isPlaceholder);
-      trigger.disabled = !!select.disabled;
-      wrap.classList.toggle('is-disabled', !!select.disabled);
-    }
-
-    function buildOptions(){
-      panel.innerHTML = '';
-      Array.from(select.options).forEach((opt) => {
-        const btn = document.createElement('button');
-        btn.type = 'button';
-        btn.className = 'portal-dropdown__option';
-        btn.setAttribute('role', 'option');
-        btn.disabled = !!opt.disabled;
-
-        const label = document.createElement('span');
-        label.className = 'portal-dropdown__option-label';
-        label.textContent = opt.textContent || '';
-        btn.appendChild(label);
-
-        if (!opt.value) btn.classList.add('is-placeholder');
-        if (opt.value === select.value) {
-          btn.classList.add('is-selected');
-          btn.setAttribute('aria-selected', 'true');
-        }
-
-        btn.addEventListener('click', () => {
-          if (opt.disabled) return;
-          select.value = opt.value;
-          select.dispatchEvent(new Event('change', { bubbles: true }));
-          refresh();
-          close();
-          trigger.focus();
-        });
-
-        panel.appendChild(btn);
-      });
-    }
-
-    function open(){
-      if (select.disabled) return;
-      dropdownRegistry.forEach((entry, key) => { if (key !== select) entry.close(); });
-      isOpen = true;
-      wrap.classList.add('is-open');
-      panel.hidden = false;
-      trigger.setAttribute('aria-expanded', 'true');
-    }
-
-    function close(){
-      isOpen = false;
-      wrap.classList.remove('is-open');
-      panel.hidden = true;
-      trigger.setAttribute('aria-expanded', 'false');
-    }
-
-    function refresh(){
-      buildOptions();
-      updateTrigger();
-    }
-
-    trigger.addEventListener('click', () => { isOpen ? close() : open(); });
-    trigger.addEventListener('keydown', (e) => {
-      if (e.key === 'ArrowDown' || e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); }
-      if (e.key === 'Escape') close();
-    });
-
-    dropdownRegistry.set(select, { refresh, close });
-    refresh();
-  }
-
-  function refreshDropdown(select){
-    const entry = dropdownRegistry.get(select);
-    if (entry) entry.refresh();
-  }
-
-  document.addEventListener('click', (e) => {
-    if (!e.target.closest('.portal-dropdown')) dropdownRegistry.forEach(entry => entry.close());
-  });
-  document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') dropdownRegistry.forEach(entry => entry.close());
-  });
-
   async function loadCountries(){
     const countries = await window.GCP.apiFetch("/countries", { method:"GET" });
-    countrySelect.innerHTML = countries.map(c => `<option value="${c.id}">${window.GCP.escapeHtml(c.name_en)}</option>`).join("");
-    refreshDropdown(countrySelect);
+    countrySelect.innerHTML = ['<option value="">Select country</option>'].concat(
+      countries.map(c => `<option value="${c.id}">${window.GCP.escapeHtml(c.name_en)}</option>`)
+    ).join("");
   }
 
   async function loadSections(){
     const sections = await window.GCP.apiFetch('/sections', { method:'GET' });
     const active = sections.filter(s => s.is_active);
     requiredBox.innerHTML = active.map(s => (
-      `<label class="checkitem calendar-checkitem">
+      `<label class="calendar-checkitem">
         <input type="checkbox" value="${s.id}">
         <span>${window.GCP.escapeHtml(s.label)}</span>
       </label>`
     )).join('');
   }
 
-  function formatDate(d){
+  function formatDateValue(d){
     return d ? String(d).slice(0,10) : "";
   }
 
-  function humanSubmitter(v){
-    const s = String(v || 'chairman').toLowerCase();
-    if (s === 'supervisor') return 'Supervisor';
-    if (s === 'minister') return 'Minister';
-    return 'Deputy';
+  function formatSubmitter(role){
+    const key = String(role || 'chairman').toLowerCase();
+    if (key === 'chairman') return 'Deputy';
+    if (key === 'supervisor') return 'Supervisor';
+    if (key === 'minister') return 'Minister';
+    return key;
   }
 
-  function eventStatusBadge(ev){
-    if (!ev.is_active || ev.ended_at) return '<span class="calendar-status-badge is-ended">Ended</span>';
-    if (ev.deadline_date) {
-      const due = new Date(String(ev.deadline_date).slice(0,10) + 'T00:00:00');
-      const today = new Date();
-      today.setHours(0,0,0,0);
-      if (due < today) return '<span class="calendar-status-badge is-overdue">Overdue</span>';
-    }
-    return '<span class="calendar-status-badge is-active">Active</span>';
+  function formatStatus(event){
+    return event.is_active ? 'Active' : 'Ended';
+  }
+
+  function statusClass(event){
+    return event.is_active ? 'approved' : 'returned';
   }
 
   async function loadEvents(){
@@ -194,12 +71,12 @@
     for (const ev of events){
       const tr = document.createElement("tr");
       tr.innerHTML = `
-        <td>${window.GCP.escapeHtml(ev.title)}</td>
+        <td><div class="calendar-table__title">${window.GCP.escapeHtml(ev.title)}</div></td>
         <td>${window.GCP.escapeHtml(ev.country_name_en)}</td>
-        <td>${window.GCP.escapeHtml(humanSubmitter(ev.submitter_role || ev.submitterRole))}</td>
+        <td>${window.GCP.escapeHtml(formatSubmitter(ev.submitter_role || ev.submitterRole))}</td>
         <td>${ev.deadline_date ? window.GCP.escapeHtml(window.GCP.formatDate(ev.deadline_date)) : '<span class="muted">—</span>'}</td>
-        <td>${eventStatusBadge(ev)}</td>
-        <td class="row">
+        <td><span class="pill ${statusClass(ev)}">${formatStatus(ev)}</span></td>
+        <td class="calendar-table__actions">
           <button class="btn" data-act="view">View</button>
           ${canManage ? `<button class="btn primary" data-act="edit">Edit</button>` : ''}
           ${canEnd ? `<button class="btn danger" data-act="end">End event</button>` : ''}
@@ -209,28 +86,26 @@
         const details = await window.GCP.apiFetch(`/events/${ev.id}`, { method:"GET" });
         const req = (details.required_sections || details.requiredSections || []);
         const labels = Array.isArray(req) ? req.map(s => s.label).filter(Boolean) : [];
-        alert(`Required sections:
-
-${(labels.length ? labels.join('
-') : '—')}`);
+        alert(`Required sections:\n\n${(labels.length ? labels.join('\n') : '—')}`);
       });
 
       if (canManage){
         tr.querySelector('[data-act="edit"]').addEventListener("click", async () => {
           const details = await window.GCP.apiFetch(`/events/${ev.id}`, { method:"GET" });
           editEventId = ev.id;
-          countrySelect.value = String(details.country_id);
+          countrySelect.value = String(details.country_id || '');
           titleInput.value = details.title || "";
           occasionInput.value = details.occasion || "";
-          if (submitterRoleInput) submitterRoleInput.value = (details.submitter_role || details.submitterRole || 'chairman');
-          deadlineInput.value = formatDate(details.deadline_date);
+          deadlineInput.value = formatDateValue(details.deadline_date);
+          submitterSelect.value = String(details.submitter_role || details.submitterRole || 'chairman').toLowerCase();
           const req = (details.required_sections || details.requiredSections || []);
           const reqIds = new Set((Array.isArray(req) ? req : []).map(s => String(s.id)));
-          for (const cb of requiredBox.querySelectorAll('input[type=checkbox]')) cb.checked = reqIds.has(String(cb.value));
-          refreshDropdown(countrySelect);
-          refreshDropdown(submitterRoleInput);
+          for (const cb of requiredBox.querySelectorAll('input[type=checkbox]')){
+            cb.checked = reqIds.has(String(cb.value));
+          }
           saveBtn.textContent = "Update event";
           msg.textContent = `Editing event #${ev.id}`;
+          msg.className = 'calendar-message is-info';
           window.scrollTo({ top: 0, behavior: "smooth" });
         });
       }
@@ -253,11 +128,11 @@ ${(labels.length ? labels.join('
   function resetForm(){
     editEventId = null;
     form.reset();
-    if (submitterRoleInput) submitterRoleInput.value = 'chairman';
-    refreshDropdown(countrySelect);
-    refreshDropdown(submitterRoleInput);
+    submitterSelect.value = 'chairman';
     saveBtn.textContent = "Create event";
     msg.textContent = "";
+    msg.className = 'calendar-message';
+    requiredBox.querySelectorAll('input[type=checkbox]').forEach(cb => cb.checked = false);
   }
 
   resetBtn.addEventListener("click", (e) => {
@@ -274,14 +149,20 @@ ${(labels.length ? labels.join('
       countryId: Number(countrySelect.value),
       title: titleInput.value.trim(),
       occasion: occasionInput.value.trim() || null,
-      submitterRole: (submitterRoleInput?.value || 'chairman'),
       deadlineDate: deadlineInput.value || null,
       requiredSectionIds,
+      submitterRole: submitterSelect.value || 'chairman',
     };
 
     try{
+      if (!payload.countryId){
+        msg.textContent = "Country is required.";
+        msg.className = 'calendar-message is-error';
+        return;
+      }
       if (!payload.title){
         msg.textContent = "Title is required.";
+        msg.className = 'calendar-message is-error';
         return;
       }
       if (editEventId){
@@ -292,22 +173,19 @@ ${(labels.length ? labels.join('
       resetForm();
       await loadEvents();
       msg.textContent = "Saved.";
+      msg.className = 'calendar-message is-success';
     }catch(err){
       msg.textContent = err.message || "Failed";
+      msg.className = 'calendar-message is-error';
     }
   });
 
   try{
-    setupCustomDropdown(countrySelect);
-    setupCustomDropdown(submitterRoleInput);
     await Promise.all([loadCountries(), loadSections()]);
+    submitterSelect.value = 'chairman';
     await loadEvents();
   }catch(err){
     msg.textContent = err.message || "Failed to load";
+    msg.className = 'calendar-message is-error';
   }
 })();
-
-async function endEvent(id){
-  if(!confirm('End this event?')) return;
-  await window.GCP.apiFetch(`/events/${id}/end`, { method: 'POST' });
-}

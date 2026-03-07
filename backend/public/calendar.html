@@ -4,85 +4,101 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>GOV COLLAB PORTAL • Calendar</title>
-  <link rel="stylesheet" href="styles.css?v=20260306sb1" />
-  <link rel="stylesheet" href="styles/apple.css?v=20260306sb1" />
+  <link rel="stylesheet" href="styles.css?v=20260307cal2" />
+  <link rel="stylesheet" href="styles/apple.css?v=20260307cal2" />
 </head>
 <body>
 
 <div class="layout">
   <aside class="sidebar"></aside>
   <main class="main">
-    <div class="topbar topbar-ghost">
+    <div class="topbar">
       <div class="page-title">Calendar</div>
     </div>
-    
-<div class="grid">
-  <section class="card col-12 calendar-form-card" id="formCard">
-    <div class="calendar-card-head">
-      <div>
-        <div class="calendar-eyebrow">Calendar workspace</div>
-        <div class="calendar-section-title">Create / Edit event</div>
-        <div class="calendar-section-copy">Create official meetings, assign required sections and choose the submission endpoint.</div>
-      </div>
+
+    <div class="grid calendar-page-grid">
+      <section class="card col-12 calendar-card" id="formCard">
+        <div class="calendar-card__head">
+          <div>
+            <div class="calendar-eyebrow">Calendar workspace</div>
+            <div class="calendar-card__title">Create / Edit event</div>
+            <div class="calendar-card__subtitle">Create official meetings, assign required sections and choose the submission endpoint.</div>
+          </div>
+        </div>
+
+        <form id="eventForm" class="calendar-form">
+          <div class="calendar-form__left">
+            <div class="calendar-form__grid">
+              <div class="field calendar-field">
+                <label for="countryId">Country</label>
+                <select id="countryId" class="portal-select"></select>
+              </div>
+
+              <div class="field calendar-field">
+                <label for="title">Title</label>
+                <input id="title" class="input portal-input" placeholder="Meeting title" required />
+              </div>
+
+              <div class="field calendar-field">
+                <label for="submitterRole">Document submitter</label>
+                <select id="submitterRole" class="portal-select">
+                  <option value="supervisor">Supervisor</option>
+                  <option value="chairman" selected>Deputy</option>
+                  <option value="minister">Minister</option>
+                </select>
+              </div>
+
+              <div class="field calendar-field">
+                <label for="deadlineDate">Deadline</label>
+                <input id="deadlineDate" class="input portal-input" type="date" />
+              </div>
+            </div>
+          </div>
+
+          <div class="calendar-form__right">
+            <div class="field calendar-field">
+              <label for="occasion">Task</label>
+              <textarea id="occasion" class="portal-textarea" placeholder="Write clear, detailed task instructions here..."></textarea>
+            </div>
+
+            <div class="field calendar-field">
+              <label>Required sections</label>
+              <div id="requiredSectionsBox" class="calendar-sections"></div>
+            </div>
+
+            <div class="calendar-actions">
+              <button class="btn primary" id="saveEventBtn" type="submit">Create event</button>
+              <button class="btn" id="resetFormBtn" type="button">Reset</button>
+            </div>
+          </div>
+        </form>
+
+        <div id="msg" class="calendar-message"></div>
+      </section>
+
+      <section class="card col-12 calendar-card">
+        <div class="calendar-table-head">
+          <div class="calendar-card__title calendar-card__title--small">Events</div>
+          <div class="calendar-table-head__note">Manage active meetings and reopen any event for editing.</div>
+        </div>
+
+        <div class="calendar-table-wrap">
+          <table class="table calendar-table">
+            <thead>
+              <tr>
+                <th>Title</th>
+                <th>Country</th>
+                <th>Submitter</th>
+                <th>Deadline</th>
+                <th>Status</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="eventsTbody"></tbody>
+          </table>
+        </div>
+      </section>
     </div>
-
-    <form id="eventForm" class="calendar-event-form">
-      <div class="field calendar-field calendar-field--country">
-        <label>Country</label>
-        <select id="countryId" class="portal-select"></select>
-      </div>
-
-      <div class="field calendar-field calendar-field--title">
-        <label>Title</label>
-        <input id="title" required placeholder="Meeting title" />
-      </div>
-
-      <div class="field calendar-field calendar-field--task">
-        <label>Task</label>
-        <textarea id="occasion" placeholder="Write clear, detailed task instructions here..."></textarea>
-      </div>
-
-      <div class="field calendar-field calendar-field--submitter">
-        <label>Document submitter</label>
-        <select id="submitterRole" class="portal-select">
-          <option value="chairman" selected>Deputy</option>
-          <option value="supervisor">Supervisor</option>
-          <option value="minister">Minister</option>
-        </select>
-      </div>
-
-      <div class="field calendar-field calendar-field--deadline">
-        <label>Deadline</label>
-        <input id="deadlineDate" type="date" />
-      </div>
-
-      <div class="field calendar-field calendar-field--sections">
-        <label>Required sections</label>
-        <div id="requiredSectionsBox" class="checklist calendar-checklist"></div>
-      </div>
-
-      <div class="calendar-actions">
-        <button class="btn primary" id="saveEventBtn" type="submit">Create event</button>
-        <button class="btn" id="resetFormBtn">Reset</button>
-      </div>
-    </form>
-
-    <div id="msg" class="small calendar-message"></div>
-  </section>
-
-  <section class="card col-12 calendar-events-card">
-    <div class="calendar-card-head calendar-card-head--events">
-      <div style="font-weight:900;">Events</div>
-      <div class="calendar-events-note">Manage active meetings and reopen any event for editing.</div>
-    </div>
-    <div class="calendar-table-wrap">
-      <table class="table calendar-table">
-        <thead><tr><th>Title</th><th>Country</th><th>Submitter</th><th>Deadline</th><th>Status</th><th></th></tr></thead>
-        <tbody id="eventsTbody"></tbody>
-      </table>
-    </div>
-  </section>
-</div></div>
 
   </main>
 </div>
