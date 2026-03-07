@@ -1,44 +1,3 @@
-//
-function formatTbilisiDateTime(value) {
-  if (!value) return '';
-  const d = new Date(value);
-  if (Number.isNaN(d.getTime())) return String(value);
-
-  const dateParts = new Intl.DateTimeFormat('en-GB', {
-    timeZone: 'Asia/Tbilisi',
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-  }).formatToParts(d);
-
-  const timeParts = new Intl.DateTimeFormat('en-GB', {
-    timeZone: 'Asia/Tbilisi',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  }).formatToParts(d);
-
-  const dd = dateParts.find(p => p.type === 'day')?.value;
-  const mm = dateParts.find(p => p.type === 'month')?.value;
-  const yyyy = dateParts.find(p => p.type === 'year')?.value;
-  const hh = timeParts.find(p => p.type === 'hour')?.value;
-  const min = timeParts.find(p => p.type === 'minute')?.value;
-
-  return `${dd}/${mm}/${yyyy} ${hh}:${min}`;
-}
-
-function formatTbilisiDate(value) {
-  if (!value) return '';
-  const d = new Date(value);
-  if (Number.isNaN(d.getTime())) return String(value);
-  return new Intl.DateTimeFormat('en-GB', {
-    timeZone: 'Asia/Tbilisi',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit'
-  }).format(d);
-}
-
 // GOV COLLAB PORTAL - app.js (shared layout + auth)
 (function(){
   // Navigation per role (file names stay the same; labels reflect the renamed roles)
@@ -56,7 +15,6 @@ function formatTbilisiDate(value) {
       { href: "statistics.html", label: "Statistics" },
     ],
     minister: [
-      { href: "dashboard-minister.html", label: "Dashboard" },
       { href: "calendar.html", label: "Calendar" },
       { href: "library.html", label: "Library" },
       { href: "statistics.html", label: "Statistics" },
@@ -74,13 +32,13 @@ function formatTbilisiDate(value) {
     ],
     super_collaborator: [
       { href: "dashboard-collab.html", label: "Dashboard" },
-      { href: "calendar.html", label: "Calendar" },
+      { href: "calendar.html", label: "Calendar (Read)" },
       { href: "library.html", label: "Library" },
       { href: "statistics.html", label: "Statistics" },
     ],
     collaborator: [
       { href: "dashboard-collab.html", label: "Dashboard" },
-      { href: "calendar.html", label: "Calendar" },
+      { href: "calendar.html", label: "Calendar (Read)" },
       { href: "statistics.html", label: "Statistics" },
     ],
     viewer: [
@@ -186,8 +144,16 @@ function formatTbilisiDate(value) {
     `;
 
     const body = document.body;
-    const openMenu = () => body.classList.add('gp-menu-open');
-    const closeMenu = () => body.classList.remove('gp-menu-open');
+    const menuToggle = sidebar.querySelector('.gp-mobile-toggle');
+    const menuClose = sidebar.querySelector('.gp-mobile-close');
+    const setMenuState = (isOpen) => {
+      body.classList.toggle('gp-menu-open', isOpen);
+      body.classList.toggle('gp-menu-lock', isOpen);
+      menuToggle?.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+      menuClose?.setAttribute('aria-label', isOpen ? 'Close menu' : 'Close menu');
+    };
+    const openMenu = () => setMenuState(true);
+    const closeMenu = () => setMenuState(false);
     const expandSidebar = () => body.classList.add('gp-sidebar-expanded');
     const collapseSidebar = () => body.classList.remove('gp-sidebar-expanded');
 
@@ -198,10 +164,16 @@ function formatTbilisiDate(value) {
       if (!sidebar.contains(event.relatedTarget)) collapseSidebar();
     });
 
-    sidebar.querySelector('.gp-mobile-toggle')?.addEventListener('click', openMenu);
-    sidebar.querySelector('.gp-mobile-close')?.addEventListener('click', closeMenu);
+    menuToggle?.addEventListener('click', openMenu);
+    menuClose?.addEventListener('click', closeMenu);
     sidebar.querySelector('.gp-sidebar__scrim')?.addEventListener('click', closeMenu);
     sidebar.querySelectorAll('.gp-nav__link').forEach((link) => link.addEventListener('click', closeMenu));
+    window.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape') closeMenu();
+    });
+    window.addEventListener('resize', () => {
+      if (window.innerWidth > 1180) closeMenu();
+    });
 
     sidebar.querySelector('#logoutBtn').addEventListener('click', () => {
       localStorage.removeItem("gcp_token");
@@ -213,8 +185,7 @@ function formatTbilisiDate(value) {
   async function requireAuth(){
     const token = localStorage.getItem("gcp_token");
     if (!token){
-      const next = encodeURIComponent(window.location.pathname.split("/").pop() + window.location.search + window.location.hash);
-      location.href = `login.html?next=${next}`;
+      location.href = "login.html";
       return null;
     }
     try{
@@ -225,8 +196,7 @@ function formatTbilisiDate(value) {
     }catch(err){
       localStorage.removeItem("gcp_token");
       localStorage.removeItem("gcp_user");
-      const next = encodeURIComponent(window.location.pathname.split("/").pop() + window.location.search + window.location.hash);
-      location.href = `login.html?next=${next}`;
+      location.href = "login.html";
       return null;
     }
   }
@@ -235,12 +205,11 @@ function formatTbilisiDate(value) {
   window.GCP.requireAuth = requireAuth;
   window.GCP.escapeHtml = escapeHtml;
   window.GCP.roleToTitle = roleToTitle;
-  window.GCP.formatDate = formatTbilisiDate;
-  window.GCP.formatDateTime = formatTbilisiDateTime;
 
   // ------------------------------
   // Dynamic document status progress bar
   // ------------------------------
+  // submitterRole: 'supervisor' | 'deputy' | 'minister' (or undefined)
   window.GCP.getStatusSteps = function(submitterRole){
     const raw = String(submitterRole || '').toLowerCase();
     const r = raw === 'chairman' ? 'deputy' : raw;
@@ -256,8 +225,12 @@ function formatTbilisiDate(value) {
 
     if (!s || s === 'draft' || s === 'returned' || s === 'in_progress') return 0;
     if (s === 'submitted_to_supervisor' || s === 'approved_by_supervisor') return 1;
-    if (s === 'submitted_to_chairman' || s === 'submitted_to_deputy' || s === 'approved_by_chairman') return r === 'supervisor' ? 1 : 2;
-    if (s === 'submitted_to_minister' || s === 'approved_by_minister') return r === 'minister' ? 3 : 0;
+    if (s === 'submitted_to_chairman' || s === 'submitted_to_deputy' || s === 'approved_by_chairman') {
+      return r === 'supervisor' ? 1 : 2;
+    }
+    if (s === 'submitted_to_minister' || s === 'approved_by_minister') {
+      return r === 'minister' ? 3 : 0;
+    }
     if (s === 'approved' || s === 'locked') return window.GCP.getStatusSteps(r).length - 1;
     return 0;
   };
@@ -267,6 +240,7 @@ function formatTbilisiDate(value) {
     const active = window.GCP.statusToStepIndex(status, submitterRole);
     const maxIndex = Math.max(steps.length - 1, 1);
     const fillPercent = (active / maxIndex) * 100;
+
     const stepHtml = steps.map((label, idx) => {
       const state = idx < active ? 'done' : (idx === active ? 'active' : 'todo');
       return `
@@ -276,6 +250,7 @@ function formatTbilisiDate(value) {
         </div>
       `;
     }).join('');
+
     return `
       <div class="wf-progress" style="--wf-count:${steps.length};" role="group" aria-label="Document status progress">
         <div class="wf-progress__steps" role="list">${stepHtml}</div>
@@ -287,5 +262,4 @@ function formatTbilisiDate(value) {
   };
 
   window.GCP.renderStatusProgress = window.GCP.renderWorkflowProgress;
-
 })();

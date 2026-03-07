@@ -1045,8 +1045,13 @@ body.gp-shell-ready .gp-sidebar__scrim{
   display:none;
 }
 
-@media (max-width: 980px){
-  body.gp-shell-ready .layout{ padding: 12px; }
+body.gp-shell-ready.gp-menu-lock{
+  overflow: hidden;
+  touch-action: none;
+}
+
+@media (max-width: 1180px){
+  body.gp-shell-ready .layout{ padding: 14px; }
   body.gp-shell-ready .sidebar.gp-sidebar{
     position: static;
     width: auto;
@@ -1056,20 +1061,24 @@ body.gp-shell-ready .gp-sidebar__scrim{
   body.gp-shell-ready .main,
   body.gp-shell-ready.gp-sidebar-expanded .main{
     margin-left: 0;
-    padding-top: 56px;
+    padding-top: 72px;
   }
   body.gp-shell-ready .gp-sidebar__panel{
     position: fixed;
     top: 0;
     left: 0;
     bottom: 0;
-    width: min(300px, calc(100vw - 28px));
-    padding: 14px 14px 18px;
-    background: rgba(255,255,255,.96);
-    border-radius: 0 28px 28px 0;
+    width: min(360px, 72vw);
+    padding: calc(18px + env(safe-area-inset-top, 0px)) 18px calc(18px + env(safe-area-inset-bottom, 0px));
+    background: rgba(255,255,255,.98);
+    border-radius: 0 30px 30px 0;
+    box-shadow: 0 24px 60px rgba(15,23,42,.16);
     transform: translateX(-105%);
-    transition: transform .24s ease;
+    transition: transform .26s ease;
     z-index: 140;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
   }
   body.gp-shell-ready .gp-sidebar__panel::after{ display:none; }
   body.gp-shell-ready.gp-menu-open .gp-sidebar__panel{
@@ -1079,11 +1088,13 @@ body.gp-shell-ready .gp-sidebar__scrim{
     display:block;
     position: fixed;
     inset: 0;
-    background: rgba(15,23,42,.28);
+    background: rgba(15,23,42,.34);
     opacity: 0;
     pointer-events: none;
-    transition: opacity .2s ease;
+    transition: opacity .22s ease;
     z-index: 135;
+    backdrop-filter: blur(2px);
+    -webkit-backdrop-filter: blur(2px);
   }
   body.gp-shell-ready.gp-menu-open .gp-sidebar__scrim{
     opacity: 1;
@@ -1093,36 +1104,165 @@ body.gp-shell-ready .gp-sidebar__scrim{
     display:grid;
     place-items:center;
     position: fixed;
-    top: 14px;
-    left: 14px;
-    width: 44px;
-    height: 44px;
-    border-radius: 14px;
+    top: 16px;
+    left: 16px;
+    width: 48px;
+    height: 48px;
+    border-radius: 16px;
     border: 1px solid rgba(17,24,39,.08);
-    background: rgba(255,255,255,.9);
+    background: rgba(255,255,255,.94);
     color: #1f3346;
-    box-shadow: 0 12px 26px rgba(15,23,42,.10);
+    box-shadow: 0 12px 26px rgba(15,23,42,.12);
     z-index: 145;
   }
   body.gp-shell-ready .gp-mobile-close{
     display:grid;
     place-items:center;
+    width: 40px;
+    height: 40px;
+    border-radius: 14px;
+    border: 1px solid rgba(17,24,39,.08);
+    background: rgba(255,255,255,.94);
+    color: #1f3346;
+    flex: 0 0 auto;
+  }
+  body.gp-shell-ready .gp-sidebar__top{
+    align-items: flex-start;
+    padding: 0 0 12px;
+    margin-bottom: 8px;
+  }
+  body.gp-shell-ready .gp-brand__mark{
     width: 38px;
     height: 38px;
-    border-radius: 12px;
-    border: 1px solid rgba(17,24,39,.08);
-    background: rgba(255,255,255,.92);
-    color: #1f3346;
   }
   body.gp-shell-ready .gp-brand__text,
   body.gp-shell-ready .gp-profile__text,
-  body.gp-shell-ready .gp-nav__label{
+  body.gp-shell-ready .gp-nav__label,
+  body.gp-shell-ready .gp-account__text{
     opacity: 1;
     transform: none;
     pointer-events: auto;
   }
+  body.gp-shell-ready .gp-brand__title{
+    font-size: 15px;
+  }
+  body.gp-shell-ready .gp-brand__title-sub{
+    font-size: 12px;
+  }
   body.gp-shell-ready .gp-profile{
-    margin-top: auto;
+    margin-top: 0;
+    padding: 10px 2px 6px;
+  }
+  body.gp-shell-ready .gp-profile__avatar{
+    width: 46px;
+    height: 46px;
+    font-size: 15px;
+  }
+  body.gp-shell-ready .gp-profile__name{
+    font-size: 15px;
+  }
+  body.gp-shell-ready .gp-profile__role{
+    font-size: 13px;
+  }
+  body.gp-shell-ready .gp-nav{
+    gap: 10px;
+    padding: 12px 0 8px;
+  }
+  body.gp-shell-ready .gp-nav__link,
+  body.gp-shell-ready .gp-logout{
+    min-height: 56px;
+    padding: 0 14px;
+    border-radius: 18px;
+    background: rgba(248,250,252,.86);
+  }
+  body.gp-shell-ready .gp-nav__label{
+    font-size: 15px;
+  }
+  body.gp-shell-ready .gp-sidebar__footer{
+    position: sticky;
+    bottom: 0;
+    padding: 14px 0 0;
+    margin-top: 18px;
+    background: linear-gradient(180deg, rgba(255,255,255,0), rgba(255,255,255,.96) 28%, rgba(255,255,255,.98) 100%);
+  }
+}
+
+@media (max-width: 820px){
+  body.gp-shell-ready .layout{ padding: 12px; }
+  body.gp-shell-ready .main,
+  body.gp-shell-ready.gp-sidebar-expanded .main{
+    padding-top: 68px;
+  }
+  body.gp-shell-ready .gp-sidebar__panel{
+    width: min(340px, calc(100vw - 22px));
+    padding: calc(16px + env(safe-area-inset-top, 0px)) 16px calc(16px + env(safe-area-inset-bottom, 0px));
+    border-radius: 0 26px 26px 0;
+  }
+  body.gp-shell-ready .gp-mobile-toggle{
+    top: 14px;
+    left: 14px;
+    width: 46px;
+    height: 46px;
+  }
+}
+
+@media (max-width: 640px){
+  body.gp-shell-ready .layout{ padding: 10px; }
+  body.gp-shell-ready .main,
+  body.gp-shell-ready.gp-sidebar-expanded .main{
+    padding-top: 64px;
+  }
+  body.gp-shell-ready .gp-sidebar__panel{
+    width: calc(100vw - 12px);
+    padding: calc(14px + env(safe-area-inset-top, 0px)) 14px calc(14px + env(safe-area-inset-bottom, 0px));
+    border-radius: 0 22px 22px 0;
+  }
+  body.gp-shell-ready .gp-sidebar__top{
+    padding-bottom: 10px;
+  }
+  body.gp-shell-ready .gp-brand{
+    gap: 9px;
+  }
+  body.gp-shell-ready .gp-brand__mark{
+    width: 34px;
+    height: 34px;
+  }
+  body.gp-shell-ready .gp-brand__title{
+    font-size: 14px;
+  }
+  body.gp-shell-ready .gp-brand__title-sub{
+    font-size: 11px;
+  }
+  body.gp-shell-ready .gp-profile{
+    gap: 10px;
+    padding-top: 8px;
+  }
+  body.gp-shell-ready .gp-profile__avatar{
+    width: 42px;
+    height: 42px;
+    font-size: 14px;
+  }
+  body.gp-shell-ready .gp-profile__name{
+    font-size: 14px;
+  }
+  body.gp-shell-ready .gp-profile__role{
+    font-size: 12px;
+  }
+  body.gp-shell-ready .gp-nav{
+    gap: 8px;
+  }
+  body.gp-shell-ready .gp-nav__link,
+  body.gp-shell-ready .gp-logout{
+    min-height: 54px;
+    padding: 0 12px;
+    border-radius: 16px;
+  }
+  body.gp-shell-ready .gp-nav__icon,
+  body.gp-shell-ready .gp-nav__icon svg,
+  body.gp-shell-ready .gp-mobile-toggle__icon svg,
+  body.gp-shell-ready .gp-mobile-close svg{
+    width: 22px;
+    height: 22px;
   }
 }
 
