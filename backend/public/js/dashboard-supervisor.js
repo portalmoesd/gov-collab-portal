@@ -123,7 +123,7 @@
   }
 
   
-  approveAllSectionsBtn.addEventListener('click', async () => {
+  if (approveAllSectionsBtn) approveAllSectionsBtn.addEventListener('click', async () => {
     if (!currentEventId) return;
     if (!confirm('Approve all required sections for this event?')) return;
     setMsg('');
