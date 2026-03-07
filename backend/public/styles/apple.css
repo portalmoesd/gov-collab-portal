@@ -1610,3 +1610,97 @@ body.gp-shell-ready .gp-sidebar__scrim{
   .micro-action.is-expanded{ width:52px; }
   .micro-action__label{ display:none; }
 }
+
+
+/* Editor page refinements */
+.editor-page-topbar{
+  margin-bottom: 16px;
+}
+.editor-page-topbar .page-title{
+  font-size: 18px;
+  font-weight: 900;
+  letter-spacing: -0.02em;
+}
+.editor-card--compact{
+  padding: 18px 20px 16px;
+}
+.editor-task-card{
+  gap: 14px;
+  padding: 2px 0 2px;
+}
+.editor-kicker{
+  margin-bottom: 8px;
+  font-size: 11px;
+  letter-spacing: .16em;
+}
+.editor-task-title{
+  font-size: 18px;
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+}
+.editor-task-pills{
+  gap: 8px;
+  margin-top: 10px;
+}
+.editor-meta-pill{
+  padding: 7px 12px;
+  font-size: 12px;
+  font-weight: 700;
+}
+.editor-task-updated{
+  margin-top: 10px;
+  font-size: 13px;
+  font-weight: 600;
+}
+.editor-status-label{
+  font-size: 11px;
+  letter-spacing: .14em;
+}
+.pill-status{
+  padding: 8px 14px;
+  font-size: 12px;
+}
+.tp-actionbar{
+  gap: 10px;
+}
+.micro-action{
+  width: 50px;
+  min-width: 50px;
+  height: 50px;
+  padding: 0 16px 0 0;
+}
+.micro-action__icon{
+  flex: 0 0 50px;
+  width: 50px;
+  height: 50px;
+}
+.micro-action__icon::before{
+  width: 22px;
+  height: 22px;
+}
+.micro-action__label{
+  color: inherit;
+  font-size: 11px;
+  letter-spacing: .14em;
+}
+.micro-action:hover,
+.micro-action:focus-visible,
+.micro-action.is-expanded{
+  width: 148px;
+  background: var(--hover-bg);
+  color: var(--hover-color);
+}
+.editor-frame{
+  margin-top: 8px;
+}
+@media (max-width: 980px){
+  .editor-page-topbar .page-title{ font-size: 18px; }
+  .editor-task-title{ font-size: 18px; }
+}
+@media (max-width: 640px){
+  .editor-task-updated{ font-size: 12px; }
+  .micro-action,
+  .micro-action:hover,
+  .micro-action:focus-visible,
+  .micro-action.is-expanded{ width: 50px; }
+}

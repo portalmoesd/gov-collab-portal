@@ -23,6 +23,22 @@
 
   const actionButtons = [btnSave, btnSubmit, btnApprove, btnReturn];
 
+  function formatUpdatedAt(value){
+    const raw = String(value || '').trim();
+    const m = raw.match(/^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})/);
+    if (m) return `${m[4]}:${m[5]} ${m[3]}.${m[2]}.${m[1]}`;
+    const d = new Date(raw);
+    if (!Number.isNaN(d.getTime())){
+      const dd = String(d.getDate()).padStart(2,'0');
+      const mm = String(d.getMonth()+1).padStart(2,'0');
+      const yyyy = d.getFullYear();
+      const hh = String(d.getHours()).padStart(2,'0');
+      const mi = String(d.getMinutes()).padStart(2,'0');
+      return `${hh}:${mi} ${dd}.${mm}.${yyyy}`;
+    }
+    return raw || '—';
+  }
+
   function setActionLoading(activeBtn, loading){
     actionButtons.forEach((btn) => {
       if (!btn || btn.style.display === "none") return;
@@ -86,7 +102,7 @@
       <span class="editor-meta-pill">${window.GCP.escapeHtml(tp.sectionLabel || 'Unknown section')}</span>
     `;
     if (lastUpdatedEl){
-      const updatedAt = tp.lastUpdatedAt ? window.GCP.escapeHtml(tp.lastUpdatedAt) : '—';
+      const updatedAt = tp.lastUpdatedAt ? window.GCP.escapeHtml(formatUpdatedAt(tp.lastUpdatedAt)) : '—';
       const updatedBy = tp.lastUpdatedBy ? window.GCP.escapeHtml(tp.lastUpdatedBy) : 'No editor recorded yet';
       lastUpdatedEl.innerHTML = `<span>Last updated · ${updatedAt}</span><span>· ${updatedBy}</span>`;
     }
