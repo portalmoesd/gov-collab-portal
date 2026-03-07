@@ -79,6 +79,8 @@
     btnReturn.style.display = "none";
   }
 
+  updateDefaultExpandedAction();
+
   let editorInstance = null;
 
   async function load(){

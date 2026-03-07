@@ -34,8 +34,24 @@
     });
   }
 
+  function getStatusTone(status){
+    const s = String(status || '').toLowerCase();
+    if (!s || s === 'draft' || s.includes('saved')) return 'draft';
+    if (s.includes('return')) return 'return';
+    if (s.includes('approve')) return 'approve';
+    if (s.includes('submit')) return 'submit';
+    return 'draft';
+  }
+
   function setStatus(status){
-    statusEl.innerHTML = `<span class="pill ${status}">${status.replaceAll("_"," ")}</span>`;
+    const tone = getStatusTone(status);
+    statusEl.innerHTML = `<span class="pill pill--${tone} ${status}">${status.replaceAll("_"," ")}</span>`;
+  }
+
+  function updateDefaultExpandedAction(){
+    actionButtons.forEach((btn) => btn && btn.classList.remove('is-expanded-default'));
+    const firstVisible = actionButtons.find((btn) => btn && btn.style.display !== 'none');
+    if (firstVisible) firstVisible.classList.add('is-expanded-default');
   }
 
   if (!eventId || !countryId || !sectionId){
@@ -70,6 +86,8 @@
     btnApprove.style.display = "none";
     btnReturn.style.display = "none";
   }
+
+  updateDefaultExpandedAction();
 
   let editorInstance = null;
 
