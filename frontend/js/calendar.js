@@ -246,6 +246,7 @@
     form.reset();
     if (submitterSelect) submitterSelect.value = "chairman";
     saveBtn.textContent = "Create event";
+    msg.style.color = "var(--danger)";
     msg.textContent = "";
   }
 
@@ -255,15 +256,61 @@
   });
 
 
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    msg.style.color = "var(--danger)";
+    msg.textContent = "";
+    if (!canManage) return;
+
+    const countryId = Number(countrySelect.value);
+    const title = (titleInput.value || "").trim();
+    const occasion = (occasionInput.value || "").trim();
+    const deadlineDate = (deadlineInput.value || "").trim();
+    const submitterRole = submitterSelect ? String(submitterSelect.value || "chairman") : "chairman";
+    const requiredSectionIds = Array.from(requiredBox.querySelectorAll('input[type=checkbox]:checked')).map(cb => Number(cb.value)).filter(Number.isFinite);
+
+    if (!Number.isFinite(countryId) || !title) {
+      msg.textContent = "Country and Title are required.";
+      return;
+    }
+
+    const payload = { countryId, title, occasion, deadlineDate, requiredSectionIds, submitterRole };
+
+    try {
+      saveBtn.disabled = true;
+      saveBtn.textContent = editEventId ? "Updating..." : "Creating...";
+
+      if (editEventId) {
+        await window.GCP.apiFetch(`/events/${editEventId}`, {
+          method: 'PUT',
+          body: JSON.stringify(payload)
+        });
+      } else {
+        await window.GCP.apiFetch('/events', {
+          method: 'POST',
+          body: JSON.stringify(payload)
+        });
+      }
+
+      const wasEditing = !!editEventId;
+      resetForm();
+      msg.style.color = 'var(--success)';
+      msg.textContent = wasEditing ? 'Event updated.' : 'Event created.';
+      await loadEvents();
+    } catch (err) {
+      msg.style.color = 'var(--danger)';
+      msg.textContent = err?.message || 'Failed to save event';
+    } finally {
+      saveBtn.disabled = false;
+      saveBtn.textContent = editEventId ? 'Update event' : 'Create event';
+    }
+  });
+
+
   try{
     await Promise.all([loadCountries(), loadSections()]);
     await loadEvents();
   }catch(err){
     msg.textContent = err.message || "Failed to load";
   }
-})();async function endEvent(id){
-  if(!confirm('End this event?')) return;
-  await window.GCP.apiFetch(`/events/${id}/end`, { method: 'POST' });
-}
-
-
+})();
