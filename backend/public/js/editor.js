@@ -20,6 +20,20 @@
 
   const actionButtons = [btnSave, btnSubmit, btnApprove, btnReturn];
 
+  function getStatusTone(status){
+    const value = String(status || "draft").toLowerCase();
+    if (value.includes("return")) return "return";
+    if (value.includes("approve") || value.includes("approved")) return "approve";
+    if (value.includes("submit") || value.includes("review") || value.includes("deputy") || value.includes("minister") || value.includes("supervisor")) return "submit";
+    return "draft";
+  }
+
+  function syncDefaultExpandedAction(){
+    actionButtons.forEach((btn) => btn && btn.classList.remove("is-default-expanded"));
+    const firstVisible = actionButtons.find((btn) => btn && btn.style.display !== "none");
+    if (firstVisible) firstVisible.classList.add("is-default-expanded");
+  }
+
   function setActionLoading(activeBtn, loading){
     actionButtons.forEach((btn) => {
       if (!btn || btn.style.display === "none") return;
@@ -79,7 +93,7 @@
     btnReturn.style.display = "none";
   }
 
-  updateDefaultExpandedAction();
+  syncDefaultExpandedAction();
 
   let editorInstance = null;
 
@@ -119,6 +133,7 @@
       }
     }
     setStatus(tp.status || "draft");
+    syncDefaultExpandedAction();
 
     const textarea = document.getElementById("editor");
     textarea.value = tp.htmlContent || "";

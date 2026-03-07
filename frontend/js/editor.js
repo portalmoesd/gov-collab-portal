@@ -21,6 +21,20 @@
 
   const actionButtons = [btnSave, btnSubmit, btnApprove, btnReturn];
 
+  function getStatusTone(status){
+    const value = String(status || "draft").toLowerCase();
+    if (value.includes("return")) return "return";
+    if (value.includes("approve") || value.includes("approved")) return "approve";
+    if (value.includes("submit") || value.includes("review") || value.includes("deputy") || value.includes("minister") || value.includes("supervisor")) return "submit";
+    return "draft";
+  }
+
+  function syncDefaultExpandedAction(){
+    actionButtons.forEach((btn) => btn && btn.classList.remove("is-default-expanded"));
+    const firstVisible = actionButtons.find((btn) => btn && btn.style.display !== "none");
+    if (firstVisible) firstVisible.classList.add("is-default-expanded");
+  }
+
   function setActionLoading(activeBtn, loading){
     actionButtons.forEach((btn) => {
       if (!btn || btn.style.display === "none") return;
@@ -34,24 +48,9 @@
     });
   }
 
-  function getStatusTone(status){
-    const s = String(status || '').toLowerCase();
-    if (!s || s === 'draft' || s.includes('saved')) return 'draft';
-    if (s.includes('return')) return 'return';
-    if (s.includes('approve')) return 'approve';
-    if (s.includes('submit')) return 'submit';
-    return 'draft';
-  }
-
   function setStatus(status){
     const tone = getStatusTone(status);
-    statusEl.innerHTML = `<span class="pill pill--${tone} ${status}">${status.replaceAll("_"," ")}</span>`;
-  }
-
-  function updateDefaultExpandedAction(){
-    actionButtons.forEach((btn) => btn && btn.classList.remove('is-expanded-default'));
-    const firstVisible = actionButtons.find((btn) => btn && btn.style.display !== 'none');
-    if (firstVisible) firstVisible.classList.add('is-expanded-default');
+    statusEl.innerHTML = `<span class="pill pill--${tone}">${status.replaceAll("_"," ")}</span>`;
   }
 
   if (!eventId || !countryId || !sectionId){
@@ -87,7 +86,7 @@
     btnReturn.style.display = "none";
   }
 
-  updateDefaultExpandedAction();
+  syncDefaultExpandedAction();
 
   let editorInstance = null;
 
@@ -125,6 +124,7 @@
       }
     }
     setStatus(tp.status || "draft");
+    syncDefaultExpandedAction();
 
     const textarea = document.getElementById("editor");
     textarea.value = tp.htmlContent || "";
