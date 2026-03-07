@@ -12,77 +12,58 @@
 <div class="layout">
   <aside class="sidebar"></aside>
   <main class="main">
-    <div class="topbar">
+    <div class="topbar topbar-ghost">
       <div class="page-title">Calendar</div>
     </div>
     
 <div class="grid">
   <section class="card col-12" id="formCard">
     <div style="font-weight:900; margin-bottom:10px;">Create / Edit event</div>
-    <form id="eventForm" class="calendar-event-form">
-      <div class="calendar-form-col calendar-form-col--left">
-        <div class="field">
-          <label>Country</label>
-          <select id="countryId"></select>
-        </div>
-        <div class="field">
-          <label>Title</label>
-          <input id="title" required />
-        </div>
-        <div class="field">
-          <label>Document submitter</label>
-          <select id="submitterRole">
-            <option value="supervisor">Supervisor</option>
-            <option value="chairman" selected>Deputy</option>
-            <option value="minister">Minister</option>
-          </select>
-        </div>
-        <div class="field">
-          <label>Deadline</label>
-          <input id="deadlineDate" type="date" />
-        </div>
+    <form id="eventForm" class="row">
+      <div class="field">
+        <label>Country</label>
+        <select id="countryId"></select>
       </div>
-
-      <div class="calendar-form-col calendar-form-col--middle">
-        <div class="field field-sections">
-          <label>Required sections</label>
-          <div id="requiredSectionsBox" class="checklist calendar-sections-grid"></div>
-        </div>
+      <div class="field" style="min-width:280px;">
+        <label>Title</label>
+        <input id="title" required />
       </div>
-
-      <div class="calendar-form-col calendar-form-col--right">
-        <div class="field field-task">
-          <label>Task</label>
-          <textarea id="occasion" rows="8"></textarea>
-        </div>
-        <div class="row calendar-form-actions">
-          <button class="btn primary" id="saveEventBtn" type="submit">Create event</button>
-          <button class="btn" id="resetFormBtn">Reset</button>
-        </div>
+            <div class="field" style="min-width:420px; flex:1;">
+        <label>Task</label>
+        <textarea id="occasion" placeholder="Write clear, detailed task instructions here..."></textarea>
+      </div>
+      <div class="field" style="min-width:220px;">
+        <label>Document submitter</label>
+        <select id="submitterRole">
+          <option value="chairman" selected>Deputy</option>
+          <option value="supervisor">Supervisor</option>
+          <option value="minister">Minister</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Deadline</label>
+        <input id="deadlineDate" type="date" />
+      </div>
+      <div class="field" style="min-width:320px; max-width:420px;">
+        <label>Required sections</label>
+        <div id="requiredSectionsBox" class="checklist" style="max-height:180px; overflow:auto;"></div>
+      </div>
+      <div class="row" style="align-self:flex-end;">
+        <button class="btn primary" id="saveEventBtn" type="submit">Create event</button>
+        <button class="btn" id="resetFormBtn">Reset</button>
       </div>
     </form>
     <div id="msg" class="small" style="color:var(--danger); font-weight:800; margin-top:10px;"></div>
   </section>
 
-    <section class="card col-12 calendar-events-card">
-    <div class="calendar-events-head">
-      <div>
-        <div class="calendar-events-title">Events</div>
-        <div class="calendar-events-subtitle">Track deadlines, submitters and workflow status.</div>
-      </div>
-    </div>
-
-    <div class="calendar-events-tablewrap">
-      <table class="table calendar-events-table">
-        <thead><tr><th>Title</th><th>Country</th><th>Deadline</th><th>Submitter</th><th>Status</th><th>Actions</th></tr></thead>
-        <tbody id="eventsTbody"></tbody>
-      </table>
-    </div>
-
-    <div id="eventsCards" class="calendar-events-cards"></div>
-    <div id="eventsEmpty" class="calendar-events-empty" hidden>No events yet.</div>
+  <section class="card col-12">
+    <div style="font-weight:900; margin-bottom:10px;">Events</div>
+    <table class="table">
+      <thead><tr><th>Title</th><th>Country</th><th>Deadline</th><th>Active</th><th></th></tr></thead>
+      <tbody id="eventsTbody"></tbody>
+    </table>
   </section>
-</div></div>
+</div>
 
   </main>
 </div>
