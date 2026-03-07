@@ -2144,3 +2144,157 @@ body.gp-shell-ready .gp-sidebar__scrim{
     background-position: 0 0, right 14px center;
   }
 }
+
+
+/* === Collaborator dashboard custom dropdowns === */
+#openEditorSection .field .portal-select-native{
+  position:absolute !important;
+  pointer-events:none !important;
+  opacity:0 !important;
+  width:1px !important;
+  height:1px !important;
+  overflow:hidden !important;
+}
+#openEditorSection .field{
+  position:relative;
+}
+#openEditorSection .field .portal-dropdown{
+  position:relative;
+  width:100%;
+}
+#openEditorSection .field .portal-dropdown__trigger{
+  -webkit-appearance:none;
+  appearance:none;
+  width:100%;
+  min-height:54px;
+  padding:15px 48px 15px 18px;
+  border-radius:18px;
+  border:1px solid rgba(43,68,91,.14);
+  background: linear-gradient(180deg, rgba(255,255,255,.98), rgba(247,250,253,.98));
+  color:#2b445b;
+  font-size:14px;
+  font-weight:700;
+  letter-spacing:-0.01em;
+  line-height:1.2;
+  box-shadow:0 10px 28px rgba(24,39,75,.06), inset 0 1px 0 rgba(255,255,255,.75);
+  transition:border-color .18s ease, box-shadow .18s ease, transform .18s ease, background-color .18s ease;
+  cursor:pointer;
+  text-align:left;
+  position:relative;
+}
+#openEditorSection .field .portal-dropdown__trigger:hover{
+  border-color: rgba(43,68,91,.24);
+  box-shadow: 0 12px 30px rgba(24,39,75,.08), inset 0 1px 0 rgba(255,255,255,.82);
+}
+#openEditorSection .field .portal-dropdown__trigger:focus-visible,
+#openEditorSection .field .portal-dropdown.is-open .portal-dropdown__trigger{
+  outline:none;
+  border-color: rgba(10,132,255,.42);
+  box-shadow: 0 0 0 4px rgba(10,132,255,.15), 0 14px 32px rgba(24,39,75,.10), inset 0 1px 0 rgba(255,255,255,.9);
+}
+#openEditorSection .field .portal-dropdown__trigger.is-placeholder,
+#openEditorSection .field .portal-dropdown.is-disabled .portal-dropdown__trigger{
+  color: rgba(43,68,91,.48);
+}
+#openEditorSection .field .portal-dropdown.is-disabled .portal-dropdown__trigger{
+  background: linear-gradient(180deg, rgba(248,249,251,.98), rgba(242,245,248,.98));
+  border-color: rgba(43,68,91,.10);
+  box-shadow:none;
+  cursor:not-allowed;
+}
+#openEditorSection .field .portal-dropdown__text{
+  display:block;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+#openEditorSection .field .portal-dropdown__arrow{
+  position:absolute;
+  right:16px;
+  top:50%;
+  width:16px;
+  height:16px;
+  transform:translateY(-50%);
+}
+#openEditorSection .field .portal-dropdown__arrow::before{
+  content:'';
+  position:absolute; inset:0;
+  background: center / 16px 16px no-repeat url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16' fill='none'%3E%3Cpath d='M4 6.5L8 10L12 6.5' stroke='%232B445B' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  transition: transform .18s ease, opacity .18s ease;
+}
+#openEditorSection .field .portal-dropdown.is-open .portal-dropdown__arrow::before{
+  transform:rotate(180deg);
+}
+#openEditorSection .field .portal-dropdown__panel{
+  position:absolute;
+  top:calc(100% + 10px);
+  left:0;
+  right:0;
+  z-index:120;
+  padding:8px;
+  border-radius:18px;
+  border:1px solid rgba(43,68,91,.12);
+  background: rgba(255,255,255,.98);
+  box-shadow: 0 24px 44px rgba(24,39,75,.14), 0 10px 24px rgba(24,39,75,.08);
+  backdrop-filter: blur(12px);
+  max-height:280px;
+  overflow:auto;
+}
+#openEditorSection .field .portal-dropdown__option{
+  width:100%;
+  border:0;
+  background:transparent;
+  display:flex;
+  align-items:center;
+  gap:10px;
+  padding:12px 14px;
+  border-radius:14px;
+  color:#2b445b;
+  text-align:left;
+  font-size:14px;
+  font-weight:700;
+  line-height:1.3;
+  cursor:pointer;
+  transition: background-color .16s ease, color .16s ease, transform .16s ease;
+}
+#openEditorSection .field .portal-dropdown__option:hover,
+#openEditorSection .field .portal-dropdown__option:focus-visible{
+  outline:none;
+  background: rgba(10,132,255,.09);
+  color:#103b70;
+}
+#openEditorSection .field .portal-dropdown__option.is-selected{
+  background: linear-gradient(180deg, rgba(10,132,255,.12), rgba(10,132,255,.08));
+  color:#0a56bf;
+}
+#openEditorSection .field .portal-dropdown__option.is-selected::before{
+  content:'✓';
+  font-size:13px;
+  font-weight:900;
+  color:#0a84ff;
+}
+#openEditorSection .field .portal-dropdown__option.is-placeholder{
+  color: rgba(43,68,91,.45);
+}
+#openEditorSection .field .portal-dropdown__option:disabled{
+  opacity:.5;
+  cursor:not-allowed;
+}
+@media (max-width: 980px){
+  #openEditorSection .field .portal-dropdown__trigger{
+    min-height:50px;
+    border-radius:16px;
+    padding:14px 44px 14px 16px;
+    font-size:13px;
+  }
+  #openEditorSection .field .portal-dropdown__panel{
+    border-radius:16px;
+    padding:7px;
+    max-height:240px;
+  }
+  #openEditorSection .field .portal-dropdown__option{
+    padding:11px 13px;
+    font-size:13px;
+    border-radius:12px;
+  }
+}

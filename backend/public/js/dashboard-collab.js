@@ -9,6 +9,7 @@
 
   const eventsGrid = document.getElementById('eventsGrid');
   const eventSelect = document.getElementById('eventSelect');
+  const countrySelect = document.getElementById('countrySelect');
   const sectionSelect = document.getElementById('sectionSelect');
   const openBtn = document.getElementById('openEditorBtn');
   const msg = document.getElementById('msg');
@@ -81,6 +82,8 @@
     }catch(e){
       return null;
     }
+    refreshCustomDropdown(eventSelect);
+    refreshCustomDropdown(sectionSelect);
   }
 
 
@@ -90,6 +93,10 @@
     msg.style.color = isError ? 'crimson' : '#2b445b';
   }
 
+  setupCustomDropdown(eventSelect);
+  setupCustomDropdown(countrySelect);
+  setupCustomDropdown(sectionSelect);
+
   async function loadUpcoming(){
     const events = await window.GCP.apiFetch('/events/upcoming', { method:'GET' });
     eventsById.clear();
@@ -97,6 +104,11 @@
 
     if (eventsGrid) eventsGrid.innerHTML = '';
     eventSelect.innerHTML = `<option value="">Select event...</option>`;
+    if (countrySelect){
+      countrySelect.innerHTML = `<option value="">Country</option>`;
+      countrySelect.disabled = true;
+      refreshCustomDropdown(countrySelect);
+    }
     sectionSelect.innerHTML = `<option value="">Select section...</option>`;
     sectionSelect.disabled = true;
 
@@ -139,6 +151,7 @@
 
   async function loadSectionsForEvent(eventId){
     sectionSelect.innerHTML = `<option value="">Loading...</option>`;
+    refreshCustomDropdown(sectionSelect);
     console.debug('Loading allowed sections for event', eventId);
 
     sectionSelect.disabled = true;
@@ -155,6 +168,7 @@
       sectionSelect.appendChild(opt);
     }
     sectionSelect.disabled = false;
+    refreshCustomDropdown(sectionSelect);
 
     // reset status box
     showSectionStatus(null, (eventsById.get(Number(eventSelect.value))||{}).occasion||'');
@@ -165,9 +179,22 @@
     setMsg('');
     const eventId = Number(eventSelect.value);
     if (!Number.isFinite(eventId)) {
+      if (countrySelect){
+        countrySelect.innerHTML = `<option value="">Country</option>`;
+        countrySelect.disabled = true;
+        refreshCustomDropdown(countrySelect);
+      }
       sectionSelect.innerHTML = `<option value="">Select section...</option>`;
       sectionSelect.disabled = true;
+      refreshCustomDropdown(sectionSelect);
+      refreshCustomDropdown(sectionSelect);
       return;
+    }
+    if (countrySelect){
+      const meta = eventMeta[eventId] || {};
+      countrySelect.innerHTML = `<option value="${window.GCP.escapeHtml(String(meta.country || ''))}">${window.GCP.escapeHtml(meta.country || 'Country')}</option>`;
+      countrySelect.disabled = true;
+      refreshCustomDropdown(countrySelect);
     }
     try{
       await loadSectionsForEvent(eventId);
@@ -175,6 +202,7 @@
       setMsg(e.message || 'Failed to load event', true);
       sectionSelect.innerHTML = `<option value="">Select section...</option>`;
       sectionSelect.disabled = true;
+      refreshCustomDropdown(sectionSelect);
     }
   });
 
