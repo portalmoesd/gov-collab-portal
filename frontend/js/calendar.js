@@ -4,7 +4,7 @@
   if (!me) return;
 
   const role = String(me.role).toLowerCase();
-  const canManage = ['admin','chairman','supervisor','protocol','super_collaborator'].includes(role);
+  const canManage = ['admin','chairman','supervisor','protocol'].includes(role);
   const canEnd = ['admin','chairman','supervisor','protocol'].includes(role);
 
   const msg = document.getElementById("msg");
@@ -15,7 +15,6 @@
   const countrySelect = document.getElementById("countryId");
   const titleInput = document.getElementById("title");
   const occasionInput = document.getElementById("occasion");
-  const submitterRoleInput = document.getElementById("submitterRole");
   const deadlineInput = document.getElementById("deadlineDate");
   const requiredBox = document.getElementById("requiredSectionsBox");
   const saveBtn = document.getElementById("saveEventBtn");
@@ -29,21 +28,21 @@
 
   async function loadCountries(){
     const countries = await window.GCP.apiFetch("/countries", { method:"GET" });
-    countrySelect.innerHTML = '<option value="" disabled selected>Select country</option>' + countries.map(c => `<option value="${c.id}">${window.GCP.escapeHtml(c.name_en)}</option>`).join("");
+    countrySelect.innerHTML = countries.map(c => `<option value="${c.id}">${window.GCP.escapeHtml(c.name_en)}</option>`).join("");
   }
 
   async function loadSections(){
     const sections = await window.GCP.apiFetch('/sections', { method:'GET' });
     const active = sections.filter(s => s.is_active);
     requiredBox.innerHTML = active.map(s => (
-      `<label class="calendar-checkitem">
+      `<label class="checkitem">
         <input type="checkbox" value="${s.id}">
         <span>${window.GCP.escapeHtml(s.label)}</span>
       </label>`
     )).join('');
   }
 
-  function formatDateForInput(d){
+  function formatDate(d){
     return d ? String(d).slice(0,10) : "";
   }
 
@@ -69,8 +68,7 @@
         const labels = Array.isArray(req) ? req.map(s => s.label).filter(Boolean) : [];
         alert(`Required sections:
 
-${(labels.length ? labels.join('
-') : '—')}`);
+${(labels.length ? labels.join('\n') : '—')}`);
       });
 
       if (canManage){
@@ -80,8 +78,8 @@ ${(labels.length ? labels.join('
           countrySelect.value = String(details.country_id);
           titleInput.value = details.title || "";
           occasionInput.value = details.occasion || "";
-          if (submitterRoleInput) submitterRoleInput.value = (details.submitter_role || details.submitterRole || 'chairman');
-          deadlineInput.value = formatDateForInput(details.deadline_date);
+          deadlineInput.value = formatDate(details.deadline_date);
+          // select required sections
           const req = (details.required_sections || details.requiredSections || []);
           const reqIds = new Set((Array.isArray(req) ? req : []).map(s => String(s.id)));
           for (const cb of requiredBox.querySelectorAll('input[type=checkbox]')){
@@ -89,7 +87,6 @@ ${(labels.length ? labels.join('
           }
           saveBtn.textContent = "Update event";
           msg.textContent = `Editing event #${ev.id}`;
-          msg.style.color = 'var(--text)';
           window.scrollTo({ top: 0, behavior: "smooth" });
         });
       }
@@ -112,12 +109,8 @@ ${(labels.length ? labels.join('
   function resetForm(){
     editEventId = null;
     form.reset();
-    if (countrySelect.options.length){ countrySelect.selectedIndex = 0; }
-    if (submitterRoleInput) submitterRoleInput.value = 'chairman';
-    for (const cb of requiredBox.querySelectorAll('input[type=checkbox]')) cb.checked = false;
     saveBtn.textContent = "Create event";
     msg.textContent = "";
-    msg.style.color = 'var(--danger)';
   }
 
   resetBtn.addEventListener("click", (e) => {
@@ -134,16 +127,11 @@ ${(labels.length ? labels.join('
       countryId: Number(countrySelect.value),
       title: titleInput.value.trim(),
       occasion: occasionInput.value.trim() || null,
-      submitterRole: (submitterRoleInput?.value || 'chairman'),
       deadlineDate: deadlineInput.value || null,
       requiredSectionIds,
     };
 
     try{
-      if (!payload.countryId){
-        msg.textContent = "Country is required.";
-        return;
-      }
       if (!payload.title){
         msg.textContent = "Title is required.";
         return;
@@ -156,10 +144,8 @@ ${(labels.length ? labels.join('
       resetForm();
       await loadEvents();
       msg.textContent = "Saved.";
-      msg.style.color = 'var(--ok)';
     }catch(err){
       msg.textContent = err.message || "Failed";
-      msg.style.color = 'var(--danger)';
     }
   });
 
@@ -169,9 +155,9 @@ ${(labels.length ? labels.join('
   }catch(err){
     msg.textContent = err.message || "Failed to load";
   }
-})();
-
-async function endEvent(id){
+})();async function endEvent(id){
   if(!confirm('End this event?')) return;
   await window.GCP.apiFetch(`/events/${id}/end`, { method: 'POST' });
 }
+
+
