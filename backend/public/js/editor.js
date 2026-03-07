@@ -5,12 +5,15 @@
 
   const role = String(me.role).toLowerCase();
   const qs = window.GCP.qs();
-  const eventId = Number(qs.event_id || qs.eventId);
-  const sectionId = Number(qs.section_id || qs.sectionId);
+  const eventId = qs.eventId;
+  const countryId = qs.countryId;
+  const sectionId = qs.sectionId;
 
   const msg = document.getElementById("msg");
   const meta = document.getElementById("meta");
   const statusEl = document.getElementById("statusEl");
+  const taskTitleEl = document.getElementById("taskTitle");
+  const lastUpdatedEl = document.getElementById("lastUpdated");
   const returnCommentBox = document.getElementById("returnCommentBox");
 
   const btnSave = document.getElementById("btnSave");
@@ -19,20 +22,6 @@
   const btnReturn = document.getElementById("btnReturn");
 
   const actionButtons = [btnSave, btnSubmit, btnApprove, btnReturn];
-
-  function getStatusTone(status){
-    const value = String(status || "draft").toLowerCase();
-    if (value.includes("return")) return "return";
-    if (value.includes("approve") || value.includes("approved")) return "approve";
-    if (value.includes("submit") || value.includes("review") || value.includes("deputy") || value.includes("minister") || value.includes("supervisor")) return "submit";
-    return "draft";
-  }
-
-  function syncDefaultExpandedAction(){
-    actionButtons.forEach((btn) => btn && btn.classList.remove("is-default-expanded"));
-    const firstVisible = actionButtons.find((btn) => btn && btn.style.display !== "none");
-    if (firstVisible) firstVisible.classList.add("is-default-expanded");
-  }
 
   function setActionLoading(activeBtn, loading){
     actionButtons.forEach((btn) => {
@@ -48,20 +37,12 @@
   }
 
   function setStatus(status){
-  const map = {
-    draft: "draft",
-    submitted: "submitted",
-    returned: "returned",
-    approved_by_supervisor: "approved by supervisor",
-    approved_by_chairman: "approved by deputy",
-    approved_by_minister: "approved by minister"
-  };
-  const label = map[status] || String(status).replaceAll("_"," ");
-  statusEl.innerHTML = `<span class="pill ${status}">${window.GCP.escapeHtml(label)}</span>`;
-}
+    const pretty = String(status || 'draft').replaceAll('_',' ');
+    statusEl.innerHTML = `<span class="pill pill-status ${status}">${pretty}</span>`;
+  }
 
-  if (!Number.isFinite(eventId) || !Number.isFinite(sectionId)){
-    msg.textContent = "Missing event_id and/or section_id in URL.";
+  if (!eventId || !countryId || !sectionId){
+    msg.textContent = "Missing eventId/countryId/sectionId in URL.";
     return;
   }
 
@@ -93,47 +74,36 @@
     btnReturn.style.display = "none";
   }
 
-  syncDefaultExpandedAction();
-
   let editorInstance = null;
 
   async function load(){
     msg.textContent = "";
-    const tp = await window.GCP.apiFetch(`/tp?event_id=${encodeURIComponent(eventId)}&section_id=${encodeURIComponent(sectionId)}`, { method:"GET" });
+    const tp = await window.GCP.apiFetch(`/tp?event_id=${encodeURIComponent(eventId)}&country_id=${encodeURIComponent(countryId)}&section_id=${encodeURIComponent(sectionId)}`, { method:"GET" });
 
+    if (taskTitleEl) taskTitleEl.textContent = tp.eventTitle || 'Untitled task';
     meta.innerHTML = `
-      <div class="editor-meta-card">
-        <div class="editor-meta-label">Event</div>
-        <div class="editor-meta-value">${window.GCP.escapeHtml(tp.eventTitle)}</div>
-      </div>
-      <div class="editor-meta-card">
-        <div class="editor-meta-label">Country</div>
-        <div class="editor-meta-value">${window.GCP.escapeHtml(tp.countryName)}</div>
-      </div>
-      <div class="editor-meta-card">
-        <div class="editor-meta-label">Section</div>
-        <div class="editor-meta-value">${window.GCP.escapeHtml(tp.sectionLabel)}</div>
-      </div>
-      <div class="editor-meta-card editor-meta-card--update">
-        <div class="editor-meta-label">Last updated</div>
-        <div class="editor-meta-value">${tp.lastUpdatedAt ? window.GCP.escapeHtml(tp.lastUpdatedAt) : '—'}</div>
-        <div class="editor-meta-note">${tp.lastUpdatedBy ? window.GCP.escapeHtml(tp.lastUpdatedBy) : 'No editor recorded yet'}</div>
-      </div>
+      <span class="editor-meta-pill">${window.GCP.escapeHtml(tp.countryName || 'Unknown country')}</span>
+      <span class="editor-meta-pill">${window.GCP.escapeHtml(tp.sectionLabel || 'Unknown section')}</span>
     `;
-
-    // Show supervisor/deputy return comment prominently (if any)
+    if (lastUpdatedEl){
+      const updatedAt = tp.lastUpdatedAt ? window.GCP.escapeHtml(tp.lastUpdatedAt) : '—';
+      const updatedBy = tp.lastUpdatedBy ? window.GCP.escapeHtml(tp.lastUpdatedBy) : 'No editor recorded yet';
+      lastUpdatedEl.innerHTML = `<span>Last updated · ${updatedAt}</span><span>· ${updatedBy}</span>`;
+    }
     if (returnCommentBox){
       const note = (tp.statusComment || '').trim();
       if (note){
         returnCommentBox.style.display = 'block';
-        returnCommentBox.innerHTML = `<b>Supervisor/Deputy comment:</b> ${window.GCP.escapeHtml(note)}`;
+        returnCommentBox.innerHTML = `<b>Return comment:</b> ${window.GCP.escapeHtml(note)}`;
       } else {
         returnCommentBox.style.display = 'none';
         returnCommentBox.textContent = '';
       }
     }
     setStatus(tp.status || "draft");
-    syncDefaultExpandedAction();
+    const firstVisible = actionButtons.find((btn) => btn && btn.style.display !== 'none');
+    actionButtons.forEach((btn) => btn && btn.classList.remove('is-expanded'));
+    if (firstVisible) firstVisible.classList.add('is-expanded');
 
     const textarea = document.getElementById("editor");
     textarea.value = tp.htmlContent || "";
@@ -158,7 +128,7 @@
     try{
       await window.GCP.apiFetch("/tp/save", {
         method:"POST",
-        body: JSON.stringify({ eventId, sectionId, htmlContent: getHtml() })
+        body: JSON.stringify({ eventId, countryId, sectionId, htmlContent: getHtml() })
       });
       await load();
       msg.textContent = "Saved.";
@@ -174,7 +144,7 @@
     try{
       await window.GCP.apiFetch("/tp/submit", {
         method:"POST",
-        body: JSON.stringify({ eventId, sectionId, htmlContent: getHtml() })
+        body: JSON.stringify({ eventId, countryId, sectionId, htmlContent: getHtml() })
       });
       await load();
       msg.textContent = "Submitted.";
@@ -188,15 +158,15 @@
   btnApprove.addEventListener("click", async () => {
     setActionLoading(btnApprove, true);
     try{
-      if (role === "chairman" || role === "minister"){
+      if (role === "chairman"){
         await window.GCP.apiFetch("/tp/approve-section-chairman", {
           method:"POST",
-          body: JSON.stringify({ eventId, sectionId, htmlContent: getHtml() })
+          body: JSON.stringify({ eventId, countryId, sectionId, htmlContent: getHtml() })
         });
       } else {
         await window.GCP.apiFetch("/tp/approve-section", {
           method:"POST",
-          body: JSON.stringify({ eventId, sectionId, htmlContent: getHtml() })
+          body: JSON.stringify({ eventId, countryId, sectionId, htmlContent: getHtml() })
         });
       }
       await load();
@@ -215,7 +185,7 @@
     try{
       await window.GCP.apiFetch("/tp/return", {
         method:"POST",
-        body: JSON.stringify({ eventId, sectionId, note: comment })
+        body: JSON.stringify({ eventId, countryId, sectionId, comment })
       });
       await load();
       msg.textContent = "Returned.";

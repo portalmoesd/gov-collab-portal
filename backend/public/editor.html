@@ -16,29 +16,24 @@
 <div class="layout">
   <aside class="sidebar"></aside>
   <main class="main">
-    <div class="topbar topbar--plain">
-      <div class="page-title">Task Editor</div>
+    <div class="topbar editor-page-topbar">
+      <div class="page-title editor-page-title">Task Editor</div>
     </div>
     
-<section class="card col-12 editor-card">
+<section class="card col-12 editor-card editor-card--compact">
   <div class="editor-head">
-    <div class="editor-head-top">
-      <div class="editor-head-copy">
+    <div class="editor-task-card">
+      <div class="editor-task-main">
         <div class="editor-kicker">Document workspace</div>
-        <div class="editor-title-row">
-          <div class="editor-subtitle">Edit, review and move this section through the approval flow.</div>
-        </div>
+        <h2 class="editor-task-title" id="taskTitle">Task title</h2>
+        <div id="meta" class="editor-task-pills"></div>
+        <div id="lastUpdated" class="editor-task-updated"></div>
+        <div id="returnCommentBox" class="editor-return-box" style="display:none;"></div>
       </div>
-      <div class="editor-status-panel">
+      <div class="editor-task-side">
         <div class="editor-status-label">Current status</div>
         <div class="editor-status-line"><span id="statusEl"></span></div>
-      </div>
-    </div>
-
-    <div id="meta" class="editor-meta"></div>
-    <div class="editor-control-row">
-      <div id="returnCommentBox" class="editor-return-box" style="display:none;"></div>
-      <div class="tp-actionbar" aria-label="Editor actions">
+        <div class="tp-actionbar" aria-label="Editor actions">
         <button class="micro-action micro-action--save" id="btnSave" type="button" aria-label="Save">
           <span class="micro-action__icon" aria-hidden="true"></span>
           <span class="micro-action__label">Save</span>
@@ -55,6 +50,7 @@
           <span class="micro-action__icon" aria-hidden="true"></span>
           <span class="micro-action__label">Return</span>
         </button>
+        </div>
       </div>
     </div>
   </div>
