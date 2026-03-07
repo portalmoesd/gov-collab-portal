@@ -4,7 +4,7 @@
   if (!me) return;
 
   const role = String(me.role).toLowerCase();
-  const canManage = ['admin','chairman','supervisor','protocol'].includes(role);
+  const canManage = ['admin','chairman','supervisor','protocol','super_collaborator'].includes(role);
   const canEnd = ['admin','chairman','supervisor','protocol'].includes(role);
 
   const msg = document.getElementById("msg");
@@ -20,16 +20,11 @@
   const requiredBox = document.getElementById("requiredSectionsBox");
   const saveBtn = document.getElementById("saveEventBtn");
   const resetBtn = document.getElementById("resetFormBtn");
-  const eventSearchInput = document.getElementById("eventSearch");
-  const eventStatusFilter = document.getElementById("eventStatusFilter");
-  const eventSortSelect = document.getElementById("eventSort");
   const eventsCards = document.getElementById("eventsCards");
   const eventsEmpty = document.getElementById("eventsEmpty");
-  const quickFilterButtons = Array.from(document.querySelectorAll('[data-quick-filter]'));
 
   let editEventId = null;
   let allEvents = [];
-  let quickFilter = 'all';
 
   if (!canManage){
     formCard.style.display = "none";
@@ -163,31 +158,9 @@
   }
 
   function applyFilters(events){
-    const search = String(eventSearchInput?.value || '').trim().toLowerCase();
-    const statusValue = String(eventStatusFilter?.value || 'all');
-    const sortValue = String(eventSortSelect?.value || 'deadlineAsc');
-    let filtered = events.filter(ev => {
-      if (quickFilter === 'active' && !ev.is_active) return false;
-      if (quickFilter === 'ended' && ev.is_active) return false;
-      if (quickFilter === 'upcoming') {
-        if (!ev.is_active || !Number.isFinite(ev.deadlineSort)) return false;
-        const today = new Date();
-        const todayFloor = new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime();
-        if (ev.deadlineSort < todayFloor) return false;
-      }
-      if (statusValue !== 'all' && ev.statusKey !== statusValue) return false;
-      if (search) {
-        const hay = `${ev.title} ${ev.country_name_en}`.toLowerCase();
-        if (!hay.includes(search)) return false;
-      }
-      return true;
-    });
-    filtered.sort((a,b) => {
-      if (sortValue === 'titleAsc') return a.title.localeCompare(b.title);
-      if (sortValue === 'deadlineDesc') return (b.deadlineSort === Infinity ? -1 : b.deadlineSort) - (a.deadlineSort === Infinity ? -1 : a.deadlineSort);
+    return [...events].sort((a,b) => {
       return (a.deadlineSort === Infinity ? Number.MAX_SAFE_INTEGER : a.deadlineSort) - (b.deadlineSort === Infinity ? Number.MAX_SAFE_INTEGER : b.deadlineSort);
     });
-    return filtered;
   }
 
   function renderEvents(){
@@ -197,7 +170,7 @@
 
     if (!filtered.length){
       eventsEmpty.hidden = false;
-      eventsTbody.innerHTML = `<tr class="calendar-events-empty-row"><td colspan="6">No events match the current filters.</td></tr>`;
+      eventsTbody.innerHTML = `<tr class="calendar-events-empty-row"><td colspan="6">No events yet.</td></tr>`;
       return;
     }
     eventsEmpty.hidden = true;
@@ -281,46 +254,6 @@
     resetForm();
   });
 
-  eventSearchInput?.addEventListener('input', renderEvents);
-  eventStatusFilter?.addEventListener('change', renderEvents);
-  eventSortSelect?.addEventListener('change', renderEvents);
-  quickFilterButtons.forEach(btn => btn.addEventListener('click', () => {
-    quickFilter = btn.dataset.quickFilter || 'all';
-    quickFilterButtons.forEach(b => b.classList.toggle('is-active', b === btn));
-    renderEvents();
-  }));
-
-  form.addEventListener("submit", async (e) => {
-    e.preventDefault();
-    if (!canManage) return;
-
-    const requiredSectionIds = Array.from(requiredBox.querySelectorAll('input[type=checkbox]:checked')).map(cb => Number(cb.value));
-    const payload = {
-      countryId: Number(countrySelect.value),
-      title: titleInput.value.trim(),
-      occasion: occasionInput.value.trim() || null,
-      deadlineDate: deadlineInput.value || null,
-      submitterRole: submitterSelect ? submitterSelect.value : "chairman",
-      requiredSectionIds,
-    };
-
-    try{
-      if (!payload.title){
-        msg.textContent = "Title is required.";
-        return;
-      }
-      if (editEventId){
-        await window.GCP.apiFetch(`/events/${editEventId}`, { method:"PUT", body: JSON.stringify(payload) });
-      } else {
-        await window.GCP.apiFetch("/events", { method:"POST", body: JSON.stringify(payload) });
-      }
-      resetForm();
-      await loadEvents();
-      msg.textContent = "Saved.";
-    }catch(err){
-      msg.textContent = err.message || "Failed";
-    }
-  });
 
   try{
     await Promise.all([loadCountries(), loadSections()]);

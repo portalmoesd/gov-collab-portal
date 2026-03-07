@@ -70,33 +70,6 @@
         <div class="calendar-events-title">Events</div>
         <div class="calendar-events-subtitle">Track deadlines, submitters and workflow status.</div>
       </div>
-      <div class="calendar-events-toolbar">
-        <label class="calendar-events-search" aria-label="Search events">
-          <input id="eventSearch" type="search" placeholder="Search by title or country" />
-        </label>
-        <select id="eventStatusFilter" class="calendar-events-select" aria-label="Filter by status">
-          <option value="all">All statuses</option>
-          <option value="draft">Draft</option>
-          <option value="in_review">In review</option>
-          <option value="submitted_to_deputy">Submitted to Deputy</option>
-          <option value="submitted_to_minister">Submitted to Minister</option>
-          <option value="approved">Approved</option>
-          <option value="returned">Returned</option>
-          <option value="ended">Ended</option>
-        </select>
-        <select id="eventSort" class="calendar-events-select" aria-label="Sort events">
-          <option value="deadlineAsc">Deadline: soonest</option>
-          <option value="deadlineDesc">Deadline: latest</option>
-          <option value="titleAsc">Title: A–Z</option>
-        </select>
-      </div>
-    </div>
-
-    <div class="calendar-events-chipbar" role="tablist" aria-label="Event filters">
-      <button class="calendar-filter-chip is-active" type="button" data-quick-filter="all">All</button>
-      <button class="calendar-filter-chip" type="button" data-quick-filter="upcoming">Upcoming</button>
-      <button class="calendar-filter-chip" type="button" data-quick-filter="active">Active</button>
-      <button class="calendar-filter-chip" type="button" data-quick-filter="ended">Ended</button>
     </div>
 
     <div class="calendar-events-tablewrap">
@@ -107,7 +80,7 @@
     </div>
 
     <div id="eventsCards" class="calendar-events-cards"></div>
-    <div id="eventsEmpty" class="calendar-events-empty" hidden>No events match the current filters.</div>
+    <div id="eventsEmpty" class="calendar-events-empty" hidden>No events yet.</div>
   </section>
 </div></div>
 
