@@ -1047,29 +1047,40 @@ body.gp-shell-ready .gp-sidebar__scrim{
 
 @media (max-width: 980px){
   body.gp-shell-ready .layout{ padding: 12px; }
+  body.gp-shell-ready.gp-menu-open{ overflow:hidden; }
   body.gp-shell-ready .sidebar.gp-sidebar{
-    position: static;
-    width: auto;
-    height: auto;
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: 0;
     min-height: 0;
+    overflow: visible;
+    z-index: 140;
   }
   body.gp-shell-ready .main,
   body.gp-shell-ready.gp-sidebar-expanded .main{
     margin-left: 0;
-    padding-top: 56px;
+    padding-top: 72px;
   }
   body.gp-shell-ready .gp-sidebar__panel{
     position: fixed;
     top: 0;
     left: 0;
     bottom: 0;
-    width: min(300px, calc(100vw - 28px));
-    padding: 14px 14px 18px;
+    width: min(320px, calc(100vw - 28px));
+    max-width: calc(100vw - 28px);
+    padding: 18px 16px 18px;
     background: rgba(255,255,255,.96);
+    border-right: 1px solid rgba(17,24,39,.08);
     border-radius: 0 28px 28px 0;
-    transform: translateX(-105%);
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
+    box-shadow: 0 24px 48px rgba(15,23,42,.18);
+    transform: translateX(calc(-100% - 16px));
     transition: transform .24s ease;
-    z-index: 140;
+    z-index: 142;
+    overflow-y: auto;
   }
   body.gp-shell-ready .gp-sidebar__panel::after{ display:none; }
   body.gp-shell-ready.gp-menu-open .gp-sidebar__panel{
@@ -1083,7 +1094,7 @@ body.gp-shell-ready .gp-sidebar__scrim{
     opacity: 0;
     pointer-events: none;
     transition: opacity .2s ease;
-    z-index: 135;
+    z-index: 141;
   }
   body.gp-shell-ready.gp-menu-open .gp-sidebar__scrim{
     opacity: 1;
@@ -1095,37 +1106,174 @@ body.gp-shell-ready .gp-sidebar__scrim{
     position: fixed;
     top: 14px;
     left: 14px;
-    width: 44px;
-    height: 44px;
-    border-radius: 14px;
+    width: 46px;
+    height: 46px;
+    border-radius: 16px;
     border: 1px solid rgba(17,24,39,.08);
-    background: rgba(255,255,255,.9);
+    background: rgba(255,255,255,.92);
     color: #1f3346;
-    box-shadow: 0 12px 26px rgba(15,23,42,.10);
+    box-shadow: 0 12px 26px rgba(15,23,42,.12);
     z-index: 145;
   }
   body.gp-shell-ready .gp-mobile-close{
     display:grid;
     place-items:center;
-    width: 38px;
-    height: 38px;
-    border-radius: 12px;
+    width: 40px;
+    height: 40px;
+    border-radius: 14px;
     border: 1px solid rgba(17,24,39,.08);
     background: rgba(255,255,255,.92);
     color: #1f3346;
+    flex: 0 0 auto;
+  }
+  body.gp-shell-ready .gp-sidebar__top{
+    padding-right: 2px;
+    margin-bottom: 6px;
   }
   body.gp-shell-ready .gp-brand__text,
   body.gp-shell-ready .gp-profile__text,
-  body.gp-shell-ready .gp-nav__label{
+  body.gp-shell-ready .gp-nav__label,
+  body.gp-shell-ready .gp-account__text{
     opacity: 1;
     transform: none;
     pointer-events: auto;
   }
   body.gp-shell-ready .gp-profile{
-    margin-top: auto;
+    margin-top: 4px;
   }
 }
 
+@media (max-width: 640px){
+  body.gp-shell-ready .main,
+  body.gp-shell-ready.gp-sidebar-expanded .main{
+    padding-top: 70px;
+  }
+  body.gp-shell-ready .gp-sidebar__panel{
+    width: min(92vw, 340px);
+    max-width: calc(100vw - 20px);
+    padding: 16px 14px 16px;
+    border-radius: 0 24px 24px 0;
+  }
+  body.gp-shell-ready .gp-mobile-toggle{
+    top: 12px;
+    left: 12px;
+  }
+}
+
+
+
+/* Editor micro action buttons */
+.tp-actionbar{
+  display:flex;
+  align-items:center;
+  gap:12px;
+  padding:8px 10px;
+  border:1px solid rgba(17,24,39,.08);
+  border-radius:999px;
+  background:rgba(255,255,255,.78);
+  box-shadow:0 8px 22px rgba(15,23,42,.08), 0 2px 4px rgba(15,23,42,.04);
+  backdrop-filter: blur(6px);
+}
+
+.micro-action{
+  --icon-color:#18253d;
+  --hover-bg:#eef2f7;
+  --hover-color:var(--icon-color);
+  --icon-url:none;
+  position:relative;
+  display:inline-flex;
+  align-items:center;
+  justify-content:flex-start;
+  gap:14px;
+  width:58px;
+  min-width:58px;
+  height:58px;
+  padding:0 22px 0 0;
+  border:none;
+  border-radius:999px;
+  background:#f8fafc;
+  color:var(--icon-color);
+  box-shadow: inset 0 0 0 1px rgba(17,24,39,.03);
+  overflow:hidden;
+  cursor:pointer;
+  transition: width .28s ease, background-color .22s ease, color .22s ease, transform .22s ease, opacity .22s ease, box-shadow .22s ease;
+}
+.micro-action:hover,
+.micro-action:focus-visible{
+  width:176px;
+  background:var(--hover-bg);
+  color:var(--hover-color);
+  box-shadow:none;
+  outline:none;
+}
+.micro-action:active{ transform:translateY(1px); }
+.micro-action[disabled]{ opacity:.55; cursor:not-allowed; }
+.micro-action[disabled]:hover,
+.micro-action[disabled]:focus-visible{ width:58px; background:#f8fafc; color:var(--icon-color); box-shadow: inset 0 0 0 1px rgba(17,24,39,.03); }
+
+.micro-action__icon{
+  flex:0 0 58px;
+  width:58px;
+  height:58px;
+  display:grid;
+  place-items:center;
+  position:relative;
+}
+.micro-action__icon::before{
+  content:"";
+  width:28px;
+  height:28px;
+  background-color: currentColor;
+  -webkit-mask-image: var(--icon-url);
+  mask-image: var(--icon-url);
+  -webkit-mask-repeat:no-repeat;
+  mask-repeat:no-repeat;
+  -webkit-mask-position:center;
+  mask-position:center;
+  -webkit-mask-size:contain;
+  mask-size:contain;
+}
+.micro-action__label{
+  font-size:13px;
+  font-weight:900;
+  text-transform:uppercase;
+  letter-spacing:.08em;
+  white-space:nowrap;
+  opacity:0;
+  transform:translateX(-8px);
+  transition: opacity .18s ease, transform .18s ease;
+}
+.micro-action:hover .micro-action__label,
+.micro-action:focus-visible .micro-action__label,
+.micro-action.is-expanded .micro-action__label{
+  opacity:1;
+  transform:translateX(0);
+}
+
+.micro-action--save{
+  --icon-url:url('../assets/save-icon.svg');
+  --icon-color:#111827;
+  --hover-color:#111827;
+  --hover-bg:#f1f5f9;
+}
+.micro-action--submit{
+  --icon-url:url('../assets/submit-icon.svg');
+  --icon-color:#1d4ed8;
+  --hover-color:#1d4ed8;
+  --hover-bg:#e8f0ff;
+}
+.micro-action--approve{
+  --icon-url:url('../assets/approve-icon.svg');
+  --icon-color:#16a34a;
+  --hover-color:#16a34a;
+  --hover-bg:#e8f7ee;
+}
+.micro-action--return{
+  --icon-url:url('../assets/return-icon.svg');
+  --icon-color:#dc2626;
+  --hover-color:#dc2626;
+  --hover-bg:#fdecec;
+}
 
 @media (max-width: 900px){
   .tp-actionbar{

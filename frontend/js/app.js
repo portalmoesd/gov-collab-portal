@@ -161,6 +161,13 @@
     sidebar.querySelector('.gp-sidebar__scrim')?.addEventListener('click', closeMenu);
     sidebar.querySelectorAll('.gp-nav__link').forEach((link) => link.addEventListener('click', closeMenu));
 
+    document.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape') closeMenu();
+    });
+    window.addEventListener('resize', () => {
+      if (window.innerWidth > 980) closeMenu();
+    });
+
     sidebar.querySelector('#logoutBtn').addEventListener('click', () => {
       localStorage.removeItem("gcp_token");
       location.href = "login.html";
