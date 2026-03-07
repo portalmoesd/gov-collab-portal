@@ -39,11 +39,20 @@
   </section>
 
   <section class="card col-12">
-    <div style="font-weight:900; margin-bottom:10px;">Required sections</div>
-    <table class="table">
-      <thead><tr><th>Section</th><th>Status</th><th>Last update</th><th>Actions</th></tr></thead>
-      <tbody id="sectionsTbody"></tbody>
-    </table>
+    <div class="required-sections-head">
+      <div>
+        <div class="required-sections-title">Required sections</div>
+        <div class="required-sections-subtitle">Review section progress, check who updated each part, and take action.</div>
+      </div>
+      <button class="btn success" id="approveAllSectionsBtn">Approve all sections</button>
+    </div>
+    <div class="required-sections-tablewrap">
+      <table class="required-sections-table">
+        <thead><tr><th>Section</th><th>Status</th><th>Last update</th><th>Updated by</th><th>Actions</th></tr></thead>
+        <tbody id="sectionsTbody"></tbody>
+      </table>
+      <div id="sectionsCards" class="required-sections-cards"></div>
+    </div>
   </section>
 
 
@@ -70,7 +79,7 @@
   <script src="js/config.js"></script>
   <script src="js/api.js"></script>
   <script src="js/app.js?v=47"></script>
-  <script src="js/dashboard-supervisor.js?v=46"></script>
+  <script src="js/dashboard-supervisor.js?v=47"></script>
   <script src="js/dashboard-supervisor-upcoming.js?v=1"></script>
   <script src="js/calendar-collab.js?v=2"></script>
 </body>

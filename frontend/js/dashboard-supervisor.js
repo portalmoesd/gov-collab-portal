@@ -5,6 +5,7 @@
 
   const eventSelect = document.getElementById('eventSelect');
   const sectionsTbody = document.getElementById('sectionsTbody');
+  const sectionsCards = document.getElementById('sectionsCards');
   const approveAllSectionsBtn = document.getElementById('approveAllSectionsBtn');
   const submitDocBtn = document.getElementById('submitDocBtn');
   const previewFullBtn = document.getElementById('previewFullBtn');
@@ -59,62 +60,106 @@
     }
   }
 
+
+
+  function statusBadgeClass(status){
+    const s = String(status || '').toLowerCase();
+    if (['draft','in_progress','locked'].includes(s)) return 'is-draft';
+    if (['submitted_to_supervisor'].includes(s)) return 'is-review';
+    if (['submitted_to_chairman'].includes(s)) return 'is-submitted';
+    if (['approved_by_supervisor','approved_by_chairman'].includes(s)) return 'is-approved';
+    if (['returned_by_supervisor','returned_by_chairman'].includes(s)) return 'is-returned';
+    return 'is-draft';
+  }
+
+  function escape(v){ return window.GCP.escapeHtml(v || ''); }
+
+  function createMicroAction(label, kind, onClick){
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = `micro-action required-action required-action--${kind}`;
+    btn.setAttribute('aria-label', label);
+    btn.innerHTML = `<span class="micro-action__icon"></span><span class="micro-action__label">${escape(label)}</span>`;
+    btn.addEventListener('click', onClick);
+    return btn;
+  }
+
+  function appendSectionActions(target, section){
+    const wrap = document.createElement('div');
+    wrap.className = 'required-actions';
+
+    wrap.appendChild(createMicroAction('Open', 'open', () => {
+      window.open(`editor.html?event_id=${currentEventId}&section_id=${section.sectionId}`, '_blank');
+    }));
+
+    if (section.status === 'submitted_to_supervisor' || section.status === 'returned_by_supervisor' || section.status === 'draft') {
+      wrap.appendChild(createMicroAction('Approve', 'approve', async () => {
+        setMsg('');
+        await window.GCP.apiFetch('/tp/approve-section', {
+          method:'POST',
+          body: JSON.stringify({ eventId: currentEventId, sectionId: section.sectionId })
+        });
+        await refreshStatusGrid();
+      }));
+
+      wrap.appendChild(createMicroAction('Return', 'return', async () => {
+        const note = prompt('Return note (optional):', '');
+        await window.GCP.apiFetch('/tp/return', {
+          method:'POST',
+          body: JSON.stringify({ eventId: currentEventId, sectionId: section.sectionId, note })
+        });
+        await refreshStatusGrid();
+      }));
+    }
+    target.appendChild(wrap);
+  }
+
   async function refreshStatusGrid(){
     if (!currentEventId) return;
     const data = await window.GCP.apiFetch(`/tp/status-grid?event_id=${currentEventId}`, { method:'GET' });
     currentSections = data.sections || [];
     sectionsTbody.innerHTML = '';
+    sectionsTbody.innerHTML = '';
+    if (sectionsCards) sectionsCards.innerHTML = '';
 
     for (const s of currentSections){
       const tr = document.createElement('tr');
+      tr.className = 'required-sections-row';
       const last = s.lastUpdatedAt ? window.GCP.formatDateTime(s.lastUpdatedAt) : '';
       const note = (s.statusComment || '').trim();
+      const updatedBy = s.lastUpdatedBy || '—';
+      const badgeClass = statusBadgeClass(s.status);
       tr.innerHTML = `
-        <td>${s.sectionLabel}</td>
-        <td>${humanStatus(s.status)}${note ? `<div class="small" style="margin-top:4px; padding:6px 8px; border-radius:10px; border:1px solid rgba(220,38,38,.25); background: rgba(254,226,226,.55);"><b>Comment:</b> ${window.GCP.escapeHtml(note)}</div>` : ''}</td>
-        <td>${last}</td>
-        <td class="actions"></td>
+        <td>
+          <div class="required-section-name">${escape(s.sectionLabel)}</div>
+          ${note ? `<div class="required-section-note"><b>Comment:</b> ${escape(note)}</div>` : ''}
+        </td>
+        <td><span class="required-status-badge ${badgeClass}">${escape(humanStatus(s.status))}</span></td>
+        <td><span class="required-updated-at">${escape(last || '—')}</span></td>
+        <td><span class="required-updated-by">${escape(updatedBy)}</span></td>
+        <td class="required-actions-cell"></td>
       `;
-      const actionsTd = tr.querySelector('.actions');
-
-      const open = document.createElement('button');
-      open.className = 'btn';
-      open.textContent = 'Open';
-      open.addEventListener('click', () => {
-        window.open(`editor.html?event_id=${currentEventId}&section_id=${s.sectionId}`, '_blank');
-      });
-      actionsTd.appendChild(open);
-
-      // Approve/Return for supervisor stage
-      if (s.status === 'submitted_to_supervisor' || s.status === 'returned_by_supervisor' || s.status === 'draft') {
-        const approve = document.createElement('button');
-        approve.className = 'btn secondary';
-        approve.textContent = 'Approve';
-        approve.addEventListener('click', async () => {
-          setMsg('');
-          await window.GCP.apiFetch('/tp/approve-section', {
-            method:'POST',
-            body: JSON.stringify({ eventId: currentEventId, sectionId: s.sectionId })
-          });
-          await refreshStatusGrid();
-        });
-        actionsTd.appendChild(approve);
-
-        const ret = document.createElement('button');
-        ret.className = 'btn danger';
-        ret.textContent = 'Return';
-        ret.addEventListener('click', async () => {
-          const note = prompt('Return note (optional):', '');
-          await window.GCP.apiFetch('/tp/return', {
-            method:'POST',
-            body: JSON.stringify({ eventId: currentEventId, sectionId: s.sectionId, note })
-          });
-          await refreshStatusGrid();
-        });
-        actionsTd.appendChild(ret);
-      }
+      appendSectionActions(tr.querySelector('.required-actions-cell'), s);
       sectionsTbody.appendChild(tr);
 
+      if (sectionsCards){
+        const card = document.createElement('article');
+        card.className = 'required-section-card';
+        card.innerHTML = `
+          <div class="required-section-card__top">
+            <div>
+              <div class="required-section-name">${escape(s.sectionLabel)}</div>
+              <div class="required-section-meta">Last update · ${escape(last || '—')}</div>
+            </div>
+            <span class="required-status-badge ${badgeClass}">${escape(humanStatus(s.status))}</span>
+          </div>
+          <div class="required-section-card__line"><span>Updated by</span><strong>${escape(updatedBy)}</strong></div>
+          ${note ? `<div class="required-section-note"><b>Comment:</b> ${escape(note)}</div>` : ''}
+          <div class="required-actions-card"></div>
+        `;
+        appendSectionActions(card.querySelector('.required-actions-card'), s);
+        sectionsCards.appendChild(card);
+      }
     }
 
     // Enable submit to deputy when all sections approved by supervisor
