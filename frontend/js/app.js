@@ -144,16 +144,8 @@
     `;
 
     const body = document.body;
-    const menuToggle = sidebar.querySelector('.gp-mobile-toggle');
-    const menuClose = sidebar.querySelector('.gp-mobile-close');
-    const setMenuState = (isOpen) => {
-      body.classList.toggle('gp-menu-open', isOpen);
-      body.classList.toggle('gp-menu-lock', isOpen);
-      menuToggle?.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
-      menuClose?.setAttribute('aria-label', isOpen ? 'Close menu' : 'Close menu');
-    };
-    const openMenu = () => setMenuState(true);
-    const closeMenu = () => setMenuState(false);
+    const openMenu = () => body.classList.add('gp-menu-open');
+    const closeMenu = () => body.classList.remove('gp-menu-open');
     const expandSidebar = () => body.classList.add('gp-sidebar-expanded');
     const collapseSidebar = () => body.classList.remove('gp-sidebar-expanded');
 
@@ -164,16 +156,10 @@
       if (!sidebar.contains(event.relatedTarget)) collapseSidebar();
     });
 
-    menuToggle?.addEventListener('click', openMenu);
-    menuClose?.addEventListener('click', closeMenu);
+    sidebar.querySelector('.gp-mobile-toggle')?.addEventListener('click', openMenu);
+    sidebar.querySelector('.gp-mobile-close')?.addEventListener('click', closeMenu);
     sidebar.querySelector('.gp-sidebar__scrim')?.addEventListener('click', closeMenu);
     sidebar.querySelectorAll('.gp-nav__link').forEach((link) => link.addEventListener('click', closeMenu));
-    window.addEventListener('keydown', (event) => {
-      if (event.key === 'Escape') closeMenu();
-    });
-    window.addEventListener('resize', () => {
-      if (window.innerWidth > 1180) closeMenu();
-    });
 
     sidebar.querySelector('#logoutBtn').addEventListener('click', () => {
       localStorage.removeItem("gcp_token");
