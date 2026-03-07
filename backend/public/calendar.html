@@ -4,64 +4,63 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>GOV COLLAB PORTAL • Calendar</title>
-  <link rel="stylesheet" href="styles.css?v=20260307cal1" />
-  <link rel="stylesheet" href="styles/apple.css?v=20260307cal1" />
+  <link rel="stylesheet" href="styles.css?v=20260307cal2" />
+  <link rel="stylesheet" href="styles/apple.css?v=20260307cal2" />
 </head>
 <body>
+
 <div class="layout">
   <aside class="sidebar"></aside>
   <main class="main">
-    <div class="topbar">
+    <div class="topbar topbar-ghost">
       <div class="page-title">Calendar</div>
     </div>
 
-    <section class="card calendar-hero">
-      <div>
-        <div class="eyebrow">Calendar workspace</div>
-        <h1>Calendar</h1>
-        <p>Create, manage and track official meetings and task deadlines.</p>
-      </div>
-      <div class="calendar-hero__chips">
-        <span class="calendar-chip">Official meetings</span>
-        <span class="calendar-chip">Deadlines</span>
-        <span class="calendar-chip">Required sections</span>
-      </div>
-    </section>
-
-    <section class="calendar-shell">
-      <section class="card calendar-form-card" id="formCard">
-        <div class="section-head">
+    <div class="grid">
+      <section class="card col-12" id="calendarEventSection">
+        <div class="calendar-form-head">
           <div>
-            <div class="eyebrow">Event management</div>
-            <h2>Create / Edit event</h2>
-          </div>
-          <div class="calendar-stats compact-only">
-            <div class="stat-pill"><span id="eventCountStat">0</span><small>events</small></div>
-            <div class="stat-pill"><span id="upcomingCountStat">0</span><small>upcoming</small></div>
+            <div class="calendar-eyebrow">Calendar workspace</div>
+            <div class="calendar-card-title">Create / Edit event</div>
+            <div class="calendar-head-copy">Set up the event, assign required sections and choose the submission endpoint.</div>
           </div>
         </div>
 
         <form id="eventForm" class="calendar-form-grid">
-          <div class="field field-span-2">
+          <div class="field field-country">
             <label>Country</label>
-            <select id="countryId"></select>
+            <select id="countryId" class="portal-select-native"></select>
           </div>
-          <div class="field field-span-2">
+
+          <div class="field field-title">
             <label>Title</label>
-            <input id="title" required placeholder="Enter meeting title" />
+            <input id="title" class="input portal-input" placeholder="Meeting with the Minister of Economy..." required />
           </div>
-          <div class="field field-span-4">
-            <label>Task</label>
-            <textarea id="occasion" rows="5" placeholder="Write clear, detailed task instructions here..."></textarea>
+
+          <div class="field field-submitter">
+            <label>Document submitter</label>
+            <select id="submitterRole" class="portal-select-native">
+              <option value="supervisor">Supervisor</option>
+              <option value="chairman" selected>Deputy</option>
+              <option value="minister">Minister</option>
+            </select>
           </div>
-          <div class="field">
+
+          <div class="field field-deadline">
             <label>Deadline</label>
-            <input id="deadlineDate" type="date" />
+            <input id="deadlineDate" class="input portal-input portal-date" type="date" />
           </div>
-          <div class="field field-span-3">
+
+          <div class="field field-task">
+            <label>Task</label>
+            <textarea id="occasion" class="portal-textarea" rows="5" placeholder="Write clear, detailed task instructions here..."></textarea>
+          </div>
+
+          <div class="field field-sections">
             <label>Required sections</label>
-            <div id="requiredSectionsBox" class="calendar-sections"></div>
+            <div id="requiredSectionsBox" class="calendar-checklist"></div>
           </div>
+
           <div class="calendar-form-actions">
             <button class="btn primary" id="saveEventBtn" type="submit">Create event</button>
             <button class="btn" id="resetFormBtn" type="button">Reset</button>
@@ -70,70 +69,25 @@
         <div id="msg" class="small calendar-msg"></div>
       </section>
 
-      <section class="card calendar-side-card">
-        <div class="section-head section-head--tight">
-          <div>
-            <div class="eyebrow">Month preview</div>
-            <h2 id="calendarMonthLabel">—</h2>
-          </div>
-          <div class="calendar-nav-inline">
-            <button class="btn icon-btn" id="monthPrevBtn" type="button" aria-label="Previous month">‹</button>
-            <button class="btn icon-btn" id="monthNextBtn" type="button" aria-label="Next month">›</button>
-          </div>
+      <section class="card col-12" id="calendarEventsSection">
+        <div class="calendar-section-head">
+          <div style="font-weight:900;">Events</div>
+          <div class="calendar-section-copy">Manage active meetings and reopen any event for editing.</div>
         </div>
-
-        <div class="calendar-stats">
-          <div class="stat-pill"><span id="eventCountStatDesktop">0</span><small>events</small></div>
-          <div class="stat-pill"><span id="upcomingCountStatDesktop">0</span><small>upcoming</small></div>
-          <div class="stat-pill"><span id="overdueCountStatDesktop">0</span><small>overdue</small></div>
-        </div>
-
-        <div class="calendar-mini" id="calendarMini">
-          <div class="cal-dow">
-            <div>Mon</div><div>Tue</div><div>Wed</div><div>Thu</div><div>Fri</div><div>Sat</div><div>Sun</div>
-          </div>
-          <div class="cal-grid" id="calendarMiniGrid"></div>
-        </div>
-
-        <div class="day-agenda">
-          <div class="day-agenda__head">
-            <div>
-              <div class="eyebrow">Selected date</div>
-              <h3 id="selectedDateLabel">All events</h3>
-            </div>
-            <button class="btn" id="clearDateFilterBtn" type="button">Show all</button>
-          </div>
-          <div id="dayAgendaList" class="day-agenda__list"></div>
+        <div class="calendar-table-wrap">
+          <table class="table">
+            <thead><tr><th>Title</th><th>Country</th><th>Submitter</th><th>Deadline</th><th>Status</th><th></th></tr></thead>
+            <tbody id="eventsTbody"></tbody>
+          </table>
         </div>
       </section>
-    </section>
+    </div>
 
-    <section class="card calendar-events-card">
-      <div class="section-head section-head--tight">
-        <div>
-          <div class="eyebrow">Events</div>
-          <h2>Events list</h2>
-        </div>
-        <div class="calendar-filterbar">
-          <button class="calendar-filter is-active" type="button" data-filter="all">All</button>
-          <button class="calendar-filter" type="button" data-filter="upcoming">Upcoming</button>
-          <button class="calendar-filter" type="button" data-filter="thisMonth">This month</button>
-          <button class="calendar-filter" type="button" data-filter="overdue">Overdue</button>
-        </div>
-      </div>
-
-      <div class="calendar-table-wrap">
-        <table class="table calendar-table">
-          <thead><tr><th>Title</th><th>Country</th><th>Deadline</th><th>Status</th><th></th></tr></thead>
-          <tbody id="eventsTbody"></tbody>
-        </table>
-      </div>
-    </section>
   </main>
 </div>
-  <script src="js/config.js"></script>
-  <script src="js/api.js"></script>
-  <script src="js/app.js"></script>
-  <script src="js/calendar.js?v=20260307cal1"></script>
+  <script src="js/config.js?v=41"></script>
+  <script src="js/api.js?v=41"></script>
+  <script src="js/app.js?v=48"></script>
+  <script src="js/calendar.js?v=20260307cal2"></script>
 </body>
 </html>
