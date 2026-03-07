@@ -1963,3 +1963,33 @@ body.gp-shell-ready .gp-sidebar__scrim{
     text-align: center;
   }
 }
+
+
+@media (min-width: 641px) and (max-width: 980px){
+  .event-card .row1{
+    flex-direction: row;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+  }
+  .event-card .row1 > div{
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+  .event-card .title{
+    padding-right: 0;
+  }
+  .openmini.openmini-top{
+    position: static;
+    order: 2;
+    align-self: flex-start;
+    flex: 0 0 auto;
+    width: auto;
+    min-width: 88px;
+    padding: 9px 16px;
+    justify-content: center;
+    text-align: center;
+    background: rgba(255,255,255,0.82);
+    border-color: rgba(10,132,255,0.28);
+  }
+}
