@@ -21,37 +21,41 @@
     <div style="font-weight:900; margin-bottom:10px;">Create / Edit event</div>
     <form id="eventForm" class="calendar-event-form">
       <div class="calendar-form-col calendar-form-col--left">
-        <div class="field calendar-field">
+        <div class="field">
           <label>Country</label>
           <select id="countryId"></select>
         </div>
-        <div class="field calendar-field">
+        <div class="field">
           <label>Title</label>
           <input id="title" required />
         </div>
-        <div class="field calendar-field">
+        <div class="field">
           <label>Document submitter</label>
-          <input value="Deputy" readonly aria-readonly="true" />
+          <select id="submitterRole">
+            <option value="supervisor">Supervisor</option>
+            <option value="chairman" selected>Deputy</option>
+            <option value="minister">Minister</option>
+          </select>
         </div>
-        <div class="field calendar-field">
+        <div class="field">
           <label>Deadline</label>
           <input id="deadlineDate" type="date" />
         </div>
       </div>
 
       <div class="calendar-form-col calendar-form-col--middle">
-        <div class="field calendar-field calendar-field--fill">
+        <div class="field field-sections">
           <label>Required sections</label>
-          <div id="requiredSectionsBox" class="checklist calendar-sections-box"></div>
+          <div id="requiredSectionsBox" class="checklist calendar-sections-grid"></div>
         </div>
       </div>
 
       <div class="calendar-form-col calendar-form-col--right">
-        <div class="field calendar-field calendar-field--fill">
+        <div class="field field-task">
           <label>Task</label>
-          <textarea id="occasion"></textarea>
+          <textarea id="occasion" rows="8"></textarea>
         </div>
-        <div class="calendar-actions">
+        <div class="row calendar-form-actions">
           <button class="btn primary" id="saveEventBtn" type="submit">Create event</button>
           <button class="btn" id="resetFormBtn">Reset</button>
         </div>
@@ -67,7 +71,7 @@
       <tbody id="eventsTbody"></tbody>
     </table>
   </section>
-</div>
+</div></div>
 
   </main>
 </div>
