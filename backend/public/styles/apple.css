@@ -1723,3 +1723,28 @@ body.gp-shell-ready .gp-sidebar__scrim{
   .micro-action.is-expanded{ width: 50px; }
   .micro-action__label{ display:none; }
 }
+
+
+/* mobile action buttons: keep tablet-style wide pills with visible labels */
+@media (max-width: 640px){
+  .tp-actionbar{
+    gap: 8px;
+    flex-wrap: wrap;
+    justify-content: flex-start;
+  }
+  .micro-action,
+  .micro-action:hover,
+  .micro-action:focus-visible,
+  .micro-action.is-expanded{
+    width: 132px !important;
+    min-width: 132px !important;
+    padding-right: 14px !important;
+  }
+  .micro-action__label{
+    display: block !important;
+    opacity: 1 !important;
+    transform: translateX(0) !important;
+    color: inherit !important;
+    white-space: nowrap;
+  }
+}
