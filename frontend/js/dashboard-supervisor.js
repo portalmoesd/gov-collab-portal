@@ -6,6 +6,158 @@
   const eventSelect = document.getElementById('eventSelect');
   const sectionsTbody = document.getElementById('sectionsTbody');
   const sectionsCards = document.getElementById('sectionsCards');
+  const supervisorControlPanel = document.getElementById('supervisorControlPanel');
+
+  const dropdownRegistry = new Map();
+
+  function syncDropdownOpenState(){
+    if (!supervisorControlPanel) return;
+    const hasOpen = Array.from(dropdownRegistry.values()).some(entry => entry && entry.isOpen && entry.isOpen());
+    supervisorControlPanel.classList.toggle('dropdown-open', hasOpen);
+  }
+
+  function closeAllCustomDropdowns(exceptSelect = null){
+    dropdownRegistry.forEach((entry, key) => {
+      if (key !== exceptSelect) entry.close();
+    });
+    syncDropdownOpenState();
+  }
+
+  function refreshCustomDropdown(select){
+    const entry = dropdownRegistry.get(select);
+    if (entry) entry.refresh();
+  }
+
+  function setupCustomDropdown(select){
+    if (!select || dropdownRegistry.has(select)) return;
+
+    select.classList.add('portal-select-native');
+
+    const wrap = document.createElement('div');
+    wrap.className = 'portal-dropdown';
+
+    const trigger = document.createElement('button');
+    trigger.type = 'button';
+    trigger.className = 'portal-dropdown__trigger';
+    trigger.setAttribute('aria-haspopup', 'listbox');
+    trigger.setAttribute('aria-expanded', 'false');
+
+    const triggerText = document.createElement('span');
+    triggerText.className = 'portal-dropdown__text';
+
+    const triggerArrow = document.createElement('span');
+    triggerArrow.className = 'portal-dropdown__arrow';
+    triggerArrow.setAttribute('aria-hidden', 'true');
+
+    trigger.appendChild(triggerText);
+    trigger.appendChild(triggerArrow);
+
+    const panel = document.createElement('div');
+    panel.className = 'portal-dropdown__panel';
+    panel.hidden = true;
+
+    select.parentNode.insertBefore(wrap, select.nextSibling);
+    wrap.appendChild(trigger);
+    wrap.appendChild(panel);
+
+    let isOpen = false;
+
+    function getSelectedOption(){
+      return select.options[select.selectedIndex] || select.options[0] || null;
+    }
+
+    function updateTrigger(){
+      const selected = getSelectedOption();
+      const label = selected ? selected.textContent : '';
+      triggerText.textContent = label || select.getAttribute('placeholder') || 'Select...';
+      const isPlaceholder = !select.value;
+      trigger.classList.toggle('is-placeholder', isPlaceholder);
+      trigger.disabled = !!select.disabled;
+      wrap.classList.toggle('is-disabled', !!select.disabled);
+    }
+
+    function buildOptions(){
+      panel.innerHTML = '';
+      Array.from(select.options).forEach((opt, idx) => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'portal-dropdown__option';
+        btn.setAttribute('role', 'option');
+        btn.dataset.value = opt.value;
+        btn.dataset.index = String(idx);
+        btn.disabled = !!opt.disabled;
+
+        const label = document.createElement('span');
+        label.className = 'portal-dropdown__option-label';
+        label.textContent = opt.textContent || '';
+        btn.appendChild(label);
+
+        if (!opt.value) btn.classList.add('is-placeholder');
+        if (opt.value === select.value) {
+          btn.classList.add('is-selected');
+          btn.setAttribute('aria-selected', 'true');
+        }
+
+        btn.addEventListener('click', () => {
+          if (opt.disabled) return;
+          select.value = opt.value;
+          select.dispatchEvent(new Event('change', { bubbles: true }));
+          refresh();
+          close();
+          trigger.focus();
+        });
+
+        panel.appendChild(btn);
+      });
+    }
+
+    function open(){
+      if (select.disabled) return;
+      closeAllCustomDropdowns(select);
+      isOpen = true;
+      wrap.classList.add('is-open');
+      panel.hidden = false;
+      trigger.setAttribute('aria-expanded', 'true');
+      syncDropdownOpenState();
+    }
+
+    function close(){
+      isOpen = false;
+      wrap.classList.remove('is-open');
+      panel.hidden = true;
+      trigger.setAttribute('aria-expanded', 'false');
+      syncDropdownOpenState();
+    }
+
+    function refresh(){
+      buildOptions();
+      updateTrigger();
+    }
+
+    trigger.addEventListener('click', () => {
+      if (isOpen) close();
+      else open();
+    });
+
+    trigger.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowDown' || e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        open();
+      }
+      if (e.key === 'Escape') close();
+    });
+
+    dropdownRegistry.set(select, { refresh, close, open, isOpen: () => isOpen });
+    refresh();
+  }
+
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('.portal-dropdown')) closeAllCustomDropdowns();
+  });
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') closeAllCustomDropdowns();
+  });
   const approveAllSectionsBtn = document.getElementById('approveAllSectionsBtn');
   const sectionsEmpty = document.getElementById('sectionsEmpty');
   const submitDocBtn = document.getElementById('submitDocBtn');
@@ -49,6 +201,7 @@
   async function loadUpcoming(){
     const events = await window.GCP.apiFetch('/events/upcoming', { method:'GET' });
     eventSelect.innerHTML = `<option value="">Select event...</option>`;
+    refreshCustomDropdown(eventSelect);
     eventsById.clear();
     for (const ev of (events || [])){
       eventsById.set(Number(ev.id), ev);
@@ -59,6 +212,7 @@
       opt.textContent = `${ev.title || 'Event'} (${ev.country_name_en || ''}${ev.deadline_date ? ', ' + window.GCP.formatDateTime(ev.deadline_date) : ''})`;
       eventSelect.appendChild(opt);
     }
+    refreshCustomDropdown(eventSelect);
   }
 
 
@@ -299,5 +453,8 @@ modalBackdrop.addEventListener('click', (e) => {
     }
   });
 
+  setupCustomDropdown(eventSelect);
+
   await loadUpcoming();
+  refreshCustomDropdown(eventSelect);
 })();
