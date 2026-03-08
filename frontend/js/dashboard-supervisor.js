@@ -7,6 +7,7 @@
   const sectionsTbody = document.getElementById('sectionsTbody');
   const sectionsCards = document.getElementById('sectionsCards');
   const approveAllSectionsBtn = document.getElementById('approveAllSectionsBtn');
+  const sectionsEmpty = document.getElementById('sectionsEmpty');
   const submitDocBtn = document.getElementById('submitDocBtn');
   const previewFullBtn = document.getElementById('previewFullBtn');
   const modalBackdrop = document.getElementById('modalBackdrop');
@@ -120,8 +121,15 @@
     const data = await window.GCP.apiFetch(`/tp/status-grid?event_id=${currentEventId}`, { method:'GET' });
     currentSections = data.sections || [];
     sectionsTbody.innerHTML = '';
-    sectionsTbody.innerHTML = '';
     if (sectionsCards) sectionsCards.innerHTML = '';
+    if (sectionsEmpty) sectionsEmpty.hidden = true;
+
+    if (!currentSections.length){
+      if (sectionsEmpty) sectionsEmpty.hidden = false;
+      sectionsTbody.innerHTML = `<tr class="required-sections-empty-row"><td colspan="5">No required sections yet.</td></tr>`;
+      submitDocBtn.disabled = true;
+      return;
+    }
 
     for (const s of currentSections){
       const tr = document.createElement('tr');
@@ -148,7 +156,7 @@
         card.className = 'required-section-card';
         card.innerHTML = `
           <div class="required-section-card__top">
-            <div>
+            <div class="required-section-card__meta">
               <div class="required-section-name">${escape(s.sectionLabel)}</div>
               <div class="required-section-meta">Last update · ${escape(last || '—')}</div>
             </div>
@@ -186,6 +194,8 @@ eventSelect.addEventListener('change', async () => {
     if (!Number.isFinite(currentEventId) || currentEventId <= 0) {
       currentEventId = null;
       sectionsTbody.innerHTML = '';
+      if (sectionsCards) sectionsCards.innerHTML = '';
+      if (sectionsEmpty) sectionsEmpty.hidden = false;
       submitDocBtn.disabled = true;
       endEventBtn.style.display = 'none';
       return;
@@ -228,6 +238,8 @@ eventSelect.addEventListener('change', async () => {
     }catch(e){
       setMsg(e.message || 'Failed to load sections', true);
       sectionsTbody.innerHTML = '';
+      if (sectionsCards) sectionsCards.innerHTML = '';
+      if (sectionsEmpty) sectionsEmpty.hidden = false;
       submitDocBtn.disabled = true;
     }
   });

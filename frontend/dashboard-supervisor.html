@@ -38,7 +38,7 @@
     <div id="msg" class="small" style="color:var(--danger); font-weight:800; margin-top:10px;"></div>
   </section>
 
-  <section class="card col-12">
+    <section class="card col-12 required-sections-panel">
     <div class="required-sections-head">
       <div>
         <div class="required-sections-title">Required sections</div>
@@ -46,13 +46,16 @@
       </div>
       <button class="btn success" id="approveAllSectionsBtn">Approve all sections</button>
     </div>
+
     <div class="required-sections-tablewrap">
-      <table class="required-sections-table">
+      <table class="table required-sections-table">
         <thead><tr><th>Section</th><th>Status</th><th>Last update</th><th>Updated by</th><th>Actions</th></tr></thead>
         <tbody id="sectionsTbody"></tbody>
       </table>
-      <div id="sectionsCards" class="required-sections-cards"></div>
     </div>
+
+    <div id="sectionsCards" class="required-sections-cards"></div>
+    <div id="sectionsEmpty" class="required-sections-empty" hidden>No required sections yet.</div>
   </section>
 
 
