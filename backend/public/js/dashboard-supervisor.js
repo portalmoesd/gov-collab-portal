@@ -92,7 +92,8 @@
       window.open(`editor.html?event_id=${currentEventId}&section_id=${section.sectionId}`, '_blank');
     }));
 
-    if (section.status === 'submitted_to_supervisor' || section.status === 'returned_by_supervisor' || section.status === 'draft') {
+    const canDecision = !['approved_by_supervisor', 'approved_by_chairman'].includes(String(section.status || '').toLowerCase());
+    if (canDecision) {
       wrap.appendChild(createMicroAction('Approve', 'approve', async () => {
         setMsg('');
         await window.GCP.apiFetch('/tp/approve-section', {
