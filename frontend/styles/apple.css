@@ -2708,30 +2708,178 @@ body.gp-shell-ready .gp-sidebar__scrim{
 }
 
 
-
-
 /* Supervisor dashboard title + centered workflow */
-.supervisor-titlebar{
-  background: transparent !important;
-  border: none !important;
-  box-shadow: none !important;
-  padding: 0 !important;
-  margin-bottom: 18px;
-}
-.supervisor-titlebar .page-title{
-  display: inline-flex;
-  align-items: center;
-}
 .supervisor-progress-wrap{
   display:flex;
   justify-content:center;
   width:100%;
 }
 .supervisor-progress-wrap .wf-progress{
-  width:min(1120px, 92%);
   margin-left:auto;
   margin-right:auto;
 }
-@media (max-width: 1024px){
-  .supervisor-progress-wrap .wf-progress{ width:100%; }
+
+
+/* === Supervisor Dashboard responsive refinements === */
+#supervisorEventSection .supervisor-event-top{
+  align-items:flex-end;
+  gap:14px;
+}
+#supervisorEventSection .supervisor-event-filters{
+  flex:1 1 640px;
+  min-width:0;
+}
+#supervisorEventSection .supervisor-event-filters .field{
+  flex:1 1 260px;
+  min-width:220px;
+}
+#supervisorEventSection .supervisor-event-actions{
+  flex:0 0 auto;
+  justify-content:flex-end;
+}
+#supervisorEventSection .supervisor-event-actions .btn{
+  min-width:180px;
+}
+#supervisorEventSection #countrySelect.portal-select,
+#supervisorEventSection #eventSelect.portal-select{
+  -webkit-appearance:none;
+  appearance:none;
+  width:100%;
+  min-height:54px;
+  padding:15px 48px 15px 18px;
+  border-radius:18px;
+  border:1px solid rgba(43,68,91,.14);
+  background-color: rgba(255,255,255,.96);
+  background-image:
+    linear-gradient(180deg, rgba(255,255,255,.98), rgba(247,250,253,.98)),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16' fill='none'%3E%3Cpath d='M4 6.5L8 10L12 6.5' stroke='%232B445B' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat:no-repeat, no-repeat;
+  background-position:0 0, right 16px center;
+  background-size:auto,16px 16px;
+  color:#2b445b;
+  font-size:14px;
+  font-weight:700;
+  letter-spacing:-0.01em;
+  line-height:1.2;
+  box-shadow:0 10px 28px rgba(24,39,75,.06), inset 0 1px 0 rgba(255,255,255,.75);
+  transition:border-color .18s ease, box-shadow .18s ease, transform .18s ease, background-color .18s ease;
+  cursor:pointer;
+}
+#supervisorEventSection #countrySelect.portal-select:hover,
+#supervisorEventSection #eventSelect.portal-select:hover{
+  border-color: rgba(43,68,91,.24);
+  box-shadow: 0 12px 30px rgba(24,39,75,.08), inset 0 1px 0 rgba(255,255,255,.82);
+}
+#supervisorEventSection #countrySelect.portal-select:focus,
+#supervisorEventSection #eventSelect.portal-select:focus{
+  outline:none;
+  border-color: rgba(10,132,255,.42);
+  box-shadow: 0 0 0 4px rgba(10,132,255,.15), 0 14px 32px rgba(24,39,75,.10), inset 0 1px 0 rgba(255,255,255,.9);
+}
+#supervisorEventSection #countrySelect.portal-select:disabled,
+#supervisorEventSection #eventSelect.portal-select:disabled{
+  color: rgba(43,68,91,.48);
+  background-color: rgba(245,247,250,.95);
+  background-image:
+    linear-gradient(180deg, rgba(248,249,251,.98), rgba(242,245,248,.98)),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16' fill='none'%3E%3Cpath d='M4 6.5L8 10L12 6.5' stroke='%2390A0AF' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  border-color: rgba(43,68,91,.10);
+  box-shadow:none;
+  cursor:not-allowed;
+}
+#supervisorEventSection #countrySelect.portal-select option,
+#supervisorEventSection #eventSelect.portal-select option{
+  color:#2b445b;
+  background:#fff;
+}
+#supervisorEventSection label{
+  font-size:13px;
+  color:#666b72;
+  font-weight:800;
+}
+#supervisorEventSection #docStatusBox{
+  margin-top:14px;
+}
+#supervisorEventSection #docStatusBox > div:first-child{
+  margin-bottom:8px;
+}
+@media (max-width: 1180px){
+  #supervisorEventSection .supervisor-event-top{
+    flex-direction:column;
+    align-items:stretch;
+  }
+  #supervisorEventSection .supervisor-event-actions{
+    justify-content:flex-start;
+  }
+}
+@media (max-width: 980px){
+  #supervisorEventSection{
+    padding:16px;
+    border-radius:22px;
+  }
+  #supervisorEventSection .supervisor-event-filters,
+  #supervisorEventSection .supervisor-event-actions{
+    width:100%;
+  }
+  #supervisorEventSection .supervisor-event-filters{
+    flex-direction:column;
+    align-items:stretch;
+    gap:12px;
+  }
+  #supervisorEventSection .supervisor-event-filters .field{
+    width:100%;
+    min-width:0;
+  }
+  #supervisorEventSection .supervisor-event-actions{
+    gap:10px;
+    flex-wrap:wrap;
+  }
+  #supervisorEventSection .supervisor-event-actions .btn{
+    flex:1 1 260px;
+    min-width:0;
+  }
+  #supervisorEventSection #countrySelect.portal-select,
+  #supervisorEventSection #eventSelect.portal-select{
+    min-height:50px;
+    border-radius:16px;
+    padding:14px 46px 14px 16px;
+    font-size:13px;
+  }
+  #supervisorEventSection #docStatusBox .supervisor-progress-wrap{
+    overflow-x:auto;
+    justify-content:flex-start;
+    padding-bottom:4px;
+  }
+  #supervisorEventSection #docStatusBox .wf-progress{
+    min-width:620px;
+  }
+  .required-sections-head{
+    align-items:flex-start;
+  }
+}
+@media (max-width: 640px){
+  #supervisorEventSection{
+    padding:14px;
+    border-radius:20px;
+  }
+  #supervisorEventSection .supervisor-event-actions{
+    flex-direction:column;
+    align-items:stretch;
+  }
+  #supervisorEventSection .supervisor-event-actions .btn{
+    width:100%;
+    flex:1 1 auto;
+  }
+  #supervisorEventSection label{
+    font-size:11px;
+  }
+  #supervisorEventSection #countrySelect.portal-select,
+  #supervisorEventSection #eventSelect.portal-select{
+    min-height:46px;
+    border-radius:15px;
+    font-size:13px;
+  }
+  #supervisorEventSection #docStatusBox .wf-progress{
+    min-width:560px;
+  }
 }

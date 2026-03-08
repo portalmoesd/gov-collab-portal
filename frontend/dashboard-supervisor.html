@@ -5,31 +5,31 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>GOV COLLAB PORTAL • Supervisor Dashboard</title>
   <link rel="stylesheet" href="styles.css?v=20260306sb1" />
-  <link rel="stylesheet" href="styles/apple.css?v=20260308supfix3" />
+  <link rel="stylesheet" href="styles/apple.css?v=20260308supfix2" />
 </head>
 <body>
 
 <div class="layout">
   <aside class="sidebar"></aside>
   <main class="main">
-    <div class="topbar topbar-ghost supervisor-titlebar" style="background:transparent;border:none;box-shadow:none;padding:0;">
+    <div class="topbar topbar-ghost">
       <div class="page-title">Supervisor Dashboard</div>
     </div>
     
 <div class="grid">
-  <section class="card col-12">
-    <div class="row" style="justify-content:space-between;">
-      <div class="row">
+  <section class="card col-12" id="supervisorEventSection">
+    <div class="row supervisor-event-top" style="justify-content:space-between;">
+      <div class="row supervisor-event-filters">
         <div class="field">
           <label>Country</label>
-          <select id="countrySelect"></select>
+          <select id="countrySelect" class="portal-select"></select>
         </div>
         <div class="field">
           <label>Event</label>
-          <select id="eventSelect"></select>
+          <select id="eventSelect" class="portal-select"></select>
         </div>
       </div>
-      <div class="row">
+      <div class="row supervisor-event-actions">
         <button class="btn" id="previewFullBtn">Preview full TPs</button>
         <button class="btn primary" id="submitDocBtn">Submit document to Deputy</button>
       </div>
@@ -79,7 +79,7 @@
   <script src="js/config.js"></script>
   <script src="js/api.js"></script>
   <script src="js/app.js?v=47"></script>
-  <script src="js/dashboard-supervisor.js?v=49"></script>
+  <script src="js/dashboard-supervisor.js?v=48"></script>
   <script src="js/dashboard-supervisor-upcoming.js?v=1"></script>
   <script src="js/calendar-collab.js?v=2"></script>
 </body>
