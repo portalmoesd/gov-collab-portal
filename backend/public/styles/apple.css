@@ -2660,8 +2660,8 @@ body.gp-shell-ready .gp-sidebar__scrim{
 .required-sections-head{display:flex; align-items:flex-start; justify-content:space-between; gap:16px; margin-bottom:14px; flex-wrap:wrap;}
 .required-sections-title{font-size:18px; font-weight:900; color:#22395a; line-height:1.1;}
 .required-sections-subtitle{margin-top:4px; font-size:12px; color:#71819a; font-weight:700;}
-.required-sections-tablewrap{overflow:visible;}
-.required-sections-table{width:100%; border-collapse:separate; border-spacing:0 10px;}
+.required-sections-tablewrap{overflow-x:auto; overflow-y:visible; -webkit-overflow-scrolling:touch;}
+.required-sections-table{width:100%; min-width:0; table-layout:fixed; border-collapse:separate; border-spacing:0 10px;}
 .required-sections-table thead th{font-size:11px; text-transform:uppercase; letter-spacing:.12em; color:#7b8aa4; font-weight:800; border-bottom:none; padding:0 14px 4px;}
 .required-sections-table tbody td{background:#fbfdff; padding:16px 14px; border-top:1px solid rgba(39,70,112,.06); border-bottom:1px solid rgba(39,70,112,.06); vertical-align:middle;}
 .required-sections-table tbody tr td:first-child{border-left:1px solid rgba(39,70,112,.06); border-top-left-radius:18px; border-bottom-left-radius:18px;}
@@ -2693,7 +2693,7 @@ body.gp-shell-ready .gp-sidebar__scrim{
 .required-section-card__line{display:flex; align-items:center; justify-content:space-between; gap:12px; font-size:12px; color:#73829c;}
 .required-section-card__line strong{font-size:13px; color:#22395a;}
 .required-actions-card{display:flex; align-items:center; justify-content:flex-start; gap:8px; flex-wrap:wrap;}
-@media (max-width: 980px){
+@media (max-width: 1220px){
   .required-sections-table{display:none;}
   .required-sections-cards{display:grid; grid-template-columns:1fr; gap:12px;}
   .required-actions,.required-actions-card{justify-content:flex-start;}
@@ -2708,6 +2708,17 @@ body.gp-shell-ready .gp-sidebar__scrim{
 }
 
 
+
+@media (min-width: 1221px){
+  .required-sections-table{display:table;}
+  .required-sections-cards{display:none;}
+}
+
+@media (max-width: 760px){
+  .required-sections-head .btn.success{width:100%;}
+  .required-section-card{padding:14px;}
+  .required-section-card__line{align-items:flex-start; flex-direction:column;}
+}
 /* Supervisor dashboard title + centered workflow */
 .supervisor-progress-wrap{
   display:flex;
@@ -2747,8 +2758,16 @@ body.gp-shell-ready .gp-sidebar__scrim{
 }
 
 #sectionsTbody td:last-child{
-  min-width:220px;
+  min-width:0;
 }
+
+.required-sections-table thead th:nth-child(1){width:26%;}
+.required-sections-table thead th:nth-child(2){width:16%;}
+.required-sections-table thead th:nth-child(3){width:20%;}
+.required-sections-table thead th:nth-child(4){width:18%;}
+.required-sections-table thead th:nth-child(5){width:20%;}
+.required-sections-table tbody td{word-break:break-word;}
+.required-actions-cell{min-width:0;}
 
 @media (max-width: 1180px){
   body.gp-shell-ready .main,
