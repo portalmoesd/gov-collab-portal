@@ -2706,3 +2706,15 @@ body.gp-shell-ready .gp-sidebar__scrim{
   .required-actions, .required-actions-card{width:100%;}
   .required-section-card__top{flex-direction:column;}
 }
+
+
+/* Supervisor dashboard title + centered workflow */
+.supervisor-progress-wrap{
+  display:flex;
+  justify-content:center;
+  width:100%;
+}
+.supervisor-progress-wrap .wf-progress{
+  margin-left:auto;
+  margin-right:auto;
+}

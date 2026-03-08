@@ -220,7 +220,7 @@ eventSelect.addEventListener('change', async () => {
             <div><b>Status:</b> ${window.GCP.escapeHtml(humanStatus(ds.status) || '')}</div>
             ${last ? `<div class="muted">${window.GCP.escapeHtml(last)}</div>` : ''}
           </div>
-          ${window.GCP.renderWorkflowProgress(ds.status, submitterRole)}
+          <div class="supervisor-progress-wrap">${window.GCP.renderWorkflowProgress(ds.status, submitterRole)}</div>
           ${task ? `<div style="margin-top:10px;"><b>Task:</b> ${window.GCP.escapeHtml(task)}</div>` : ''}
         `;
       }
