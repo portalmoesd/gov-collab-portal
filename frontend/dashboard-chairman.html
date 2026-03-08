@@ -5,28 +5,30 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>GOV COLLAB PORTAL • Deputy Dashboard</title>
   <link rel="stylesheet" href="styles.css?v=20260306sb1" />
-  <link rel="stylesheet" href="styles/apple.css?v=20260307sbfix1" />
+  <link rel="stylesheet" href="styles/apple.css?v=20260309depui1" />
 </head>
 <body>
 
 <div class="layout">
   <aside class="sidebar"></aside>
   <main class="main">
-    <div class="topbar">
+    <div class="topbar topbar-ghost">
       <div class="page-title">Deputy Dashboard</div>
     </div>
     
 <div class="grid">
-  <section class="card col-12">
+  <section class="card col-12 supervisor-control-panel chairman-control-panel" id="chairmanControlPanel">
+    <div class="supervisor-panel-head">
+      <div>
+        <div class="supervisor-panel-title">Event</div>
+        <div class="supervisor-panel-subtitle">Choose an event to review workflow status, preview talking points, and approve the document.</div>
+      </div>
+    </div>
     <div class="row" style="justify-content:space-between;">
       <div class="row">
         <div class="field">
-          <label>Country</label>
-          <select id="countrySelect"></select>
-        </div>
-        <div class="field">
           <label>Event</label>
-          <select id="eventSelect"></select>
+          <select id="eventSelect" class="portal-select"></select>
         </div>
       </div>
       <div class="row">
@@ -39,12 +41,24 @@
     <div id="msg" class="small" style="color:var(--danger); font-weight:800; margin-top:10px;"></div>
   </section>
 
-  <section class="card col-12">
-    <div style="font-weight:900; margin-bottom:10px;">Required sections</div>
-    <table class="table">
-      <thead><tr><th>Section</th><th>Status</th><th>Last update</th><th>Actions</th></tr></thead>
-      <tbody id="sectionsTbody"></tbody>
-    </table>
+  <section class="card col-12 required-sections-panel chairman-required-sections-panel">
+    <div class="required-sections-head">
+      <div>
+        <div class="required-sections-title">Required sections</div>
+        <div class="required-sections-subtitle">Review section progress, check recent updates, and take action.</div>
+      </div>
+      <button class="btn success" id="approveAllSectionsBtn">Approve all sections</button>
+    </div>
+
+    <div class="required-sections-tablewrap">
+      <table class="table required-sections-table">
+        <thead><tr><th>Section</th><th>Status</th><th>Last update</th><th>Actions</th></tr></thead>
+        <tbody id="sectionsTbody"></tbody>
+      </table>
+    </div>
+
+    <div id="sectionsCards" class="required-sections-cards"></div>
+    <div id="sectionsEmpty" class="required-sections-empty" hidden>No required sections yet.</div>
   </section>
 </div>
 
@@ -60,6 +74,6 @@
   <script src="js/config.js"></script>
   <script src="js/api.js"></script>
   <script src="js/app.js?v=47"></script>
-  <script src="js/dashboard-chairman.js?v=45"></script>
+  <script src="js/dashboard-chairman.js?v=46"></script>
 </body>
 </html>

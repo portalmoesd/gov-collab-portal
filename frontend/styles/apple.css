@@ -3417,3 +3417,30 @@ body.gp-shell-ready .gp-sidebar__scrim{
   .supervisor-control-panel .field .portal-dropdown__trigger{min-height:46px; padding:14px 44px 14px 16px; font-size:13px;}
   .supervisor-control-panel .field .portal-dropdown__panel{top:calc(100% + 8px);}
 }
+
+
+/* Deputy dashboard alignment with supervisor layout */
+.chairman-control-panel,
+.chairman-required-sections-panel{
+  overflow: visible;
+}
+
+.chairman-control-panel .field{
+  min-width: min(420px, 100%);
+}
+
+@media (max-width: 860px){
+  .chairman-control-panel .row[style*="justify-content:space-between"]{
+    align-items: stretch;
+  }
+  .chairman-control-panel .row[style*="justify-content:space-between"] > .row{
+    width: 100%;
+  }
+  .chairman-control-panel .row[style*="justify-content:space-between"] > .row:last-child{
+    justify-content: stretch;
+    flex-wrap: wrap;
+  }
+  .chairman-control-panel .row[style*="justify-content:space-between"] > .row:last-child > .btn{
+    flex: 1 1 200px;
+  }
+}
