@@ -147,14 +147,23 @@
         const card = document.createElement('article');
         card.className = 'required-section-card';
         card.innerHTML = `
-          <div class="required-section-card__top">
-            <div>
+          <div class="required-section-card__head">
+            <div class="required-section-card__titlewrap">
               <div class="required-section-name">${escape(s.sectionLabel)}</div>
-              <div class="required-section-meta">Last update · ${escape(last || '—')}</div>
+              <div class="required-section-card__sub">${escape(updatedBy)}${last ? ` · ${escape(last)}` : ''}</div>
             </div>
             <span class="required-status-badge ${badgeClass}">${escape(humanStatus(s.status))}</span>
           </div>
-          <div class="required-section-card__line"><span>Updated by</span><strong>${escape(updatedBy)}</strong></div>
+          <div class="required-section-card__meta">
+            <div class="required-section-card__metaitem">
+              <span class="required-section-card__label">Last update</span>
+              <strong>${escape(last || '—')}</strong>
+            </div>
+            <div class="required-section-card__metaitem">
+              <span class="required-section-card__label">Updated by</span>
+              <strong>${escape(updatedBy)}</strong>
+            </div>
+          </div>
           ${note ? `<div class="required-section-note"><b>Comment:</b> ${escape(note)}</div>` : ''}
           <div class="required-actions-card"></div>
         `;
