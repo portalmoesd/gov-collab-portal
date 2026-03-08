@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>GOV COLLAB PORTAL • Supervisor Dashboard</title>
   <link rel="stylesheet" href="styles.css?v=20260306sb1" />
-  <link rel="stylesheet" href="styles/apple.css?v=20260308supfix2" />
+  <link rel="stylesheet" href="styles/apple.css?v=20260308supresp3" />
 </head>
 <body>
 
@@ -17,19 +17,15 @@
     </div>
     
 <div class="grid">
-  <section class="card col-12" id="supervisorEventSection">
-    <div class="row supervisor-event-top" style="justify-content:space-between;">
-      <div class="row supervisor-event-filters">
-        <div class="field">
-          <label>Country</label>
-          <select id="countrySelect" class="portal-select"></select>
-        </div>
-        <div class="field">
+  <section class="card col-12">
+    <div class="row" style="justify-content:space-between;">
+      <div class="row">
+<div class="field">
           <label>Event</label>
-          <select id="eventSelect" class="portal-select"></select>
+          <select id="eventSelect"></select>
         </div>
       </div>
-      <div class="row supervisor-event-actions">
+      <div class="row">
         <button class="btn" id="previewFullBtn">Preview full TPs</button>
         <button class="btn primary" id="submitDocBtn">Submit document to Deputy</button>
       </div>
@@ -39,20 +35,14 @@
   </section>
 
   <section class="card col-12">
-    <div class="required-sections-head">
-      <div>
-        <div class="required-sections-title">Required sections</div>
-        <div class="required-sections-subtitle">Review section progress, check who updated each part, and take action.</div>
-      </div>
+    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:10px;">
+      <div style="font-weight:900;">Required sections</div>
       <button class="btn success" id="approveAllSectionsBtn">Approve all sections</button>
     </div>
-    <div class="required-sections-tablewrap">
-      <table class="required-sections-table">
-        <thead><tr><th>Section</th><th>Status</th><th>Last update</th><th>Updated by</th><th>Actions</th></tr></thead>
-        <tbody id="sectionsTbody"></tbody>
-      </table>
-      <div id="sectionsCards" class="required-sections-cards"></div>
-    </div>
+    <table class="table">
+      <thead><tr><th>Section</th><th>Status</th><th>Last update</th><th>Actions</th></tr></thead>
+      <tbody id="sectionsTbody"></tbody>
+    </table>
   </section>
 
 
