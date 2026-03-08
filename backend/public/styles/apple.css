@@ -2925,3 +2925,87 @@ body.gp-shell-ready .gp-sidebar__scrim{
     font-size:12px;
   }
 }
+
+
+/* Supervisor mobile/tablet overflow fix after event selection */
+@media (max-width: 980px){
+  .card.col-12{ overflow:hidden; }
+  .card.col-12 > .row:first-child,
+  .card.col-12 > .row:first-child > .row,
+  .card.col-12 > .row:first-child .field,
+  .card.col-12 > .row:first-child .row:last-child{
+    width:100%;
+    min-width:0;
+    max-width:100%;
+  }
+  #countrySelect,
+  #eventSelect{
+    display:block;
+    width:100%;
+    max-width:100%;
+    min-width:0;
+    font-size:16px;
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    padding-right:44px;
+    box-sizing:border-box;
+  }
+  #docStatusBox,
+  #docStatusBox > div,
+  #docStatusBox > div > div{
+    max-width:100%;
+    min-width:0;
+    box-sizing:border-box;
+  }
+  .supervisor-progress-wrap{
+    width:100%;
+    max-width:100%;
+  }
+  .supervisor-progress-wrap .wf-progress{
+    min-width:560px;
+  }
+  .required-sections-tablewrap{
+    width:100%;
+    max-width:100%;
+    overflow-x:hidden;
+  }
+  .required-sections-table{
+    display:none !important;
+  }
+  .required-sections-cards{
+    display:grid !important;
+    width:100%;
+    grid-template-columns:1fr;
+    gap:12px;
+  }
+  .required-section-card,
+  .required-section-card__top,
+  .required-section-card__line,
+  .required-section-note{
+    width:100%;
+    max-width:100%;
+    min-width:0;
+    box-sizing:border-box;
+  }
+  .required-section-name,
+  .required-updated-by,
+  .required-updated-at,
+  .required-section-card__line strong{
+    overflow-wrap:anywhere;
+    word-break:break-word;
+  }
+  .required-actions-card,
+  .required-actions{
+    width:100%;
+  }
+}
+@media (max-width: 640px){
+  #countrySelect,
+  #eventSelect{
+    font-size:15px;
+  }
+  .supervisor-progress-wrap .wf-progress{
+    min-width:520px;
+  }
+}
