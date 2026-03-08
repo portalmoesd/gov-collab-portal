@@ -2708,13 +2708,30 @@ body.gp-shell-ready .gp-sidebar__scrim{
 }
 
 
+
+
 /* Supervisor dashboard title + centered workflow */
+.supervisor-titlebar{
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+  margin-bottom: 18px;
+}
+.supervisor-titlebar .page-title{
+  display: inline-flex;
+  align-items: center;
+}
 .supervisor-progress-wrap{
   display:flex;
   justify-content:center;
   width:100%;
 }
 .supervisor-progress-wrap .wf-progress{
+  width:min(1120px, 92%);
   margin-left:auto;
   margin-right:auto;
+}
+@media (max-width: 1024px){
+  .supervisor-progress-wrap .wf-progress{ width:100%; }
 }
