@@ -23,6 +23,14 @@
 
   const dropdownRegistry = new Map();
 
+  function setActionButtonLabel(button, label){
+    if (!button) return;
+    const labelEl = button.querySelector('.micro-action__label');
+    if (labelEl) labelEl.textContent = label;
+    else button.textContent = label;
+    button.setAttribute('aria-label', label);
+  }
+
   function syncDropdownOpenState(){
     if (!chairmanControlPanel) return;
     const hasOpen = Array.from(dropdownRegistry.values()).some(entry => entry && entry.isOpen && entry.isOpen());
@@ -387,9 +395,9 @@
     try {
       const evDetails = await window.GCP.apiFetch(`/events/${currentEventId}`, { method:'GET' });
       const sr = String(evDetails.submitterRole || evDetails.submitter_role || '').toLowerCase();
-      approveDocBtn.textContent = sr === 'minister' ? 'Submit to Minister' : 'Approve document';
+      setActionButtonLabel(approveDocBtn, sr === 'minister' ? 'Submit to Minister' : 'Approve');
     } catch (e) {
-      approveDocBtn.textContent = 'Approve document';
+      setActionButtonLabel(approveDocBtn, 'Approve');
     }
 
     approveDocBtn.disabled = false;
