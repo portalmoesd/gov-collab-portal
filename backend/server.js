@@ -79,16 +79,42 @@ async function ensureSchema() {
   await pool.query(`ALTER TABLE events ADD COLUMN IF NOT EXISTS ended_by_user_id INTEGER`);
   await pool.query(`ALTER TABLE events ADD COLUMN IF NOT EXISTS submitter_role TEXT NOT NULL DEFAULT 'chairman'`).catch(()=>{});
 
-  // Ensure enum value exists for minister approvals (legacy DBs)
-  await pool.query(`ALTER TYPE tp_section_status ADD VALUE IF NOT EXISTS 'approved_by_minister'`).catch(async ()=>{
-    // Fallback for older Postgres that may not support IF NOT EXISTS
-    try {
-      const has = await pool.query(`SELECT 1 FROM pg_type t JOIN pg_enum e ON t.oid=e.enumtypid WHERE t.typname='tp_section_status' AND e.enumlabel='approved_by_minister'`);
-      if (!has.rowCount) {
-        await pool.query(`ALTER TYPE tp_section_status ADD VALUE 'approved_by_minister'`);
-      }
-    } catch (_) {}
-  });
+  // Ensure all workflow enum values exist for legacy databases
+  const requiredTpStatuses = [
+    'submitted_to_collaborator_2',
+    'returned_by_collaborator_2',
+    'approved_by_collaborator_2',
+    'submitted_to_collaborator',
+    'returned_by_collaborator',
+    'approved_by_collaborator',
+    'submitted_to_super_collaborator',
+    'returned_by_super_collaborator',
+    'approved_by_super_collaborator',
+    'submitted_to_supervisor',
+    'returned_by_supervisor',
+    'approved_by_supervisor',
+    'approved_by_chairman',
+    'approved_by_minister',
+    'locked'
+  ];
+
+  for (const enumLabel of requiredTpStatuses) {
+    await pool.query(`ALTER TYPE tp_section_status ADD VALUE IF NOT EXISTS '${enumLabel}'`).catch(async () => {
+      try {
+        const has = await pool.query(
+          `SELECT 1
+             FROM pg_type t
+             JOIN pg_enum e ON t.oid = e.enumtypid
+            WHERE t.typname = 'tp_section_status'
+              AND e.enumlabel = $1`,
+          [enumLabel]
+        );
+        if (!has.rowCount) {
+          await pool.query(`ALTER TYPE tp_section_status ADD VALUE '${enumLabel}'`);
+        }
+      } catch (_) {}
+    });
+  }
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS country_assignments (
