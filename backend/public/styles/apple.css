@@ -3528,3 +3528,52 @@ body.gp-shell-ready .gp-sidebar__scrim{
     min-width:0;
   }
 }
+
+
+/* === Dashboard polish: matching event widths, separated upcoming panel, modal stacking === */
+.modal-backdrop{
+  z-index:9999;
+}
+.modal{
+  position:relative;
+  z-index:10000;
+}
+
+.upcoming-events-panel{
+  overflow:hidden;
+}
+.upcoming-events-title{
+  font-size:18px;
+  font-weight:900;
+  color:#111827;
+  line-height:1.15;
+  margin-bottom:10px;
+}
+
+.supervisor-control-panel .row[style*="justify-content:space-between"] > .row:first-child,
+.chairman-control-panel .row[style*="justify-content:space-between"] > .row:first-child{
+  flex:1 1 520px;
+  min-width:0;
+}
+
+.supervisor-control-panel .field,
+.chairman-control-panel .field{
+  width:min(520px, 100%);
+  min-width:min(520px, 100%);
+  max-width:100%;
+}
+
+.supervisor-control-panel .field .portal-dropdown,
+.supervisor-control-panel .field .portal-dropdown__trigger,
+.chairman-control-panel .field .portal-dropdown,
+.chairman-control-panel .field .portal-dropdown__trigger{
+  width:100%;
+}
+
+@media (max-width: 980px){
+  .supervisor-control-panel .field,
+  .chairman-control-panel .field{
+    width:100%;
+    min-width:0;
+  }
+}
