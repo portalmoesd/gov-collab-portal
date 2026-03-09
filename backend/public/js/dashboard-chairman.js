@@ -256,7 +256,8 @@
       window.open(`editor.html?event_id=${currentEventId}&section_id=${section.sectionId}`, '_blank');
     }));
 
-    const canDecision = !['approved_by_supervisor', 'approved_by_chairman'].includes(String(section.status || '').toLowerCase());
+    const sectionStatus = String(section.status || '').toLowerCase();
+    const canDecision = !['approved_by_chairman', 'approved_by_minister', 'locked'].includes(sectionStatus);
     if (canDecision) {
       wrap.appendChild(createMicroAction('Approve', 'approve', async () => {
         try{
