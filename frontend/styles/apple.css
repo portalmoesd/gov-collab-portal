@@ -3426,8 +3426,8 @@ body.gp-shell-ready .gp-sidebar__scrim{
 }
 
 .chairman-control-panel .field{
-  min-width: min(780px, 100%);
-  width: min(780px, 100%);
+  min-width: min(520px, 100%);
+  width: min(520px, 100%);
   max-width: 100%;
 }
 
