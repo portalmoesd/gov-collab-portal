@@ -73,9 +73,11 @@
     return;
   }
 
-  // Approve button depends on role
-  if (!(role === "collaborator" || role === "super_collaborator" || role === "supervisor" || role === "chairman" || role === "minister" || role === "admin")){
+  // Approve/Return buttons depend on role
+  if (!(role === "supervisor" || role === "chairman" || role === "minister" || role === "admin")){
     btnApprove.style.display = "none";
+  }
+  if (!(role === "collaborator_2" || role === "supervisor" || role === "chairman" || role === "minister" || role === "admin")){
     btnReturn.style.display = "none";
   }
 

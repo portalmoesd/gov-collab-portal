@@ -271,17 +271,12 @@ function nextSectionSubmitStatus(roleKey) {
 function returnSectionStatus(roleKey) {
   const rk = normalizeRoleKey(roleKey);
   if (rk === 'collaborator_2') return 'returned_by_collaborator_2';
-  if (rk === 'collaborator') return 'returned_by_collaborator';
-  if (rk === 'super_collaborator') return 'returned_by_super_collaborator';
   if (rk === 'supervisor') return 'returned_by_supervisor';
   return 'returned';
 }
 
 function approveSectionStatus(roleKey) {
   const rk = normalizeRoleKey(roleKey);
-  if (rk === 'collaborator_2') return 'approved_by_collaborator_2';
-  if (rk === 'collaborator') return 'approved_by_collaborator';
-  if (rk === 'super_collaborator') return 'approved_by_super_collaborator';
   if (rk === 'supervisor') return 'approved_by_supervisor';
   if (rk === 'chairman') return 'approved_by_chairman';
   if (rk === 'minister') return 'approved_by_minister';
@@ -291,15 +286,11 @@ function approveSectionStatus(roleKey) {
 function decisionStatusesForRole(roleKey) {
   const rk = normalizeRoleKey(roleKey);
   if (rk === 'collaborator_2') return ['submitted_to_collaborator_2', 'returned_by_collaborator_2'];
-  if (rk === 'collaborator') return ['submitted_to_collaborator', 'returned_by_collaborator'];
-  if (rk === 'super_collaborator') return ['submitted_to_super_collaborator', 'returned_by_super_collaborator'];
   if (rk === 'supervisor') return ['submitted_to_supervisor', 'returned_by_supervisor'];
   if (rk === 'chairman') return ['submitted_to_chairman', 'returned_by_chairman'];
   if (rk === 'minister') return ['submitted_to_minister', 'returned_by_minister'];
   if (rk === 'admin') return [
     'submitted_to_collaborator_2', 'returned_by_collaborator_2',
-    'submitted_to_collaborator', 'returned_by_collaborator',
-    'submitted_to_super_collaborator', 'returned_by_super_collaborator',
     'submitted_to_supervisor', 'returned_by_supervisor',
     'submitted_to_chairman', 'returned_by_chairman',
     'submitted_to_minister', 'returned_by_minister'
@@ -343,13 +334,15 @@ async function assertUserCanAccessEventSection(user, eventId, sectionId){
   if (!countries.includes(Number(event.country_id))) return false;
 
   const sections = await getAssignedSectionIds(user.id);
-  if (!sections.includes(Number(sectionId))) return false;
-
   const required = await queryOne(
     `SELECT 1 AS ok FROM event_required_sections WHERE event_id=$1 AND section_id=$2`,
     [eventId, sectionId]
   );
-  return !!required;
+  if (!required) return false;
+
+  if (['collaborator','super_collaborator'].includes(roleKey)) return true;
+  if (!sections.includes(Number(sectionId))) return false;
+  return true;
 }
 
 
@@ -1612,13 +1605,13 @@ app.post('/api/tp/save', authRequired, async (req, res) => {
   await ensureTpRow(eventId, countryId, sectionId, req.user.id);
 
   // Save behavior:
-  // - Collaborator save always moves to 'draft'
-  // - Supervisor/Deputy/Admin save does NOT change status (they use Approve/Return)
+  // - Pipeline roles keep the current workflow stage while editing.
+  // - Elevated approvers save content only; they do not change stage on save.
   if (isCollab) {
     await pool.query(
       `
       UPDATE tp_content
-      SET html_content=$4, last_updated_at=NOW(), last_updated_by_user_id=$5, status='draft'
+      SET html_content=$4, last_updated_at=NOW(), last_updated_by_user_id=$5
       WHERE event_id=$1 AND country_id=$2 AND section_id=$3
       `,
       [eventId, countryId, sectionId, htmlContent, req.user.id]
@@ -1682,7 +1675,7 @@ app.post('/api/tp/submit', authRequired, attachUser, async (req, res) => {
   return res.json({ success:true, status: targetStatus });
 });
 
-app.post('/api/tp/return', requireRole('collaborator_2','collaborator','super_collaborator','supervisor','chairman','admin'), async (req, res) => {
+app.post('/api/tp/return', requireRole('collaborator_2','supervisor','chairman','admin'), async (req, res) => {
   const eventId = Number(req.body?.eventId);
   const sectionId = Number(req.body?.sectionId);
   const note = String((req.body?.note ?? req.body?.comment) || '');
@@ -1723,7 +1716,7 @@ app.post('/api/tp/return', requireRole('collaborator_2','collaborator','super_co
   return res.json({ success:true, status: returnStatus });
 });
 
-app.post('/api/tp/approve-section', requireRole('collaborator_2','collaborator','super_collaborator','supervisor','admin'), async (req, res) => {
+app.post('/api/tp/approve-section', requireRole('supervisor','admin'), async (req, res) => {
   const eventId = Number(req.body?.eventId);
   const sectionId = Number(req.body?.sectionId);
   if (!Number.isFinite(eventId) || !Number.isFinite(sectionId)) {
@@ -1762,7 +1755,7 @@ app.post('/api/tp/approve-section', requireRole('collaborator_2','collaborator',
   return res.json({ success:true, status: targetStatus });
 });
 
-app.post('/api/tp/approve-all-sections', requireRole('collaborator_2','collaborator','super_collaborator','supervisor','chairman','minister','admin'), async (req, res) => {
+app.post('/api/tp/approve-all-sections', requireRole('supervisor','chairman','minister','admin'), async (req, res) => {
   try {
     const eventId = Number(req.body?.eventId);
     if (!Number.isFinite(eventId)) return res.status(400).json({ error: 'eventId required' });
