@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>GOV COLLAB PORTAL • Super-collaborator Dashboard</title>
+  <link rel="stylesheet" href="styles.css?v=20260306sb1" />
+  <link rel="stylesheet" href="styles/apple.css?v=20260309supui2" />
+</head>
+<body>
+
+<div class="layout">
+  <aside class="sidebar"></aside>
+  <main class="main">
+    <div class="topbar topbar-ghost">
+      <div class="page-title">Super-collaborator Dashboard</div>
+    </div>
+    
+<div class="grid">
+  <section class="card col-12 supervisor-control-panel" id="supervisorControlPanel">
+    <div class="supervisor-panel-head">
+      <div>
+        <div class="supervisor-panel-title">Event</div>
+        <div class="supervisor-panel-subtitle">Choose an event to review collaborator submissions before they move to the supervisor stage.</div>
+      </div>
+    </div>
+    <div class="row" style="justify-content:space-between;">
+      <div class="row">
+        <div class="field">
+          <label>Event</label>
+          <select id="eventSelect" class="portal-select"></select>
+        </div>
+      </div>
+      <div class="row supervisor-event-actions" role="group" aria-label="Event actions">
+        <button class="micro-action supervisor-event-action supervisor-event-action--preview" id="previewFullBtn" type="button" aria-label="Preview">
+          <span class="micro-action__icon"></span><span class="micro-action__label">Preview</span>
+        </button>
+        <button class="btn primary" id="submitDocBtn">Submit approved sections to Supervisor</button>
+      </div>
+    </div>
+    <div id="docStatusBox" style="margin-top:12px;"></div>
+    <div id="msg" class="small" style="color:var(--danger); font-weight:800; margin-top:10px;"></div>
+  </section>
+
+  <section class="card col-12 required-sections-panel">
+    <div class="required-sections-head">
+      <div>
+        <div class="required-sections-title">Required sections</div>
+        <div class="required-sections-subtitle">Review section progress, check who updated each part, and take action.</div>
+      </div>
+      <button class="btn success" id="approveAllSectionsBtn">Approve all sections</button>
+    </div>
+
+    <div class="required-sections-tablewrap">
+      <table class="table required-sections-table">
+        <thead><tr><th>Section</th><th>Status</th><th>Last update</th><th>Updated by</th><th>Actions</th></tr></thead>
+        <tbody id="sectionsTbody"></tbody>
+      </table>
+    </div>
+
+    <div id="sectionsCards" class="required-sections-cards"></div>
+    <div id="sectionsEmpty" class="required-sections-empty" hidden>No required sections yet.</div>
+  </section>
+
+  <section class="card col-12 upcoming-events-panel">
+    <div class="upcoming-events-title">Upcoming events</div>
+    <div class="upcoming-split">
+      <div id="eventsCalendar" class="events-calendar"></div>
+      <div id="eventsGrid" class="event-grid"></div>
+    </div>
+  </section>
+
+</div>
+
+  </main>
+</div>
+
+<div class="modal-backdrop" id="modalBackdrop">
+  <div class="modal">
+    <div class="close-row"><button class="btn" id="modalCloseBtn">Close</button></div>
+    <div id="modalContent"></div>
+  </div>
+</div>
+
+  <script src="js/config.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/app.js?v=47"></script>
+  <script src="js/dashboard-super-collab.js?v=1"></script>
+  <script src="js/dashboard-super-collab-upcoming.js?v=1"></script>
+  <script src="js/calendar-collab.js?v=2"></script>
+</body>
+</html>

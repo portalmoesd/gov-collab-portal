@@ -9,7 +9,7 @@ CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
 -- Enums
 DO $$ BEGIN
-  CREATE TYPE tp_section_status AS ENUM ('draft', 'submitted', 'returned', 'approved_by_supervisor', 'approved_by_chairman', 'approved_by_minister');
+  CREATE TYPE tp_section_status AS ENUM ('draft', 'submitted', 'returned', 'submitted_to_super_collaborator', 'returned_by_super_collaborator', 'approved_by_super_collaborator', 'submitted_to_supervisor', 'returned_by_supervisor', 'approved_by_supervisor', 'approved_by_chairman', 'approved_by_minister');
 EXCEPTION
   WHEN duplicate_object THEN NULL;
 END $$;
@@ -159,3 +159,11 @@ CREATE TABLE IF NOT EXISTS country_assignments (
     country_id INTEGER REFERENCES countries(id) ON DELETE CASCADE,
     PRIMARY KEY (user_id, country_id)
 );
+
+
+-- Keep older databases in sync with the newer section workflow statuses
+ALTER TYPE tp_section_status ADD VALUE IF NOT EXISTS 'submitted_to_super_collaborator';
+ALTER TYPE tp_section_status ADD VALUE IF NOT EXISTS 'returned_by_super_collaborator';
+ALTER TYPE tp_section_status ADD VALUE IF NOT EXISTS 'approved_by_super_collaborator';
+ALTER TYPE tp_section_status ADD VALUE IF NOT EXISTS 'submitted_to_supervisor';
+ALTER TYPE tp_section_status ADD VALUE IF NOT EXISTS 'returned_by_supervisor';

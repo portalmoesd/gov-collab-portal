@@ -188,6 +188,9 @@
     const map = {
       draft: 'Draft',
       in_progress: 'Draft',
+      submitted_to_super_collaborator: 'Awaiting Super-collaborator',
+      returned_by_super_collaborator: 'Returned (Super-collaborator)',
+      approved_by_super_collaborator: 'Approved (Super-collaborator)',
       submitted_to_supervisor: 'Submitted',
       returned_by_supervisor: 'Returned',
       approved_by_supervisor: 'Approved (Supervisor)',

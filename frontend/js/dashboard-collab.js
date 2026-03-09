@@ -178,7 +178,11 @@
     const map = {
       draft: 'Draft',
       returned: 'Returned',
+      submitted_to_super_collaborator: 'Submitted to Super-collaborator',
+      returned_by_super_collaborator: 'Returned by Super-collaborator',
+      approved_by_super_collaborator: 'Approved by Super-collaborator',
       submitted_to_supervisor: 'Submitted to Supervisor',
+      returned_by_supervisor: 'Returned by Supervisor',
       submitted_to_chairman: 'Submitted to Deputy',
       submitted_to_minister: 'Submitted to Minister',
       approved: 'Approved'

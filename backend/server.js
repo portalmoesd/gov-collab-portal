@@ -1569,7 +1569,6 @@ app.post('/api/tp/submit', async (req, res) => {
     return res.status(403).json({ error: 'Forbidden' });
   }
 
-
   const ok = await assertUserCanAccessEventSection(req.user, eventId, sectionId);
   if (!ok) return res.status(403).json({ error: 'Forbidden' });
 
@@ -1579,19 +1578,23 @@ app.post('/api/tp/submit', async (req, res) => {
   await ensureDocumentStatus(eventId, countryId);
   await ensureTpRow(eventId, countryId, sectionId, req.user.id);
 
+  const targetStatus = roleKey === 'super_collaborator'
+    ? 'submitted_to_supervisor'
+    : 'submitted_to_super_collaborator';
+
   await pool.query(
     `
     UPDATE tp_content
-    SET html_content=$4, last_updated_at=NOW(), last_updated_by_user_id=$5, status='submitted'
+    SET html_content=$4, last_updated_at=NOW(), last_updated_by_user_id=$5, status=$6, status_comment=NULL
     WHERE event_id=$1 AND country_id=$2 AND section_id=$3
     `,
-    [eventId, countryId, sectionId, htmlContent, req.user.id]
+    [eventId, countryId, sectionId, htmlContent, req.user.id, targetStatus]
   );
 
-  return res.json({ success:true });
+  return res.json({ success:true, status: targetStatus });
 });
 
-app.post('/api/tp/return', requireRole('supervisor','chairman','admin'), async (req, res) => {
+app.post('/api/tp/return', requireRole('super_collaborator','supervisor','chairman','admin'), async (req, res) => {
   const eventId = Number(req.body?.eventId);
   const sectionId = Number(req.body?.sectionId);
   const note = String((req.body?.note ?? req.body?.comment) || '');
@@ -1600,6 +1603,18 @@ app.post('/api/tp/return', requireRole('supervisor','chairman','admin'), async (
     return res.status(400).json({ error: 'eventId and sectionId required' });
   }
 
+  const roleKey = normalizeRoleKey(req.user.role_key);
+  if (roleKey === 'super_collaborator') {
+    const ok = await assertUserCanAccessEventSection(req.user, eventId, sectionId);
+    if (!ok) return res.status(403).json({ error: 'Forbidden' });
+  }
+
+  const returnStatus = roleKey === 'super_collaborator'
+    ? 'returned_by_super_collaborator'
+    : roleKey === 'supervisor'
+      ? 'returned_by_supervisor'
+      : 'returned';
+
   const countryId = await resolveCountryIdForEvent(eventId);
   if (!countryId) return res.status(404).json({ error: 'Event not found' });
 
@@ -1609,22 +1624,29 @@ app.post('/api/tp/return', requireRole('supervisor','chairman','admin'), async (
   await pool.query(
     `
     UPDATE tp_content
-    SET status='returned', status_comment=$4, last_updated_at=NOW(), last_updated_by_user_id=$5
+    SET status=$4, status_comment=$5, last_updated_at=NOW(), last_updated_by_user_id=$6
     WHERE event_id=$1 AND country_id=$2 AND section_id=$3
     `,
-    [eventId, countryId, sectionId, note, req.user.id]
+    [eventId, countryId, sectionId, returnStatus, note, req.user.id]
   );
 
-  return res.json({ success:true });
+  return res.json({ success:true, status: returnStatus });
 });
 
-app.post('/api/tp/approve-section', requireRole('supervisor','admin'), async (req, res) => {
+app.post('/api/tp/approve-section', requireRole('super_collaborator','supervisor','admin'), async (req, res) => {
   const eventId = Number(req.body?.eventId);
   const sectionId = Number(req.body?.sectionId);
   if (!Number.isFinite(eventId) || !Number.isFinite(sectionId)) {
     return res.status(400).json({ error: 'eventId and sectionId required' });
   }
 
+  const roleKey = normalizeRoleKey(req.user.role_key);
+  if (roleKey === 'super_collaborator') {
+    const ok = await assertUserCanAccessEventSection(req.user, eventId, sectionId);
+    if (!ok) return res.status(403).json({ error: 'Forbidden' });
+  }
+  const targetStatus = roleKey === 'super_collaborator' ? 'approved_by_super_collaborator' : 'approved_by_supervisor';
+
   const countryId = await resolveCountryIdForEvent(eventId);
   if (!countryId) return res.status(404).json({ error: 'Event not found' });
 
@@ -1634,16 +1656,16 @@ app.post('/api/tp/approve-section', requireRole('supervisor','admin'), async (re
   await pool.query(
     `
     UPDATE tp_content
-    SET status='approved_by_supervisor', status_comment=NULL, last_updated_at=NOW(), last_updated_by_user_id=$4
+    SET status=$4, status_comment=NULL, last_updated_at=NOW(), last_updated_by_user_id=$5
     WHERE event_id=$1 AND country_id=$2 AND section_id=$3
     `,
-    [eventId, countryId, sectionId, req.user.id]
+    [eventId, countryId, sectionId, targetStatus, req.user.id]
   );
 
-  return res.json({ success:true });
+  return res.json({ success:true, status: targetStatus });
 });
 
-app.post('/api/tp/approve-all-sections', requireRole('supervisor','chairman','minister','admin'), async (req, res) => {
+app.post('/api/tp/approve-all-sections', requireRole('super_collaborator','supervisor','chairman','minister','admin'), async (req, res) => {
   try {
     const eventId = Number(req.body?.eventId);
     if (!Number.isFinite(eventId)) return res.status(400).json({ error: 'eventId required' });
@@ -1657,7 +1679,12 @@ app.post('/api/tp/approve-all-sections', requireRole('supervisor','chairman','mi
       `SELECT section_id FROM event_required_sections WHERE event_id=$1 ORDER BY section_id ASC`,
       [eventId]
     );
-    const sectionIds = required.map(r => Number(r.section_id)).filter(n => Number.isFinite(n));
+    const roleKey = normalizeRoleKey(req.user.role_key);
+    let sectionIds = required.map(r => Number(r.section_id)).filter(n => Number.isFinite(n));
+    if (roleKey === 'super_collaborator') {
+      const assignedSectionIds = await getAssignedSectionIds(req.user.id);
+      sectionIds = sectionIds.filter(id => assignedSectionIds.includes(id));
+    }
     if (sectionIds.length === 0) return res.json({ success:true, approved: 0 });
 
     // Ensure rows exist
@@ -1665,8 +1692,7 @@ app.post('/api/tp/approve-all-sections', requireRole('supervisor','chairman','mi
       await ensureTpRow(eventId, countryId, sid, req.user.id);
     }
 
-    const roleKey = normalizeRoleKey(req.user.role_key);
-    const targetStatus = (roleKey === 'minister') ? 'approved_by_minister' : (roleKey === 'chairman') ? 'approved_by_chairman' : 'approved_by_supervisor';
+    const targetStatus = (roleKey === 'minister') ? 'approved_by_minister' : (roleKey === 'chairman') ? 'approved_by_chairman' : (roleKey === 'super_collaborator') ? 'approved_by_super_collaborator' : 'approved_by_supervisor';
 
     await pool.query(
       `
@@ -1684,6 +1710,47 @@ app.post('/api/tp/approve-all-sections', requireRole('supervisor','chairman','mi
   }
 });
 
+
+
+app.post('/api/tp/submit-approved-to-supervisor', requireRole('super_collaborator','admin'), async (req, res) => {
+  const eventId = Number(req.body?.eventId);
+  if (!Number.isFinite(eventId)) {
+    return res.status(400).json({ error: 'eventId required' });
+  }
+
+  const countryId = await resolveCountryIdForEvent(eventId);
+  if (!countryId) return res.status(404).json({ error: 'Event not found' });
+
+  let sectionIds = await queryAll(
+    `SELECT section_id FROM event_required_sections WHERE event_id=$1 ORDER BY section_id ASC`,
+    [eventId]
+  );
+  sectionIds = sectionIds.map(r => Number(r.section_id)).filter(Number.isFinite);
+
+  const roleKey = normalizeRoleKey(req.user.role_key);
+  if (roleKey === 'super_collaborator') {
+    const assignedSectionIds = await getAssignedSectionIds(req.user.id);
+    sectionIds = sectionIds.filter(id => assignedSectionIds.includes(id));
+  }
+  if (!sectionIds.length) return res.json({ success:true, submitted: 0 });
+
+  for (const sid of sectionIds) {
+    await ensureTpRow(eventId, countryId, sid, req.user.id);
+  }
+
+  const { rows } = await pool.query(
+    `
+    UPDATE tp_content
+    SET status='submitted_to_supervisor', status_comment=NULL, last_updated_at=NOW(), last_updated_by_user_id=$4
+    WHERE event_id=$1 AND country_id=$2 AND section_id = ANY($3::int[])
+      AND status IN ('approved_by_super_collaborator','returned_by_supervisor')
+    RETURNING section_id
+    `,
+    [eventId, countryId, sectionIds, req.user.id]
+  );
+
+  return res.json({ success:true, submitted: rows.length, status: 'submitted_to_supervisor' });
+});
 
 app.post('/api/tp/approve-section-chairman', requireRole('chairman','minister','admin'), async (req, res) => {
   const eventId = Number(req.body?.eventId);
@@ -1770,12 +1837,13 @@ app.get('/api/tp/status-grid', authRequired, async (req, res) => {
     const eventId = parseInt(req.query.event_id, 10);
     if (!eventId) return res.status(400).json({ error: 'event_id required' });
 
+    const roleKey = normalizeRoleKey(req.user.role_key);
+
     // Resolve the event's country_id (tp_content is keyed by event_id + country_id + section_id)
     const countryId = await resolveCountryIdForEvent(eventId);
     if (!countryId) return res.status(404).json({ error: 'event not found' });
 
-    // Build status grid for required sections for this event
-    const q = `
+    let q = `
       SELECT
         ers.section_id AS id,
         s.label,
@@ -1792,9 +1860,18 @@ app.get('/api/tp/status-grid', authRequired, async (req, res) => {
        AND t.section_id = ers.section_id
       LEFT JOIN users u ON u.id = t.last_updated_by_user_id
       WHERE ers.event_id = $1
-      ORDER BY s.order_index ASC, s.id ASC
     `;
-    const { rows } = await pool.query(q, [eventId, countryId]);
+    const params = [eventId, countryId];
+    if (roleKey === 'collaborator' || roleKey === 'super_collaborator') {
+      const assignedSectionIds = await getAssignedSectionIds(req.user.id);
+      if (!assignedSectionIds.length) {
+        return res.json({ event_id: eventId, country_id: countryId, sections: [] });
+      }
+      q += ` AND ers.section_id = ANY($3::int[])`;
+      params.push(assignedSectionIds);
+    }
+    q += ` ORDER BY s.order_index ASC, s.id ASC`;
+    const { rows } = await pool.query(q, params);
 
     res.json({
       event_id: eventId,

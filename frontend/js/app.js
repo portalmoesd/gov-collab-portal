@@ -31,13 +31,13 @@
       { href: "statistics.html", label: "Statistics" },
     ],
     super_collaborator: [
-      { href: "dashboard-collab.html", label: "Dashboard" },
+      { href: "dashboard-super-collab.html", label: "Dashboard" },
       { href: "calendar.html", label: "Calendar (Read)" },
       { href: "library.html", label: "Library" },
       { href: "statistics.html", label: "Statistics" },
     ],
     collaborator: [
-      { href: "dashboard-collab.html", label: "Dashboard" },
+      { href: "dashboard-super-collab.html", label: "Dashboard" },
       { href: "calendar.html", label: "Calendar (Read)" },
       { href: "statistics.html", label: "Statistics" },
     ],

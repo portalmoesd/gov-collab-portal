@@ -187,6 +187,9 @@
     const map = {
       draft: 'Draft',
       in_progress: 'Draft',
+      submitted_to_super_collaborator: 'Awaiting Super-collaborator',
+      returned_by_super_collaborator: 'Returned (Super-collaborator)',
+      approved_by_super_collaborator: 'Approved (Super-collaborator)',
       submitted_to_supervisor: 'Submitted',
       returned_by_supervisor: 'Returned',
       approved_by_supervisor: 'Approved (Supervisor)',
@@ -220,10 +223,10 @@
   function statusBadgeClass(status){
     const s = String(status || '').toLowerCase();
     if (['draft','in_progress','locked'].includes(s)) return 'is-draft';
-    if (['submitted_to_supervisor'].includes(s)) return 'is-review';
+    if (['submitted_to_super_collaborator','submitted_to_supervisor'].includes(s)) return 'is-review';
     if (['submitted_to_chairman'].includes(s)) return 'is-submitted';
-    if (['approved_by_supervisor','approved_by_chairman'].includes(s)) return 'is-approved';
-    if (['returned_by_supervisor','returned_by_chairman'].includes(s)) return 'is-returned';
+    if (['approved_by_super_collaborator','approved_by_supervisor','approved_by_chairman'].includes(s)) return 'is-approved';
+    if (['returned_by_super_collaborator','returned_by_supervisor','returned_by_chairman'].includes(s)) return 'is-returned';
     return 'is-draft';
   }
 

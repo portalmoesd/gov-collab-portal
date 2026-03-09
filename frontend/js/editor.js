@@ -74,7 +74,7 @@
   }
 
   // Approve button depends on role
-  if (!(role === "supervisor" || role === "chairman" || role === "minister" || role === "admin")){
+  if (!(role === "super_collaborator" || role === "supervisor" || role === "chairman" || role === "minister" || role === "admin")){
     btnApprove.style.display = "none";
     btnReturn.style.display = "none";
   }
@@ -163,7 +163,7 @@
         body: JSON.stringify({ eventId, sectionId, htmlContent: getHtml() })
       });
       await load();
-      msg.textContent = "Submitted.";
+      msg.textContent = role === "super_collaborator" ? "Submitted to Supervisor." : "Submitted to Super-collaborator.";
     }catch(err){
       msg.textContent = err.message || "Submit failed";
     } finally {
