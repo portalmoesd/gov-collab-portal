@@ -61,7 +61,7 @@
         if (newFull === null) return;
         const newEmail = prompt("Email:", u.email || "");
         if (newEmail === null) return;
-        const newRole = prompt("Role (admin/minister/chairman(=deputy)/supervisor/protocol/super_collaborator/collaborator/viewer):", u.role);
+        const newRole = prompt("Role (admin/minister/chairman(=deputy)/supervisor/protocol/super_collaborator/collaborator/collaborator_2/collaborator_1/viewer):", u.role);
         if (newRole === null) return;
         const pw = prompt("New password (leave blank to keep):", "");
         try{
@@ -347,7 +347,7 @@
     const users = await window.GCP.apiFetch("/users", { method:"GET" });
     assignableUsersCache = (users || []).filter(u => {
       const rk = String(u.role || '').toLowerCase();
-      return (rk === 'collaborator' || rk === 'super_collaborator') && u.isActive;
+      return ['collaborator_1','collaborator_2','collaborator','super_collaborator'].includes(rk) && u.isActive;
     });
 
     assignUserSelect.innerHTML = `<option value="">Select…</option>` + assignableUsersCache.map(u => {

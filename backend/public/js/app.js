@@ -101,6 +101,8 @@ function formatTbilisiDate(value) {
       protocol:"Protocol",
       super_collaborator:"Super-collaborator",
       collaborator:"Collaborator",
+      collaborator_2:"Collaborator II",
+      collaborator_1:"Collaborator I",
       viewer:"Viewer"
     };
     return map[String(r||"").toLowerCase()] || r;

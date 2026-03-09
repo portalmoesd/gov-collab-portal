@@ -1,7 +1,11 @@
-// dashboard-supervisor.js
+// dashboard-super-collab.js
 (async function(){
   const me = await window.GCP.requireAuth();
   if (!me) return;
+  if (String(me.role || '').toLowerCase() !== 'collaborator') {
+    location.href = 'dashboard-collab.html';
+    return;
+  }
 
   const eventSelect = document.getElementById('eventSelect');
   const sectionsTbody = document.getElementById('sectionsTbody');
@@ -193,15 +197,16 @@
       submitted_to_collaborator: 'Submitted to Collaborator',
       returned_by_collaborator: 'Returned by Collaborator',
       approved_by_collaborator: 'Approved by Collaborator',
-      submitted_to_super_collaborator: 'Awaiting Super-collaborator',
-      returned_by_super_collaborator: 'Returned (Super-collaborator)',
+      submitted_to_super_collaborator: 'Submitted by Collaborator',
+      returned_by_super_collaborator: 'Returned by Super-collaborator',
       approved_by_super_collaborator: 'Approved (Super-collaborator)',
-      submitted_to_supervisor: 'Submitted',
-      returned_by_supervisor: 'Returned',
+      submitted_to_supervisor: 'Submitted to Supervisor',
+      returned_by_supervisor: 'Returned by Supervisor',
       approved_by_supervisor: 'Approved (Supervisor)',
       submitted_to_chairman: 'Submitted to Deputy',
       returned_by_chairman: 'Returned (Deputy)',
       approved_by_chairman: 'Approved (Deputy)',
+      approved_by_minister: 'Approved (Minister)',
       locked: 'Locked'
     };
     return map[s] || (s || '');
@@ -229,9 +234,9 @@
   function statusBadgeClass(status){
     const s = String(status || '').toLowerCase();
     if (['draft','in_progress','locked'].includes(s)) return 'is-draft';
-    if (['submitted_to_collaborator_2','submitted_to_collaborator','submitted_to_super_collaborator','submitted_to_supervisor'].includes(s)) return 'is-review';
-    if (['submitted_to_chairman'].includes(s)) return 'is-submitted';
-    if (['approved_by_collaborator_2','approved_by_collaborator','approved_by_super_collaborator','approved_by_supervisor','approved_by_chairman'].includes(s)) return 'is-approved';
+    if (['submitted_to_collaborator_2','submitted_to_collaborator','submitted_to_super_collaborator'].includes(s)) return 'is-review';
+    if (['submitted_to_supervisor','submitted_to_chairman'].includes(s)) return 'is-submitted';
+    if (['approved_by_collaborator_2','approved_by_collaborator','approved_by_super_collaborator','approved_by_supervisor','approved_by_chairman','approved_by_minister'].includes(s)) return 'is-approved';
     if (['returned_by_collaborator_2','returned_by_collaborator','returned_by_super_collaborator','returned_by_supervisor','returned_by_chairman'].includes(s)) return 'is-returned';
     return 'is-draft';
   }
@@ -252,11 +257,17 @@
     const wrap = document.createElement('div');
     wrap.className = 'required-actions';
 
-    wrap.appendChild(createMicroAction('Open', 'open', () => {
-      window.open(`editor.html?event_id=${currentEventId}&section_id=${section.sectionId}`, '_blank');
-    }));
+    const stage = String(section.status || '').toLowerCase();
+    const isAssigned = !!section.isAssigned;
+    const canDecision = ['submitted_to_collaborator', 'returned_by_collaborator'].includes(stage);
+    const canOpen = isAssigned || canDecision;
 
-    const canDecision = ['submitted_to_supervisor', 'returned_by_supervisor'].includes(String(section.status || '').toLowerCase());
+    if (canOpen) {
+      wrap.appendChild(createMicroAction('Open', 'open', () => {
+        window.open(`editor.html?event_id=${currentEventId}&section_id=${section.sectionId}`, '_blank');
+      }));
+    }
+
     if (canDecision) {
       wrap.appendChild(createMicroAction('Approve', 'approve', async () => {
         setMsg('');
@@ -275,6 +286,10 @@
         });
         await refreshStatusGrid();
       }));
+    }
+
+    if (!canOpen && !canDecision) {
+      wrap.innerHTML = '<span class="required-actions-muted">View only</span>';
     }
     target.appendChild(wrap);
   }
@@ -334,15 +349,17 @@
       }
     }
 
-    // Enable submit to deputy when all sections approved by supervisor
-    const ok = currentSections.length > 0 && currentSections.every(s => ['approved_by_supervisor','approved_by_chairman'].includes(s.status));
-    submitDocBtn.disabled = !ok;
+    // Enable submit to supervisor when all assigned sections are approved by super-collaborator or already beyond that stage.
+    const statuses = currentSections.map(s => String(s.status || '').toLowerCase());
+    const allReady = currentSections.length > 0 && statuses.every(s => ['approved_by_collaborator', 'submitted_to_super_collaborator', 'approved_by_super_collaborator', 'submitted_to_supervisor', 'approved_by_supervisor', 'approved_by_chairman', 'approved_by_minister', 'locked'].includes(s));
+    const hasFreshApprovals = statuses.some(s => s === 'approved_by_collaborator');
+    submitDocBtn.disabled = !(allReady && hasFreshApprovals);
   }
 
   
   if (approveAllSectionsBtn) approveAllSectionsBtn.addEventListener('click', async () => {
     if (!currentEventId) return;
-    if (!confirm('Approve all required sections for this event?')) return;
+    if (!confirm('Approve all assigned sections for this event?')) return;
     setMsg('');
     await window.GCP.apiFetch('/tp/approve-all-sections', {
       method:'POST',
@@ -350,6 +367,28 @@
     });
     await refreshStatusGrid();
   });
+
+  async function refreshDocumentStatus(){
+    if (!currentEventId) {
+      if (docStatusBox) docStatusBox.innerHTML = '';
+      return;
+    }
+    const ds = await window.GCP.apiFetch(`/tp/document-status?event_id=${encodeURIComponent(currentEventId)}`, { method:'GET' });
+    const last = ds.updatedAt ? window.GCP.formatDateTime(ds.updatedAt) : '';
+    const ev = eventsById.get(currentEventId);
+    const submitterRole = (ds.submitterRole || ev?.submitter_role || 'deputy');
+    const task = ((ev?.task ?? ev?.occasion) || '').trim();
+    if (docStatusBox) {
+      docStatusBox.innerHTML = `
+        <div style="display:flex; align-items:baseline; justify-content:space-between; gap:12px; flex-wrap:wrap;">
+          <div><b>Status:</b> ${window.GCP.escapeHtml(humanStatus(ds.status) || '')}</div>
+          ${last ? `<div class="muted">${window.GCP.escapeHtml(last)}</div>` : ''}
+        </div>
+        <div class="supervisor-progress-wrap">${window.GCP.renderWorkflowProgress(ds.status, submitterRole)}</div>
+        ${task ? `<div style="margin-top:10px;"><b>Task:</b> ${window.GCP.escapeHtml(task)}</div>` : ''}
+      `;
+    }
+  }
 
 eventSelect.addEventListener('change', async () => {
     setMsg('');
@@ -360,49 +399,21 @@ eventSelect.addEventListener('change', async () => {
       if (sectionsCards) sectionsCards.innerHTML = '';
       if (sectionsEmpty) sectionsEmpty.hidden = false;
       submitDocBtn.disabled = true;
-      endEventBtn.style.display = 'none';
+      if (docStatusBox) docStatusBox.innerHTML = '';
       return;
     }
-    // Adjust document submit button label based on configured submitter
-    // (use data from /events/upcoming to avoid permission/latency issues)
-    const selectedOpt = eventSelect.options[eventSelect.selectedIndex];
-    let sr = ((selectedOpt?.dataset?.submitterRole || '')).toLowerCase();
-    // Fallback: if submitter role wasn't included in the upcoming events list, fetch event details.
-    if (!sr && currentEventId > 0) {
-      try {
-        const evDetails = await window.GCP.apiFetch(`/events/${currentEventId}`, { method: 'GET' });
-        sr = String(evDetails?.submitter_role || evDetails?.submitterRole || '').toLowerCase();
-      } catch (e) {
-        // ignore; keep default
-      }
-    }
-    submitDocBtn.textContent = sr === 'supervisor' ? 'Send to Library' : (sr === 'minister' ? 'Submit to Deputy' : 'Submit document to Deputy');
-    submitDocBtn.dataset.submitterRole = sr || 'chairman';
+    submitDocBtn.textContent = 'Submit approved sections to Super-collaborator';
+    submitDocBtn.title = submitDocBtn.disabled ? 'Waiting for approvals' : 'Move approved sections into the Super-collaborator review stage';
     try{
       await refreshStatusGrid();
-
-      // Document status box (same workflow bar as collaborator)
-      const ds = await window.GCP.apiFetch(`/tp/document-status?event_id=${encodeURIComponent(currentEventId)}`, { method:'GET' });
-      const last = ds.updatedAt ? window.GCP.formatDateTime(ds.updatedAt) : '';
-      const ev = eventsById.get(currentEventId);
-      const submitterRole = (ds.submitterRole || ev?.submitter_role || 'deputy');
-      // Back-compat: the DB column is still "occasion" but UI now calls it "task"
-      const task = ((ev?.task ?? ev?.occasion) || '').trim();
-      if (docStatusBox) {
-        docStatusBox.innerHTML = `
-          <div style="display:flex; align-items:baseline; justify-content:space-between; gap:12px; flex-wrap:wrap;">
-            <div><b>Status:</b> ${window.GCP.escapeHtml(humanStatus(ds.status) || '')}</div>
-            ${last ? `<div class="muted">${window.GCP.escapeHtml(last)}</div>` : ''}
-          </div>
-          <div class="supervisor-progress-wrap">${window.GCP.renderWorkflowProgress(ds.status, submitterRole)}</div>
-          ${task ? `<div style="margin-top:10px;"><b>Task:</b> ${window.GCP.escapeHtml(task)}</div>` : ''}
-        `;
-      }
+      submitDocBtn.title = submitDocBtn.disabled ? 'Waiting for approvals' : 'Move approved sections into the Super-collaborator review stage';
+      await refreshDocumentStatus();
     }catch(e){
       setMsg(e.message || 'Failed to load sections', true);
       sectionsTbody.innerHTML = '';
       if (sectionsCards) sectionsCards.innerHTML = '';
       if (sectionsEmpty) sectionsEmpty.hidden = false;
+      if (docStatusBox) docStatusBox.innerHTML = '';
       submitDocBtn.disabled = true;
     }
   });
@@ -438,25 +449,18 @@ modalBackdrop.addEventListener('click', (e) => {
 });
 
   submitDocBtn.addEventListener('click', async () => {
-    if (!currentEventId) return;
+    if (!currentEventId || submitDocBtn.disabled) return;
+    if (!confirm('Submit all approved assigned sections to Super-collaborator?')) return;
     setMsg('');
     try {
-      // Determine the configured submitter for this event (Supervisor/Deputy/Minister)
-      // (use the value stored on the selected <option> from /events/upcoming)
-      const selectedOpt = eventSelect.options[eventSelect.selectedIndex];
-      const sr = String(selectedOpt?.dataset?.submitterRole || '').toLowerCase();
-
-      await window.GCP.apiFetch('/document/submit-to-chairman', {
+      const result = await window.GCP.apiFetch('/tp/submit-approved-to-super-collaborator', {
         method: 'POST',
         body: JSON.stringify({ eventId: currentEventId })
       });
-
-      if (sr === 'supervisor') {
-        setMsg('Document finalized and sent to Library.');
-      } else {
-        setMsg('Submitted to Deputy.');
-      }
+      if (result && Number(result.submitted || 0) > 0) setMsg('Approved sections submitted to Super-collaborator.');
+      else setMsg('No newly approved sections were ready to submit.');
       await refreshStatusGrid();
+      await refreshDocumentStatus();
     } catch (e) {
       setMsg(e.message || 'Submit failed', true);
     }

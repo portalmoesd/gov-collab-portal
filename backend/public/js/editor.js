@@ -63,7 +63,7 @@
   }
 
   // Buttons visible depending on role (Blueprint editor behaviour)
-  const canEdit = ["admin","chairman","minister","supervisor","collaborator","super_collaborator"].includes(role);
+  const canEdit = ["admin","chairman","minister","supervisor","collaborator_1","collaborator_2","collaborator","super_collaborator"].includes(role);
   const isViewer = role === "viewer";
   const isProtocol = role === "protocol";
 
@@ -74,13 +74,13 @@
   }
 
   // Approve button depends on role
-  if (!(role === "super_collaborator" || role === "supervisor" || role === "chairman" || role === "minister" || role === "admin")){
+  if (!(role === "collaborator_2" || role === "collaborator" || role === "super_collaborator" || role === "supervisor" || role === "chairman" || role === "minister" || role === "admin")){
     btnApprove.style.display = "none";
     btnReturn.style.display = "none";
   }
 
   // Submit is only for collaborators (they submit their draft for review)
-  if (!(role === "collaborator" || role === "super_collaborator")){
+  if (!(role === "collaborator_1" || role === "collaborator_2" || role === "collaborator" || role === "super_collaborator")){
     btnSubmit.style.display = "none";
   }
   if (isViewer){
@@ -163,7 +163,7 @@
         body: JSON.stringify({ eventId, sectionId, htmlContent: getHtml() })
       });
       await load();
-      msg.textContent = role === "super_collaborator" ? "Submitted to Supervisor." : "Submitted to Super-collaborator.";
+      msg.textContent = role === "collaborator_1" ? "Submitted to Collaborator II." : role === "collaborator_2" ? "Submitted to Collaborator." : role === "super_collaborator" ? "Submitted to Supervisor." : "Submitted to Super-collaborator.";
     }catch(err){
       msg.textContent = err.message || "Submit failed";
     } finally {

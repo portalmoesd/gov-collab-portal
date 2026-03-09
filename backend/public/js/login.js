@@ -31,7 +31,9 @@ function redirectByRole(role){
     else if (r === "chairman") location.href = "dashboard-chairman.html"; // Deputy
     else if (r === "supervisor") location.href = "dashboard-supervisor.html";
     else if (r === "super_collaborator") location.href = "dashboard-super-collab.html";
-    else if (r === "collaborator") location.href = "dashboard-collab.html";
+    else if (r === "collaborator") location.href = "dashboard-collab-review.html";
+    else if (r === "collaborator_2") location.href = "dashboard-collab-2.html";
+    else if (r === "collaborator_1") location.href = "dashboard-collab.html";
     else if (r === "protocol") location.href = "calendar.html";
     else if (r === "minister") location.href = "calendar.html";
     else location.href = "statistics.html";

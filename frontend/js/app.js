@@ -37,7 +37,17 @@
       { href: "statistics.html", label: "Statistics" },
     ],
     collaborator: [
-      { href: "dashboard-super-collab.html", label: "Dashboard" },
+      { href: "dashboard-collab-review.html", label: "Dashboard" },
+      { href: "calendar.html", label: "Calendar (Read)" },
+      { href: "statistics.html", label: "Statistics" },
+    ],
+    collaborator_2: [
+      { href: "dashboard-collab-2.html", label: "Dashboard" },
+      { href: "calendar.html", label: "Calendar (Read)" },
+      { href: "statistics.html", label: "Statistics" },
+    ],
+    collaborator_1: [
+      { href: "dashboard-collab.html", label: "Dashboard" },
       { href: "calendar.html", label: "Calendar (Read)" },
       { href: "statistics.html", label: "Statistics" },
     ],
@@ -59,6 +69,8 @@
       protocol:"Protocol",
       super_collaborator:"Super-collaborator",
       collaborator:"Collaborator",
+      collaborator_2:"Collaborator II",
+      collaborator_1:"Collaborator I",
       viewer:"Viewer"
     };
     return map[String(r||"").toLowerCase()] || r;

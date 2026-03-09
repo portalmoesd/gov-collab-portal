@@ -187,6 +187,12 @@
     const map = {
       draft: 'Draft',
       in_progress: 'Draft',
+      submitted_to_collaborator_2: 'Submitted to Collaborator II',
+      returned_by_collaborator_2: 'Returned by Collaborator II',
+      approved_by_collaborator_2: 'Approved by Collaborator II',
+      submitted_to_collaborator: 'Submitted to Collaborator',
+      returned_by_collaborator: 'Returned by Collaborator',
+      approved_by_collaborator: 'Approved by Collaborator',
       submitted_to_super_collaborator: 'Awaiting Super-collaborator',
       returned_by_super_collaborator: 'Returned (Super-collaborator)',
       approved_by_super_collaborator: 'Approved (Super-collaborator)',
@@ -223,10 +229,10 @@
   function statusBadgeClass(status){
     const s = String(status || '').toLowerCase();
     if (['draft','in_progress','locked'].includes(s)) return 'is-draft';
-    if (['submitted_to_super_collaborator','submitted_to_supervisor'].includes(s)) return 'is-review';
+    if (['submitted_to_collaborator_2','submitted_to_collaborator','submitted_to_super_collaborator','submitted_to_supervisor'].includes(s)) return 'is-review';
     if (['submitted_to_chairman'].includes(s)) return 'is-submitted';
-    if (['approved_by_super_collaborator','approved_by_supervisor','approved_by_chairman'].includes(s)) return 'is-approved';
-    if (['returned_by_super_collaborator','returned_by_supervisor','returned_by_chairman'].includes(s)) return 'is-returned';
+    if (['approved_by_collaborator_2','approved_by_collaborator','approved_by_super_collaborator','approved_by_supervisor','approved_by_chairman'].includes(s)) return 'is-approved';
+    if (['returned_by_collaborator_2','returned_by_collaborator','returned_by_super_collaborator','returned_by_supervisor','returned_by_chairman'].includes(s)) return 'is-returned';
     return 'is-draft';
   }
 
@@ -250,7 +256,7 @@
       window.open(`editor.html?event_id=${currentEventId}&section_id=${section.sectionId}`, '_blank');
     }));
 
-    const canDecision = !['approved_by_supervisor', 'approved_by_chairman'].includes(String(section.status || '').toLowerCase());
+    const canDecision = ['submitted_to_supervisor', 'returned_by_supervisor'].includes(String(section.status || '').toLowerCase());
     if (canDecision) {
       wrap.appendChild(createMicroAction('Approve', 'approve', async () => {
         setMsg('');

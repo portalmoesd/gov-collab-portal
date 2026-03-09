@@ -288,33 +288,6 @@ function approveSectionStatus(roleKey) {
   return null;
 }
 
-function decisionStatusesForRole(roleKey) {
-  const rk = normalizeRoleKey(roleKey);
-  if (rk === 'collaborator_2') return ['submitted_to_collaborator_2', 'returned_by_collaborator_2'];
-  if (rk === 'collaborator') return ['submitted_to_collaborator', 'returned_by_collaborator'];
-  if (rk === 'super_collaborator') return ['submitted_to_super_collaborator', 'returned_by_super_collaborator'];
-  if (rk === 'supervisor') return ['submitted_to_supervisor', 'returned_by_supervisor'];
-  if (rk === 'chairman') return ['submitted_to_chairman', 'returned_by_chairman'];
-  if (rk === 'minister') return ['submitted_to_minister', 'returned_by_minister'];
-  if (rk === 'admin') return [
-    'submitted_to_collaborator_2', 'returned_by_collaborator_2',
-    'submitted_to_collaborator', 'returned_by_collaborator',
-    'submitted_to_super_collaborator', 'returned_by_super_collaborator',
-    'submitted_to_supervisor', 'returned_by_supervisor',
-    'submitted_to_chairman', 'returned_by_chairman',
-    'submitted_to_minister', 'returned_by_minister'
-  ];
-  return [];
-}
-
-async function getCurrentSectionStatus(eventId, countryId, sectionId) {
-  const row = await queryOne(
-    `SELECT status::text AS status FROM tp_content WHERE event_id=$1 AND country_id=$2 AND section_id=$3`,
-    [eventId, countryId, sectionId]
-  );
-  return String(row?.status || 'draft').toLowerCase();
-}
-
 
 async function userCanSeeEvent(user, event){
   const roleKey = normalizeRoleKey(user.role_key);
@@ -1680,12 +1653,6 @@ app.post('/api/tp/return', requireRole('collaborator_2','collaborator','super_co
   await ensureDocumentStatus(eventId, countryId);
   await ensureTpRow(eventId, countryId, sectionId, req.user.id);
 
-  const currentStatus = await getCurrentSectionStatus(eventId, countryId, sectionId);
-  const allowedStatuses = decisionStatusesForRole(roleKey);
-  if (allowedStatuses.length && !allowedStatuses.includes(currentStatus)) {
-    return res.status(400).json({ error: 'Section is not at your review stage' });
-  }
-
   await pool.query(
     `
     UPDATE tp_content
@@ -1718,12 +1685,6 @@ app.post('/api/tp/approve-section', requireRole('collaborator_2','collaborator',
 
   await ensureDocumentStatus(eventId, countryId);
   await ensureTpRow(eventId, countryId, sectionId, req.user.id);
-
-  const currentStatus = await getCurrentSectionStatus(eventId, countryId, sectionId);
-  const allowedStatuses = decisionStatusesForRole(roleKey);
-  if (allowedStatuses.length && !allowedStatuses.includes(currentStatus)) {
-    return res.status(400).json({ error: 'Section is not at your review stage' });
-  }
 
   await pool.query(
     `
@@ -1766,19 +1727,16 @@ app.post('/api/tp/approve-all-sections', requireRole('collaborator_2','collabora
     const targetStatus = approveSectionStatus(roleKey);
     if (!targetStatus) return res.status(400).json({ error: 'Unsupported role for bulk approve' });
 
-    const allowedStatuses = decisionStatusesForRole(roleKey);
-    const { rows } = await pool.query(
+    await pool.query(
       `
       UPDATE tp_content
       SET status=$4, status_comment=NULL, last_updated_at=NOW(), last_updated_by_user_id=$5
       WHERE event_id=$1 AND country_id=$2 AND section_id = ANY($3::int[])
-        AND status = ANY($6::text[])
-      RETURNING section_id
       `,
-      [eventId, countryId, sectionIds, targetStatus, req.user.id, allowedStatuses]
+      [eventId, countryId, sectionIds, targetStatus, req.user.id]
     );
 
-    return res.json({ success:true, approved: rows.length, status: targetStatus });
+    return res.json({ success:true, approved: sectionIds.length, status: targetStatus });
   } catch (e) {
     console.error('POST /api/tp/approve-all-sections failed', e);
     return res.status(500).json({ error: 'Server error' });
@@ -2017,21 +1975,16 @@ app.get('/api/tp/status-grid', authRequired, async (req, res) => {
       WHERE ers.event_id = $1
     `;
     const params = [eventId, countryId];
-    let assignedSectionIds = [];
     if (isSectionPipelineRole(roleKey)) {
-      assignedSectionIds = await getAssignedSectionIds(req.user.id);
-      const shouldRestrictToAssigned = roleKey !== 'collaborator';
-      if (shouldRestrictToAssigned) {
-        if (!assignedSectionIds.length) {
-          return res.json({ event_id: eventId, country_id: countryId, sections: [] });
-        }
-        q += ` AND ers.section_id = ANY($3::int[])`;
-        params.push(assignedSectionIds);
+      const assignedSectionIds = await getAssignedSectionIds(req.user.id);
+      if (!assignedSectionIds.length) {
+        return res.json({ event_id: eventId, country_id: countryId, sections: [] });
       }
+      q += ` AND ers.section_id = ANY($3::int[])`;
+      params.push(assignedSectionIds);
     }
     q += ` ORDER BY s.order_index ASC, s.id ASC`;
     const { rows } = await pool.query(q, params);
-    const assignedSet = new Set((assignedSectionIds || []).map(Number));
 
     res.json({
       event_id: eventId,
@@ -2043,7 +1996,6 @@ app.get('/api/tp/status-grid', authRequired, async (req, res) => {
         statusComment: r.status_comment || null,
         lastUpdatedAt: r.last_updated_at,
         lastUpdatedBy: r.last_updated_by || null,
-        isAssigned: assignedSet.has(Number(r.id)),
       }))
     });
   } catch (e) {
