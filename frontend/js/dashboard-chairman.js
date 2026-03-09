@@ -227,50 +227,56 @@
 
   const escape = window.GCP.escapeHtml;
 
+  function createMicroAction(label, kind, onClick){
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = `micro-action required-action required-action--${kind}`;
+    btn.setAttribute('aria-label', label);
+    btn.innerHTML = `<span class="micro-action__icon"></span><span class="micro-action__label">${escape(label)}</span>`;
+    btn.addEventListener('click', onClick);
+    return btn;
+  }
+
   function appendSectionActions(target, section){
     if (!target) return;
     target.innerHTML = '';
 
-    const openBtn = document.createElement('button');
-    openBtn.className = 'btn';
-    openBtn.textContent = 'Open editor';
-    openBtn.addEventListener('click', () => {
+    const wrap = document.createElement('div');
+    wrap.className = 'required-actions';
+
+    wrap.appendChild(createMicroAction('Open', 'open', () => {
       window.open(`editor.html?event_id=${currentEventId}&section_id=${section.sectionId}`, '_blank');
-    });
-    target.appendChild(openBtn);
+    }));
 
-    const approveBtn = document.createElement('button');
-    approveBtn.className = 'btn success';
-    approveBtn.textContent = 'Approve section';
-    approveBtn.addEventListener('click', async () => {
-      try{
-        await window.GCP.apiFetch('/tp/approve-section-chairman', {
-          method:'POST',
-          body: JSON.stringify({ eventId: currentEventId, sectionId: section.sectionId })
-        });
-        await refresh();
-      }catch(e){
-        setMsg(e.message || 'Failed to approve section', true);
-      }
-    });
-    target.appendChild(approveBtn);
+    const canDecision = !['approved_by_supervisor', 'approved_by_chairman'].includes(String(section.status || '').toLowerCase());
+    if (canDecision) {
+      wrap.appendChild(createMicroAction('Approve', 'approve', async () => {
+        try{
+          await window.GCP.apiFetch('/tp/approve-section-chairman', {
+            method:'POST',
+            body: JSON.stringify({ eventId: currentEventId, sectionId: section.sectionId })
+          });
+          await refresh();
+        }catch(e){
+          setMsg(e.message || 'Failed to approve section', true);
+        }
+      }));
 
-    const returnBtn = document.createElement('button');
-    returnBtn.className = 'btn danger';
-    returnBtn.textContent = 'Return section';
-    returnBtn.addEventListener('click', async () => {
-      const note = prompt('Return note (optional):', '') || '';
-      try{
-        await window.GCP.apiFetch('/tp/return', {
-          method:'POST',
-          body: JSON.stringify({ eventId: currentEventId, sectionId: section.sectionId, note })
-        });
-        await refresh();
-      }catch(e){
-        setMsg(e.message || 'Failed to return section', true);
-      }
-    });
-    target.appendChild(returnBtn);
+      wrap.appendChild(createMicroAction('Return', 'return', async () => {
+        const note = prompt('Return note (optional):', '') || '';
+        try{
+          await window.GCP.apiFetch('/tp/return', {
+            method:'POST',
+            body: JSON.stringify({ eventId: currentEventId, sectionId: section.sectionId, note })
+          });
+          await refresh();
+        }catch(e){
+          setMsg(e.message || 'Failed to return section', true);
+        }
+      }));
+    }
+
+    target.appendChild(wrap);
   }
 
   async function loadEvents(){
