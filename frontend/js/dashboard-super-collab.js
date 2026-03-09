@@ -257,12 +257,17 @@
     const wrap = document.createElement('div');
     wrap.className = 'required-actions';
 
-    wrap.appendChild(createMicroAction('Open', 'open', () => {
-      window.open(`editor.html?event_id=${currentEventId}&section_id=${section.sectionId}`, '_blank');
-    }));
-
     const stage = String(section.status || '').toLowerCase();
+    const isAssigned = !!section.isAssigned;
     const canDecision = ['submitted_to_super_collaborator', 'returned_by_super_collaborator'].includes(stage);
+    const canOpen = isAssigned || canDecision;
+
+    if (canOpen) {
+      wrap.appendChild(createMicroAction('Open', 'open', () => {
+        window.open(`editor.html?event_id=${currentEventId}&section_id=${section.sectionId}`, '_blank');
+      }));
+    }
+
     if (canDecision) {
       wrap.appendChild(createMicroAction('Approve', 'approve', async () => {
         setMsg('');
@@ -281,6 +286,10 @@
         });
         await refreshStatusGrid();
       }));
+    }
+
+    if (!canOpen && !canDecision) {
+      wrap.innerHTML = '<span class="required-actions-muted">View only</span>';
     }
     target.appendChild(wrap);
   }

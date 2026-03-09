@@ -79,42 +79,16 @@ async function ensureSchema() {
   await pool.query(`ALTER TABLE events ADD COLUMN IF NOT EXISTS ended_by_user_id INTEGER`);
   await pool.query(`ALTER TABLE events ADD COLUMN IF NOT EXISTS submitter_role TEXT NOT NULL DEFAULT 'chairman'`).catch(()=>{});
 
-  // Ensure all workflow enum values exist for legacy databases
-  const requiredTpStatuses = [
-    'submitted_to_collaborator_2',
-    'returned_by_collaborator_2',
-    'approved_by_collaborator_2',
-    'submitted_to_collaborator',
-    'returned_by_collaborator',
-    'approved_by_collaborator',
-    'submitted_to_super_collaborator',
-    'returned_by_super_collaborator',
-    'approved_by_super_collaborator',
-    'submitted_to_supervisor',
-    'returned_by_supervisor',
-    'approved_by_supervisor',
-    'approved_by_chairman',
-    'approved_by_minister',
-    'locked'
-  ];
-
-  for (const enumLabel of requiredTpStatuses) {
-    await pool.query(`ALTER TYPE tp_section_status ADD VALUE IF NOT EXISTS '${enumLabel}'`).catch(async () => {
-      try {
-        const has = await pool.query(
-          `SELECT 1
-             FROM pg_type t
-             JOIN pg_enum e ON t.oid = e.enumtypid
-            WHERE t.typname = 'tp_section_status'
-              AND e.enumlabel = $1`,
-          [enumLabel]
-        );
-        if (!has.rowCount) {
-          await pool.query(`ALTER TYPE tp_section_status ADD VALUE '${enumLabel}'`);
-        }
-      } catch (_) {}
-    });
-  }
+  // Ensure enum value exists for minister approvals (legacy DBs)
+  await pool.query(`ALTER TYPE tp_section_status ADD VALUE IF NOT EXISTS 'approved_by_minister'`).catch(async ()=>{
+    // Fallback for older Postgres that may not support IF NOT EXISTS
+    try {
+      const has = await pool.query(`SELECT 1 FROM pg_type t JOIN pg_enum e ON t.oid=e.enumtypid WHERE t.typname='tp_section_status' AND e.enumlabel='approved_by_minister'`);
+      if (!has.rowCount) {
+        await pool.query(`ALTER TYPE tp_section_status ADD VALUE 'approved_by_minister'`);
+      }
+    } catch (_) {}
+  });
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS country_assignments (
@@ -312,6 +286,33 @@ function approveSectionStatus(roleKey) {
   if (rk === 'chairman') return 'approved_by_chairman';
   if (rk === 'minister') return 'approved_by_minister';
   return null;
+}
+
+function decisionStatusesForRole(roleKey) {
+  const rk = normalizeRoleKey(roleKey);
+  if (rk === 'collaborator_2') return ['submitted_to_collaborator_2', 'returned_by_collaborator_2'];
+  if (rk === 'collaborator') return ['submitted_to_collaborator', 'returned_by_collaborator'];
+  if (rk === 'super_collaborator') return ['submitted_to_super_collaborator', 'returned_by_super_collaborator'];
+  if (rk === 'supervisor') return ['submitted_to_supervisor', 'returned_by_supervisor'];
+  if (rk === 'chairman') return ['submitted_to_chairman', 'returned_by_chairman'];
+  if (rk === 'minister') return ['submitted_to_minister', 'returned_by_minister'];
+  if (rk === 'admin') return [
+    'submitted_to_collaborator_2', 'returned_by_collaborator_2',
+    'submitted_to_collaborator', 'returned_by_collaborator',
+    'submitted_to_super_collaborator', 'returned_by_super_collaborator',
+    'submitted_to_supervisor', 'returned_by_supervisor',
+    'submitted_to_chairman', 'returned_by_chairman',
+    'submitted_to_minister', 'returned_by_minister'
+  ];
+  return [];
+}
+
+async function getCurrentSectionStatus(eventId, countryId, sectionId) {
+  const row = await queryOne(
+    `SELECT status::text AS status FROM tp_content WHERE event_id=$1 AND country_id=$2 AND section_id=$3`,
+    [eventId, countryId, sectionId]
+  );
+  return String(row?.status || 'draft').toLowerCase();
 }
 
 
@@ -1513,11 +1514,20 @@ app.get('/api/tp', authRequired, async (req, res) => {
   const isElevated = ['admin','supervisor','chairman','minister','protocol','viewer'].includes(roleKey);
   if (!isCollab && !isElevated) return res.status(403).json({ error: 'Forbidden' });
 
-  // Collaborators may only access their assigned event/country + section.
+  // Pipeline roles may access assigned sections and, for collaborator/super-collaborator,
+  // sections currently at their review stage so they can work like lower-level supervisors.
   if (isCollab) {
-    const ok = await assertUserCanAccessEventSection(req.user, eventId, sectionId);
+    let ok = await assertUserCanAccessEventSection(req.user, eventId, sectionId);
+    if (!ok && ['collaborator','super_collaborator'].includes(roleKey)) {
+      const countryIdForAccess = await resolveCountryIdForEvent(eventId);
+      if (countryIdForAccess) {
+        const currentStatus = await getCurrentSectionStatus(eventId, countryIdForAccess, sectionId);
+        ok = decisionStatusesForRole(roleKey).includes(currentStatus);
+      }
+    }
     if (!ok) return res.status(403).json({ error: 'Forbidden' });
   }
+
 
   const countryId = await resolveCountryIdForEvent(eventId);
   if (!countryId) return res.status(404).json({ error: 'Event not found' });
@@ -1580,11 +1590,20 @@ app.post('/api/tp/save', authRequired, async (req, res) => {
   const canEdit = ['collaborator_1','collaborator_2','collaborator','super_collaborator','supervisor','chairman','minister','admin'].includes(roleKey);
   if (!canEdit) return res.status(403).json({ error: 'Forbidden' });
 
-  // Collaborators may only edit their assigned event/country + section.
+  // Pipeline roles may edit assigned sections and, for collaborator/super-collaborator,
+  // sections currently at their review stage so they can work like lower-level supervisors.
   if (isCollab) {
-    const ok = await assertUserCanAccessEventSection(req.user, eventId, sectionId);
+    let ok = await assertUserCanAccessEventSection(req.user, eventId, sectionId);
+    if (!ok && ['collaborator','super_collaborator'].includes(roleKey)) {
+      const countryIdForAccess = await resolveCountryIdForEvent(eventId);
+      if (countryIdForAccess) {
+        const currentStatus = await getCurrentSectionStatus(eventId, countryIdForAccess, sectionId);
+        ok = decisionStatusesForRole(roleKey).includes(currentStatus);
+      }
+    }
     if (!ok) return res.status(403).json({ error: 'Forbidden' });
   }
+
 
   const countryId = await resolveCountryIdForEvent(eventId);
   if (!countryId) return res.status(404).json({ error: 'Event not found' });
@@ -1618,7 +1637,7 @@ app.post('/api/tp/save', authRequired, async (req, res) => {
   return res.json({ success:true });
 });
 
-app.post('/api/tp/submit', authRequired, async (req, res) => {
+app.post('/api/tp/submit', authRequired, attachUser, async (req, res) => {
   const eventId = Number(req.body?.eventId);
   const sectionId = Number(req.body?.sectionId);
   const htmlContent = String(req.body?.htmlContent || '');
@@ -1632,7 +1651,14 @@ app.post('/api/tp/submit', authRequired, async (req, res) => {
     return res.status(403).json({ error: 'Forbidden' });
   }
 
-  const ok = await assertUserCanAccessEventSection(req.user, eventId, sectionId);
+  let ok = await assertUserCanAccessEventSection(req.user, eventId, sectionId);
+  if (!ok && ['collaborator','super_collaborator'].includes(roleKey)) {
+    const countryIdForAccess = await resolveCountryIdForEvent(eventId);
+    if (countryIdForAccess) {
+      const currentStatus = await getCurrentSectionStatus(eventId, countryIdForAccess, sectionId);
+      ok = decisionStatusesForRole(roleKey).includes(currentStatus);
+    }
+  }
   if (!ok) return res.status(403).json({ error: 'Forbidden' });
 
   const countryId = await resolveCountryIdForEvent(eventId);
@@ -1679,6 +1705,12 @@ app.post('/api/tp/return', requireRole('collaborator_2','collaborator','super_co
   await ensureDocumentStatus(eventId, countryId);
   await ensureTpRow(eventId, countryId, sectionId, req.user.id);
 
+  const currentStatus = await getCurrentSectionStatus(eventId, countryId, sectionId);
+  const allowedStatuses = decisionStatusesForRole(roleKey);
+  if (allowedStatuses.length && !allowedStatuses.includes(currentStatus)) {
+    return res.status(400).json({ error: 'Section is not at your review stage' });
+  }
+
   await pool.query(
     `
     UPDATE tp_content
@@ -1711,6 +1743,12 @@ app.post('/api/tp/approve-section', requireRole('collaborator_2','collaborator',
 
   await ensureDocumentStatus(eventId, countryId);
   await ensureTpRow(eventId, countryId, sectionId, req.user.id);
+
+  const currentStatus = await getCurrentSectionStatus(eventId, countryId, sectionId);
+  const allowedStatuses = decisionStatusesForRole(roleKey);
+  if (allowedStatuses.length && !allowedStatuses.includes(currentStatus)) {
+    return res.status(400).json({ error: 'Section is not at your review stage' });
+  }
 
   await pool.query(
     `
@@ -1753,16 +1791,19 @@ app.post('/api/tp/approve-all-sections', requireRole('collaborator_2','collabora
     const targetStatus = approveSectionStatus(roleKey);
     if (!targetStatus) return res.status(400).json({ error: 'Unsupported role for bulk approve' });
 
-    await pool.query(
+    const allowedStatuses = decisionStatusesForRole(roleKey);
+    const { rows } = await pool.query(
       `
       UPDATE tp_content
       SET status=$4, status_comment=NULL, last_updated_at=NOW(), last_updated_by_user_id=$5
       WHERE event_id=$1 AND country_id=$2 AND section_id = ANY($3::int[])
+        AND status = ANY($6::text[])
+      RETURNING section_id
       `,
-      [eventId, countryId, sectionIds, targetStatus, req.user.id]
+      [eventId, countryId, sectionIds, targetStatus, req.user.id, allowedStatuses]
     );
 
-    return res.json({ success:true, approved: sectionIds.length, status: targetStatus });
+    return res.json({ success:true, approved: rows.length, status: targetStatus });
   } catch (e) {
     console.error('POST /api/tp/approve-all-sections failed', e);
     return res.status(500).json({ error: 'Server error' });
@@ -2001,16 +2042,21 @@ app.get('/api/tp/status-grid', authRequired, async (req, res) => {
       WHERE ers.event_id = $1
     `;
     const params = [eventId, countryId];
+    let assignedSectionIds = [];
     if (isSectionPipelineRole(roleKey)) {
-      const assignedSectionIds = await getAssignedSectionIds(req.user.id);
-      if (!assignedSectionIds.length) {
-        return res.json({ event_id: eventId, country_id: countryId, sections: [] });
+      assignedSectionIds = await getAssignedSectionIds(req.user.id);
+      const shouldRestrictToAssigned = !['collaborator','super_collaborator'].includes(roleKey);
+      if (shouldRestrictToAssigned) {
+        if (!assignedSectionIds.length) {
+          return res.json({ event_id: eventId, country_id: countryId, sections: [] });
+        }
+        q += ` AND ers.section_id = ANY($3::int[])`;
+        params.push(assignedSectionIds);
       }
-      q += ` AND ers.section_id = ANY($3::int[])`;
-      params.push(assignedSectionIds);
     }
     q += ` ORDER BY s.order_index ASC, s.id ASC`;
     const { rows } = await pool.query(q, params);
+    const assignedSet = new Set((assignedSectionIds || []).map(Number));
 
     res.json({
       event_id: eventId,
@@ -2022,6 +2068,7 @@ app.get('/api/tp/status-grid', authRequired, async (req, res) => {
         statusComment: r.status_comment || null,
         lastUpdatedAt: r.last_updated_at,
         lastUpdatedBy: r.last_updated_by || null,
+        isAssigned: assignedSet.has(Number(r.id)),
       }))
     });
   } catch (e) {

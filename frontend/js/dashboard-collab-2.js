@@ -257,22 +257,18 @@
     const wrap = document.createElement('div');
     wrap.className = 'required-actions';
 
-    wrap.appendChild(createMicroAction('Open', 'open', () => {
-      window.open(`editor.html?event_id=${currentEventId}&section_id=${section.sectionId}`, '_blank');
-    }));
-
     const stage = String(section.status || '').toLowerCase();
-    const canDecision = ['submitted_to_collaborator_2', 'returned_by_collaborator_2'].includes(stage);
-    if (canDecision) {
-      wrap.appendChild(createMicroAction('Approve', 'approve', async () => {
-        setMsg('');
-        await window.GCP.apiFetch('/tp/approve-section', {
-          method:'POST',
-          body: JSON.stringify({ eventId: currentEventId, sectionId: section.sectionId })
-        });
-        await refreshStatusGrid();
-      }));
+    const isAssigned = !!section.isAssigned;
+    const canReview = ['submitted_to_collaborator_2', 'returned_by_collaborator_2'].includes(stage);
+    const canOpen = isAssigned || canReview;
 
+    if (canOpen) {
+      wrap.appendChild(createMicroAction('Open', 'open', () => {
+        window.open(`editor.html?event_id=${currentEventId}&section_id=${section.sectionId}`, '_blank');
+      }));
+    }
+
+    if (canReview) {
       wrap.appendChild(createMicroAction('Return', 'return', async () => {
         const note = prompt('Return note (optional):', '');
         await window.GCP.apiFetch('/tp/return', {
@@ -281,6 +277,10 @@
         });
         await refreshStatusGrid();
       }));
+    }
+
+    if (!canOpen && !canReview) {
+      wrap.innerHTML = '<span class="required-actions-muted">View only</span>';
     }
     target.appendChild(wrap);
   }
@@ -296,7 +296,7 @@
     if (!currentSections.length){
       if (sectionsEmpty) sectionsEmpty.hidden = false;
       sectionsTbody.innerHTML = `<tr class="required-sections-empty-row"><td colspan="5">No required sections yet.</td></tr>`;
-      submitDocBtn.disabled = true;
+      if (submitDocBtn) submitDocBtn.disabled = true;
       return;
     }
 
@@ -342,22 +342,11 @@
 
     // Enable submit to supervisor when all assigned sections are approved by super-collaborator or already beyond that stage.
     const statuses = currentSections.map(s => String(s.status || '').toLowerCase());
-    const allReady = currentSections.length > 0 && statuses.every(s => ['approved_by_collaborator_2', 'submitted_to_collaborator', 'approved_by_collaborator', 'submitted_to_super_collaborator', 'approved_by_super_collaborator', 'submitted_to_supervisor', 'approved_by_supervisor', 'approved_by_chairman', 'approved_by_minister', 'locked'].includes(s));
-    const hasFreshApprovals = statuses.some(s => s === 'approved_by_collaborator_2');
-    submitDocBtn.disabled = !(allReady && hasFreshApprovals);
+    if (submitDocBtn) submitDocBtn.disabled = true;
   }
 
   
-  if (approveAllSectionsBtn) approveAllSectionsBtn.addEventListener('click', async () => {
-    if (!currentEventId) return;
-    if (!confirm('Approve all assigned sections for this event?')) return;
-    setMsg('');
-    await window.GCP.apiFetch('/tp/approve-all-sections', {
-      method:'POST',
-      body: JSON.stringify({ eventId: currentEventId })
-    });
-    await refreshStatusGrid();
-  });
+  if (approveAllSectionsBtn) approveAllSectionsBtn.style.display = 'none';
 
   async function refreshDocumentStatus(){
     if (!currentEventId) {
@@ -389,15 +378,13 @@ eventSelect.addEventListener('change', async () => {
       sectionsTbody.innerHTML = '';
       if (sectionsCards) sectionsCards.innerHTML = '';
       if (sectionsEmpty) sectionsEmpty.hidden = false;
-      submitDocBtn.disabled = true;
+      if (submitDocBtn) submitDocBtn.disabled = true;
       if (docStatusBox) docStatusBox.innerHTML = '';
       return;
     }
-    submitDocBtn.textContent = 'Submit approved sections to Collaborator';
-    submitDocBtn.title = submitDocBtn.disabled ? 'Waiting for approvals' : 'Move approved sections into the Collaborator review stage';
+    if (submitDocBtn) submitDocBtn.style.display = 'none';
     try{
       await refreshStatusGrid();
-      submitDocBtn.title = submitDocBtn.disabled ? 'Waiting for approvals' : 'Move approved sections into the Collaborator review stage';
       await refreshDocumentStatus();
     }catch(e){
       setMsg(e.message || 'Failed to load sections', true);
@@ -405,7 +392,7 @@ eventSelect.addEventListener('change', async () => {
       if (sectionsCards) sectionsCards.innerHTML = '';
       if (sectionsEmpty) sectionsEmpty.hidden = false;
       if (docStatusBox) docStatusBox.innerHTML = '';
-      submitDocBtn.disabled = true;
+      if (submitDocBtn) submitDocBtn.disabled = true;
     }
   });
   // Supervisor dashboard does not use a single 'Open editor' button; per-section actions are in the table.
@@ -439,23 +426,7 @@ modalBackdrop.addEventListener('click', (e) => {
   }
 });
 
-  submitDocBtn.addEventListener('click', async () => {
-    if (!currentEventId || submitDocBtn.disabled) return;
-    if (!confirm('Submit all approved assigned sections to Collaborator?')) return;
-    setMsg('');
-    try {
-      const result = await window.GCP.apiFetch('/tp/submit-approved-to-collaborator', {
-        method: 'POST',
-        body: JSON.stringify({ eventId: currentEventId })
-      });
-      if (result && Number(result.submitted || 0) > 0) setMsg('Approved sections submitted to Collaborator.');
-      else setMsg('No newly approved sections were ready to submit.');
-      await refreshStatusGrid();
-      await refreshDocumentStatus();
-    } catch (e) {
-      setMsg(e.message || 'Submit failed', true);
-    }
-  });
+
 
   setupCustomDropdown(eventSelect);
 

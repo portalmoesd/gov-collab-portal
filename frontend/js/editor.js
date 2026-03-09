@@ -74,7 +74,7 @@
   }
 
   // Approve button depends on role
-  if (!(role === "collaborator_2" || role === "collaborator" || role === "super_collaborator" || role === "supervisor" || role === "chairman" || role === "minister" || role === "admin")){
+  if (!(role === "collaborator" || role === "super_collaborator" || role === "supervisor" || role === "chairman" || role === "minister" || role === "admin")){
     btnApprove.style.display = "none";
     btnReturn.style.display = "none";
   }

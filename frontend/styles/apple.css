@@ -3643,3 +3643,12 @@ body.gp-shell-ready .gp-sidebar__scrim{
     min-width:0;
   }
 }
+
+
+@media (max-width: 1220px){
+  .required-sections-table{ display:none !important; }
+  .required-sections-cards{ display:grid !important; grid-template-columns:1fr; gap:12px; }
+  .required-sections-tablewrap{ overflow:visible !important; }
+  .required-actions,
+  .required-actions-card{ justify-content:flex-start; width:100%; }
+}

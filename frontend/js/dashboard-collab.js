@@ -196,6 +196,17 @@
     return map[s] || (s || '');
   }
 
+  function returnCommentLabel(status){
+    const s = String(status || '').toLowerCase();
+    if (s === 'returned_by_collaborator_2') return 'Collaborator II comment';
+    if (s === 'returned_by_collaborator') return 'Collaborator comment';
+    if (s === 'returned_by_super_collaborator') return 'Super-collaborator comment';
+    if (s === 'returned_by_supervisor') return 'Supervisor comment';
+    if (s === 'returned_by_chairman') return 'Deputy comment';
+    if (s === 'returned_by_minister') return 'Minister comment';
+    return 'Return comment';
+  }
+
   function normalizeSubmitterRole(r){
     const v = String(r || '').toLowerCase();
     return v === 'chairman' ? 'deputy' : v;
@@ -225,7 +236,7 @@
     sectionStatusBox.innerHTML = `
       <div style="margin-bottom:8px;"><b>Status:</b> ${window.GCP.escapeHtml(humanDocStatus(docStatus))}</div>
       <div>${window.GCP.renderWorkflowProgress(docStatus, submitterRole)}</div>
-            ${note ? `<div style="margin-top:10px; padding:8px 10px; border-radius:10px; border:1px solid rgba(220,38,38,.25); background: rgba(254,226,226,.55);"><b>Supervisor/Deputy comment:</b> ${window.GCP.escapeHtml(note)}</div>` : ''}
+            ${note ? `<div style="margin-top:10px; padding:8px 10px; border-radius:10px; border:1px solid rgba(220,38,38,.25); background: rgba(254,226,226,.55);"><b>${window.GCP.escapeHtml(returnCommentLabel(tp.status))}:</b> ${window.GCP.escapeHtml(note)}</div>` : ''}
       <div style="margin-top:12px;"><b>Task:</b> ${window.GCP.escapeHtml((taskText || '').trim() || '—')}</div>
     `;
   }
