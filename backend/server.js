@@ -1619,7 +1619,7 @@ app.post('/api/tp/save', authRequired, async (req, res) => {
   return res.json({ success:true });
 });
 
-app.post('/api/tp/submit', async (req, res) => {
+app.post('/api/tp/submit', authRequired, async (req, res) => {
   const eventId = Number(req.body?.eventId);
   const sectionId = Number(req.body?.sectionId);
   const htmlContent = String(req.body?.htmlContent || '');
@@ -2017,21 +2017,16 @@ app.get('/api/tp/status-grid', authRequired, async (req, res) => {
       WHERE ers.event_id = $1
     `;
     const params = [eventId, countryId];
-    let assignedSectionIds = [];
     if (isSectionPipelineRole(roleKey)) {
-      assignedSectionIds = await getAssignedSectionIds(req.user.id);
-      const shouldRestrictToAssigned = roleKey !== 'collaborator';
-      if (shouldRestrictToAssigned) {
-        if (!assignedSectionIds.length) {
-          return res.json({ event_id: eventId, country_id: countryId, sections: [] });
-        }
-        q += ` AND ers.section_id = ANY($3::int[])`;
-        params.push(assignedSectionIds);
+      const assignedSectionIds = await getAssignedSectionIds(req.user.id);
+      if (!assignedSectionIds.length) {
+        return res.json({ event_id: eventId, country_id: countryId, sections: [] });
       }
+      q += ` AND ers.section_id = ANY($3::int[])`;
+      params.push(assignedSectionIds);
     }
     q += ` ORDER BY s.order_index ASC, s.id ASC`;
     const { rows } = await pool.query(q, params);
-    const assignedSet = new Set((assignedSectionIds || []).map(Number));
 
     res.json({
       event_id: eventId,
@@ -2043,7 +2038,6 @@ app.get('/api/tp/status-grid', authRequired, async (req, res) => {
         statusComment: r.status_comment || null,
         lastUpdatedAt: r.last_updated_at,
         lastUpdatedBy: r.last_updated_by || null,
-        isAssigned: assignedSet.has(Number(r.id)),
       }))
     });
   } catch (e) {

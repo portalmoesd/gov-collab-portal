@@ -1592,7 +1592,7 @@ app.post('/api/tp/save', authRequired, async (req, res) => {
   return res.json({ success:true });
 });
 
-app.post('/api/tp/submit', async (req, res) => {
+app.post('/api/tp/submit', authRequired, async (req, res) => {
   const eventId = Number(req.body?.eventId);
   const sectionId = Number(req.body?.sectionId);
   const htmlContent = String(req.body?.htmlContent || '');
