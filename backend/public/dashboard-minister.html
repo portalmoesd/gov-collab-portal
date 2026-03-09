@@ -5,45 +5,74 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>GOV COLLAB PORTAL • Minister Dashboard</title>
   <link rel="stylesheet" href="styles.css?v=20260306sb1" />
-  <link rel="stylesheet" href="styles/apple.css?v=20260307sbfix1" />
+  <link rel="stylesheet" href="styles/apple.css?v=20260309minui1" />
 </head>
 <body>
 
 <div class="layout">
   <aside class="sidebar"></aside>
   <main class="main">
-    <div class="topbar">
+    <div class="topbar topbar-ghost">
       <div class="page-title">Minister Dashboard</div>
     </div>
     
 <div class="grid">
-  <section class="card col-12">
+  <section class="card col-12 supervisor-control-panel chairman-control-panel minister-control-panel" id="ministerControlPanel">
+    <div class="supervisor-panel-head">
+      <div>
+        <div class="supervisor-panel-title">Event</div>
+        <div class="supervisor-panel-subtitle">Choose an event to review workflow status, preview talking points, and approve the document.</div>
+      </div>
+    </div>
     <div class="row" style="justify-content:space-between;">
       <div class="row">
-<div class="field">
+        <div class="field">
           <label>Event</label>
-          <select id="eventSelect"></select>
+          <select id="eventSelect" class="portal-select"></select>
         </div>
       </div>
-      <div class="row">
-        <button class="btn" id="previewBtn">Preview full TPs</button>
-        <button class="btn danger" id="returnDocBtn">Return document</button>
-        <button class="btn success" id="approveDocBtn">Approve document</button>
+      <div class="row chairman-event-actions minister-event-actions" role="group" aria-label="Event actions">
+        <button class="micro-action chairman-event-action chairman-event-action--preview minister-event-action minister-event-action--preview" id="previewBtn" type="button" aria-label="Preview full TPs">
+          <span class="micro-action__icon"></span><span class="micro-action__label">Preview</span>
+        </button>
+        <button class="micro-action chairman-event-action chairman-event-action--return minister-event-action minister-event-action--return" id="returnDocBtn" type="button" aria-label="Return document">
+          <span class="micro-action__icon"></span><span class="micro-action__label">Return</span>
+        </button>
+        <button class="micro-action chairman-event-action chairman-event-action--approve minister-event-action minister-event-action--approve" id="approveDocBtn" type="button" aria-label="Approve document">
+          <span class="micro-action__icon"></span><span class="micro-action__label">Approve</span>
+        </button>
       </div>
     </div>
     <div id="docStatusBox" style="margin-top:12px;"></div>
     <div id="msg" class="small" style="color:var(--danger); font-weight:800; margin-top:10px;"></div>
   </section>
 
-  <section class="card col-12">
-    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:10px;">
-      <div style="font-weight:900;">Required sections</div>
+  <section class="card col-12 required-sections-panel chairman-required-sections-panel minister-required-sections-panel">
+    <div class="required-sections-head">
+      <div>
+        <div class="required-sections-title">Required sections</div>
+        <div class="required-sections-subtitle">Review section progress, check who updated each part, and take action.</div>
+      </div>
       <button class="btn success" id="approveAllSectionsBtn">Approve all sections</button>
     </div>
-    <table class="table">
-      <thead><tr><th>Section</th><th>Status</th><th>Last update</th><th>Actions</th></tr></thead>
-      <tbody id="sectionsTbody"></tbody>
-    </table>
+
+    <div class="required-sections-tablewrap">
+      <table class="table required-sections-table">
+        <thead><tr><th>Section</th><th>Status</th><th>Last update</th><th>Updated by</th><th>Actions</th></tr></thead>
+        <tbody id="sectionsTbody"></tbody>
+      </table>
+    </div>
+
+    <div id="sectionsCards" class="required-sections-cards"></div>
+    <div id="sectionsEmpty" class="required-sections-empty" hidden>No required sections yet.</div>
+  </section>
+
+  <section class="card col-12 upcoming-events-panel">
+    <div class="upcoming-events-title">Upcoming events</div>
+    <div class="upcoming-split">
+      <div id="eventsCalendar" class="events-calendar"></div>
+      <div id="eventsGrid" class="event-grid"></div>
+    </div>
   </section>
 </div>
 
@@ -59,6 +88,8 @@
   <script src="js/config.js"></script>
   <script src="js/api.js"></script>
   <script src="js/app.js?v=47"></script>
-  <script src="js/dashboard-minister.js?v=45"></script>
+  <script src="js/dashboard-minister.js?v=46"></script>
+  <script src="js/dashboard-minister-upcoming.js?v=1"></script>
+  <script src="js/calendar-collab.js?v=2"></script>
 </body>
 </html>

@@ -3432,6 +3432,48 @@ body.gp-shell-ready .gp-sidebar__scrim{
 }
 
 .chairman-control-panel .field .portal-dropdown,
+
+.supervisor-event-actions{
+  display:flex;
+  align-items:center;
+  justify-content:flex-end;
+  gap:8px;
+  flex-wrap:wrap;
+}
+
+.supervisor-event-action{
+  width:46px;
+  min-width:46px;
+  height:46px;
+  padding:0 14px 0 0;
+  box-shadow: inset 0 0 0 1px rgba(24,37,61,.04);
+}
+
+.supervisor-event-action .micro-action__icon{
+  flex:0 0 46px;
+  width:46px;
+  height:46px;
+}
+
+.supervisor-event-action .micro-action__icon::before{
+  width:20px;
+  height:20px;
+}
+
+.supervisor-event-action .micro-action__label{
+  font-size:10px;
+  letter-spacing:.12em;
+  color:inherit;
+}
+
+.supervisor-event-action:hover,
+.supervisor-event-action:focus-visible,
+.supervisor-event-action.is-expanded{
+  width:132px;
+}
+
+.supervisor-event-action--preview{ --icon-url:url('../assets/view-icon.svg'); --icon-color:#20314d; --hover-color:#20314d; --hover-bg:#eef3f8; }
+
 .chairman-control-panel .field .portal-dropdown__trigger{
   width: 100%;
 }
@@ -3485,6 +3527,21 @@ body.gp-shell-ready .gp-sidebar__scrim{
 }
 
 @media (max-width: 980px){
+  .supervisor-event-actions{
+    justify-content:flex-start;
+    width:100%;
+  }
+  .supervisor-event-action,
+  .supervisor-event-action:hover,
+  .supervisor-event-action:focus-visible,
+  .supervisor-event-action.is-expanded{
+    width:132px;
+    min-width:132px;
+  }
+  .supervisor-event-action .micro-action__label{
+    opacity:1;
+    transform:translateX(0);
+  }
   .chairman-control-panel .field{
     min-width:0;
     width:100%;
@@ -3507,6 +3564,15 @@ body.gp-shell-ready .gp-sidebar__scrim{
 }
 
 @media (max-width: 860px){
+  .supervisor-control-panel .row[style*="justify-content:space-between"]{
+    align-items: stretch;
+  }
+  .supervisor-control-panel .row[style*="justify-content:space-between"] > .row{
+    width: 100%;
+  }
+  .supervisor-event-actions{
+    justify-content:flex-start;
+  }
   .chairman-control-panel .row[style*="justify-content:space-between"]{
     align-items: stretch;
   }
