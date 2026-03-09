@@ -197,24 +197,18 @@
   const eventsById = new Map();
 
   function humanStatus(s){
-    const m = {
+    const map = {
       draft: 'Draft',
       in_progress: 'Draft',
-      submitted: 'Submitted',
-      submitted_to_supervisor: 'Submitted to Supervisor',
-      approved_by_supervisor: 'Approved by Supervisor',
-      submitted_to_chairman: 'Submitted to Deputy',
-      approved_by_chairman: 'Approved by Deputy',
-      submitted_to_minister: 'Submitted to Minister',
-      approved_by_minister: 'Approved by Minister',
-      approved: 'Approved',
-      returned: 'Returned',
+      submitted_to_supervisor: 'Submitted',
       returned_by_supervisor: 'Returned',
-      returned_by_chairman: 'Returned',
-      returned_by_minister: 'Returned',
+      approved_by_supervisor: 'Approved (Supervisor)',
+      submitted_to_chairman: 'Submitted to Deputy',
+      returned_by_chairman: 'Returned (Deputy)',
+      approved_by_chairman: 'Approved (Deputy)',
       locked: 'Locked'
     };
-    return m[s] || s || '';
+    return map[s] || (s || '');
   }
 
   function statusBadgeClass(status){
@@ -311,7 +305,7 @@
       previewBtn.disabled = true;
       if (approveAllSectionsBtn) approveAllSectionsBtn.disabled = true;
       if (sectionsEmpty) sectionsEmpty.hidden = false;
-      sectionsTbody.innerHTML = `<tr class="required-sections-empty-row"><td colspan="4">Choose an event to review required sections.</td></tr>`;
+      sectionsTbody.innerHTML = `<tr class="required-sections-empty-row"><td colspan="5">Choose an event to review required sections.</td></tr>`;
       endEventBtn.style.display = 'none';
       return;
     }
@@ -339,7 +333,7 @@
 
     if (!currentSections.length){
       if (sectionsEmpty) sectionsEmpty.hidden = false;
-      sectionsTbody.innerHTML = `<tr class="required-sections-empty-row"><td colspan="4">No required sections yet.</td></tr>`;
+      sectionsTbody.innerHTML = `<tr class="required-sections-empty-row"><td colspan="5">No required sections yet.</td></tr>`;
       if (approveAllSectionsBtn) approveAllSectionsBtn.disabled = true;
     } else {
       if (approveAllSectionsBtn) approveAllSectionsBtn.disabled = false;
@@ -348,6 +342,7 @@
         tr.className = 'required-sections-row';
         const lastUpdate = s.lastUpdatedAt ? window.GCP.formatDateTime(s.lastUpdatedAt) : '';
         const note = (s.statusComment || '').trim();
+        const updatedBy = s.lastUpdatedBy || '—';
         const badgeClass = statusBadgeClass(s.status);
         tr.innerHTML = `
           <td>
@@ -356,6 +351,7 @@
           </td>
           <td><span class="required-status-badge ${badgeClass}">${escape(humanStatus(s.status))}</span></td>
           <td><span class="required-updated-at">${escape(lastUpdate || '—')}</span></td>
+          <td><span class="required-updated-by">${escape(updatedBy)}</span></td>
           <td class="required-actions-cell"></td>
         `;
         appendSectionActions(tr.querySelector('.required-actions-cell'), s);
@@ -372,6 +368,7 @@
               </div>
               <span class="required-status-badge ${badgeClass}">${escape(humanStatus(s.status))}</span>
             </div>
+            <div class="required-section-card__line"><span>Updated by</span><strong>${escape(updatedBy)}</strong></div>
             ${note ? `<div class="required-section-note"><b>Comment:</b> ${escape(note)}</div>` : ''}
             <div class="required-actions-card"></div>
           `;
