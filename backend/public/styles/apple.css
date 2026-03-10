@@ -3730,3 +3730,15 @@ body.gp-shell-ready .gp-sidebar__scrim{
 .required-sections-tablewrap {
   overflow-x: auto;
 }
+
+/* Progress bar: real name as main label, role title as sublabel */
+.wf-step__sublabel {
+  font-size: 10px;
+  color: #8fa3c0;
+  font-weight: 600;
+  margin-top: 2px;
+  line-height: 1.2;
+}
+.wf-step.active .wf-step__sublabel {
+  color: #5a78a8;
+}
