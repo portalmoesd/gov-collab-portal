@@ -2,8 +2,15 @@
 (async function(){
   const me = await window.GCP.requireAuth();
   if (!me) return;
-  if (String(me.role || '').toLowerCase() !== 'collaborator') {
-    location.href = 'dashboard-collab.html';
+  const role = String(me.role || '').toLowerCase();
+  const roleHome = {
+    super_collaborator: 'dashboard-super-collab.html',
+    collaborator: 'dashboard-collab-review.html',
+    collaborator_2: 'dashboard-collab-2.html',
+    collaborator_1: 'dashboard-collab.html'
+  };
+  if (role !== 'collaborator') {
+    location.href = roleHome[role] || 'dashboard-collab.html';
     return;
   }
 
@@ -323,7 +330,7 @@
       }
     }
 
-    if (submitDocBtn) submitDocBtn.style.display = 'none';
+    if (submitDocBtn) submitDocBtn.style.display = '';
   }
 
 
@@ -363,7 +370,7 @@ eventSelect.addEventListener('change', async () => {
       if (docStatusBox) docStatusBox.innerHTML = '';
       return;
     }
-    if (submitDocBtn) submitDocBtn.style.display = 'none';
+    if (submitDocBtn) submitDocBtn.style.display = '';
     try{
       await refreshStatusGrid();
       await refreshDocumentStatus();
