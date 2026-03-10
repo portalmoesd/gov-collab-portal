@@ -337,39 +337,26 @@
     return 0;
   };
 
-  // Maps status to the step index of the person who last acted (lastUpdatedBy).
-  // This differs from lowerTierStepIndex (which is where the doc currently waits).
-  // e.g. submitted_to_collaborator_2 → Collab I acted (step 0), not Collab II (step 1).
-  window.GCP.lowerTierActorStepIndex = function(status) {
-    const s = String(status || 'draft').toLowerCase();
-    // Collab I is the actor: initial draft or submitted forward to Collab II
-    if (['draft', 'returned', 'returned_by_collaborator_2', 'submitted_to_collaborator_2'].includes(s)) return 0;
-    // Collab II is the actor: returned, approved, or submitted to Collaborator
-    if (['approved_by_collaborator_2', 'submitted_to_collaborator'].includes(s)) return 1;
-    // Collaborator is the actor: returned, approved, or submitted to Super-collab
-    if (['returned_by_collaborator', 'approved_by_collaborator', 'submitted_to_super_collaborator'].includes(s)) return 2;
-    // Super-collab is the actor: returned, approved, or submitted to Supervisor+
-    if (['returned_by_super_collaborator', 'approved_by_super_collaborator',
-         'submitted_to_supervisor', 'returned_by_supervisor', 'approved_by_supervisor',
-         'submitted_to_chairman', 'approved_by_chairman',
-         'submitted_to_minister', 'approved_by_minister', 'approved', 'locked'].includes(s)) return 3;
-    return 0;
-  };
-
-  // actorName: optional real name shown at the step of whoever last acted (steps 0–3)
-  window.GCP.renderLowerTierProgress = function(status, actorName) {
+  // stepNames: { collabI, collabII, collaborator, superCollab } — assigned user names per step
+  window.GCP.renderLowerTierProgress = function(status, stepNames) {
     const defaultSteps = ['Collab. I', 'Collab. II', 'Collaborator', 'Super-collab.', 'Approved'];
+    const names = stepNames && typeof stepNames === 'object' ? [
+      stepNames.collabI      || null,
+      stepNames.collabII     || null,
+      stepNames.collaborator || null,
+      stepNames.superCollab  || null,
+      null,
+    ] : [null, null, null, null, null];
+
     const active = window.GCP.lowerTierStepIndex(status);
-    const actorStep = window.GCP.lowerTierActorStepIndex(status);
     const maxIndex = defaultSteps.length - 1;
     const fillPercent = (active / maxIndex) * 100;
 
     const stepHtml = defaultSteps.map((label, idx) => {
       const state = idx < active ? 'done' : (idx === active ? 'active' : 'todo');
-      // Show the real name at the step of whoever last acted (not the active/waiting step)
-      const showName = actorName && idx === actorStep && idx <= 3;
-      const displayLabel = showName ? escapeHtml(actorName) : escapeHtml(label);
-      const sublabel = showName ? `<div class="wf-step__sublabel">${escapeHtml(label)}</div>` : '';
+      const name = names[idx];
+      const displayLabel = name ? escapeHtml(name) : escapeHtml(label);
+      const sublabel = name ? `<div class="wf-step__sublabel">${escapeHtml(label)}</div>` : '';
       return `<div class="wf-step ${state}" role="listitem" aria-current="${idx === active ? 'step' : 'false'}">
         <div class="wf-step__circle" aria-hidden="true">${idx + 1}</div>
         <div class="wf-step__label">${displayLabel}</div>
