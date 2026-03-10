@@ -6,7 +6,6 @@
   const role = String(me.role).toLowerCase();
   const qs = window.GCP.qs();
   const eventId = qs.eventId || qs.event_id;
-  const countryId = qs.countryId || qs.country_id || null;
   const sectionId = qs.sectionId || qs.section_id;
 
   const msg = document.getElementById("msg");
@@ -22,22 +21,6 @@
   const btnReturn = document.getElementById("btnReturn");
 
   const actionButtons = [btnSave, btnSubmit, btnApprove, btnReturn];
-
-  function formatUpdatedAt(value){
-    const raw = String(value || '').trim();
-    const m = raw.match(/^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})/);
-    if (m) return `${m[4]}:${m[5]} ${m[3]}.${m[2]}.${m[1]}`;
-    const d = new Date(raw);
-    if (!Number.isNaN(d.getTime())){
-      const dd = String(d.getDate()).padStart(2,'0');
-      const mm = String(d.getMonth()+1).padStart(2,'0');
-      const yyyy = d.getFullYear();
-      const hh = String(d.getHours()).padStart(2,'0');
-      const mi = String(d.getMinutes()).padStart(2,'0');
-      return `${hh}:${mi} ${dd}.${mm}.${yyyy}`;
-    }
-    return raw || '—';
-  }
 
   function setActionLoading(activeBtn, loading){
     actionButtons.forEach((btn) => {
@@ -62,37 +45,61 @@
     return;
   }
 
-  // Buttons visible depending on role (Blueprint editor behaviour)
-  const canEdit = ["admin","chairman","minister","supervisor","collaborator_1","collaborator_2","collaborator","super_collaborator"].includes(role);
   const isViewer = role === "viewer";
   const isProtocol = role === "protocol";
 
   if (isProtocol){
     msg.textContent = "Protocol role cannot edit Talking Points.";
-    btnSave.disabled = btnSubmit.disabled = btnApprove.disabled = btnReturn.disabled = true;
+    actionButtons.forEach(b => b && (b.disabled = true));
     return;
   }
 
-  // Approve/Return buttons depend on role
-  if (!(role === "supervisor" || role === "chairman" || role === "minister" || role === "admin")){
-    btnApprove.style.display = "none";
-  }
-  if (!(role === "collaborator_2" || role === "supervisor" || role === "chairman" || role === "minister" || role === "admin")){
-    btnReturn.style.display = "none";
-  }
-
-  // Submit is only for collaborators (they submit their draft for review)
-  if (!(role === "collaborator_1" || role === "collaborator_2" || role === "collaborator" || role === "super_collaborator")){
-    btnSubmit.style.display = "none";
-  }
-  if (isViewer){
-    btnSave.style.display = "none";
-    btnSubmit.style.display = "none";
-    btnApprove.style.display = "none";
-    btnReturn.style.display = "none";
-  }
+  // Initially hide dynamic buttons; applyButtonRules() sets them correctly after load
+  if (btnSubmit) btnSubmit.style.display = "none";
+  if (btnApprove) btnApprove.style.display = "none";
+  if (btnReturn) btnReturn.style.display = "none";
+  if (isViewer) { if(btnSave) btnSave.style.display = "none"; }
 
   let editorInstance = null;
+
+  function applyButtonRules(tp){
+    const s = String(tp.status || 'draft').toLowerCase();
+
+    // Reset all
+    actionButtons.forEach(b => b && (b.style.display = "none"));
+    if (isViewer) return;
+
+    if (role === 'collaborator_1') {
+      if (btnSave) btnSave.style.display = "";
+      if (btnSubmit) btnSubmit.style.display = "";
+    } else if (role === 'collaborator_2') {
+      if (btnSave) btnSave.style.display = "";
+      if (btnSubmit) btnSubmit.style.display = "";
+      const canReturn = ['submitted_to_collaborator_2', 'returned_by_collaborator_2'].includes(s);
+      if (btnReturn) btnReturn.style.display = canReturn ? "" : "none";
+    } else if (role === 'collaborator') {
+      if (btnSave) btnSave.style.display = "";
+      if (btnSubmit) btnSubmit.style.display = "";
+      // Return only if section came from lower tiers
+      const canReturn = ['submitted_to_collaborator', 'returned_by_collaborator'].includes(s);
+      if (btnReturn) btnReturn.style.display = canReturn ? "" : "none";
+    } else if (role === 'super_collaborator') {
+      if (btnSave) btnSave.style.display = "";
+      if (btnApprove) btnApprove.style.display = "";
+      if (btnReturn) btnReturn.style.display = "";
+    } else if (['supervisor','chairman','minister','admin'].includes(role)) {
+      if (btnSave) btnSave.style.display = "";
+      if (btnApprove) btnApprove.style.display = "";
+      if (btnReturn) btnReturn.style.display = "";
+    } else {
+      if (btnSave) btnSave.style.display = "";
+    }
+
+    // Highlight first visible button
+    const firstVisible = actionButtons.find((btn) => btn && btn.style.display !== 'none');
+    actionButtons.forEach((btn) => btn && btn.classList.remove('is-expanded'));
+    if (firstVisible) firstVisible.classList.add('is-expanded');
+  }
 
   async function load(){
     msg.textContent = "";
@@ -103,11 +110,18 @@
       <span class="editor-meta-pill">${window.GCP.escapeHtml(tp.countryName || 'Unknown country')}</span>
       <span class="editor-meta-pill">${window.GCP.escapeHtml(tp.sectionLabel || 'Unknown section')}</span>
     `;
+
+    // Only show last-updated when a real user has made a meaningful update
     if (lastUpdatedEl){
-      const updatedAt = tp.lastUpdatedAt ? window.GCP.escapeHtml(formatUpdatedAt(tp.lastUpdatedAt)) : '—';
-      const updatedBy = tp.lastUpdatedBy ? window.GCP.escapeHtml(tp.lastUpdatedBy) : 'No editor recorded yet';
-      lastUpdatedEl.innerHTML = `<span>Last updated · ${updatedAt}</span><span>· ${updatedBy}</span>`;
+      if (tp.lastUpdatedBy && tp.lastUpdatedAt) {
+        const updatedAt = window.GCP.escapeHtml(window.GCP.formatDateTime(tp.lastUpdatedAt));
+        const updatedBy = window.GCP.escapeHtml(tp.lastUpdatedBy);
+        lastUpdatedEl.innerHTML = `<span>Last updated · ${updatedAt}</span><span>· ${updatedBy}</span>`;
+      } else {
+        lastUpdatedEl.innerHTML = `<span class="muted">No updates yet</span>`;
+      }
     }
+
     if (returnCommentBox){
       const note = (tp.statusComment || '').trim();
       if (note){
@@ -118,20 +132,19 @@
         returnCommentBox.textContent = '';
       }
     }
+
     setStatus(tp.status || "draft");
-    const firstVisible = actionButtons.find((btn) => btn && btn.style.display !== 'none');
-    actionButtons.forEach((btn) => btn && btn.classList.remove('is-expanded'));
-    if (firstVisible) firstVisible.classList.add('is-expanded');
+    applyButtonRules(tp);
 
     const textarea = document.getElementById("editor");
     textarea.value = tp.htmlContent || "";
 
+    const canEdit = !isViewer && !isProtocol;
     if (window.CKEDITOR){
       if (editorInstance) editorInstance.destroy(true);
       editorInstance = window.CKEDITOR.replace("editor", { height: 420 });
       if (!canEdit && editorInstance && typeof editorInstance.setReadOnly === 'function') editorInstance.setReadOnly(true);
     } else {
-      // Fallback: plain textarea
       textarea.disabled = !canEdit;
     }
   }
@@ -141,7 +154,7 @@
     return document.getElementById("editor").value;
   }
 
-  btnSave.addEventListener("click", async () => {
+  if (btnSave) btnSave.addEventListener("click", async () => {
     setActionLoading(btnSave, true);
     try{
       await window.GCP.apiFetch("/tp/save", {
@@ -157,7 +170,7 @@
     }
   });
 
-  btnSubmit.addEventListener("click", async () => {
+  if (btnSubmit) btnSubmit.addEventListener("click", async () => {
     setActionLoading(btnSubmit, true);
     try{
       await window.GCP.apiFetch("/tp/submit", {
@@ -165,7 +178,13 @@
         body: JSON.stringify({ eventId, sectionId, htmlContent: getHtml() })
       });
       await load();
-      msg.textContent = role === "collaborator_1" ? "Submitted to Collaborator II." : role === "collaborator_2" ? "Submitted to Collaborator." : role === "super_collaborator" ? "Submitted to Supervisor." : "Submitted to Super-collaborator.";
+      const msgMap = {
+        collaborator_1: "Submitted to Collaborator II.",
+        collaborator_2: "Submitted to Collaborator.",
+        collaborator: "Submitted to Super-collaborator.",
+        super_collaborator: "Submitted to Supervisor.",
+      };
+      msg.textContent = msgMap[role] || "Submitted.";
     }catch(err){
       msg.textContent = err.message || "Submit failed";
     } finally {
@@ -173,18 +192,19 @@
     }
   });
 
-  btnApprove.addEventListener("click", async () => {
+  if (btnApprove) btnApprove.addEventListener("click", async () => {
     setActionLoading(btnApprove, true);
     try{
-      if (role === "chairman"){
+      if (role === "chairman" || role === "minister"){
         await window.GCP.apiFetch("/tp/approve-section-chairman", {
           method:"POST",
-          body: JSON.stringify({ eventId, sectionId, htmlContent: getHtml() })
+          body: JSON.stringify({ eventId, sectionId })
         });
       } else {
+        // supervisor, super_collaborator, admin
         await window.GCP.apiFetch("/tp/approve-section", {
           method:"POST",
-          body: JSON.stringify({ eventId, sectionId, htmlContent: getHtml() })
+          body: JSON.stringify({ eventId, sectionId })
         });
       }
       await load();
@@ -196,7 +216,7 @@
     }
   });
 
-  btnReturn.addEventListener("click", async () => {
+  if (btnReturn) btnReturn.addEventListener("click", async () => {
     const comment = prompt("Return comment (required):", "");
     if (comment === null) return;
     setActionLoading(btnReturn, true);

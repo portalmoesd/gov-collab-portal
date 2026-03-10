@@ -284,4 +284,79 @@
   };
 
   window.GCP.renderStatusProgress = window.GCP.renderWorkflowProgress;
+
+  // --- Tbilisi timezone formatting ---
+  function formatTbilisiDateTime(value) {
+    if (!value) return '';
+    const d = new Date(value);
+    if (Number.isNaN(d.getTime())) return String(value);
+    const dateParts = new Intl.DateTimeFormat('en-GB', {
+      timeZone: 'Asia/Tbilisi', day: '2-digit', month: '2-digit', year: 'numeric',
+    }).formatToParts(d);
+    const timeParts = new Intl.DateTimeFormat('en-GB', {
+      timeZone: 'Asia/Tbilisi', hour: '2-digit', minute: '2-digit', hour12: false,
+    }).formatToParts(d);
+    const dd = dateParts.find(p => p.type === 'day')?.value;
+    const mm = dateParts.find(p => p.type === 'month')?.value;
+    const yyyy = dateParts.find(p => p.type === 'year')?.value;
+    const hh = timeParts.find(p => p.type === 'hour')?.value;
+    const min = timeParts.find(p => p.type === 'minute')?.value;
+    return `${dd}/${mm}/${yyyy} ${hh}:${min}`;
+  }
+
+  function formatTbilisiDate(value) {
+    if (!value) return '';
+    const d = new Date(value);
+    if (Number.isNaN(d.getTime())) return String(value);
+    return new Intl.DateTimeFormat('en-GB', {
+      timeZone: 'Asia/Tbilisi', year: 'numeric', month: '2-digit', day: '2-digit'
+    }).format(d);
+  }
+
+  window.GCP.formatDate = formatTbilisiDate;
+  window.GCP.formatDateTime = formatTbilisiDateTime;
+
+  // --- Lower-tier progress bar (Collaborator I → II → Collaborator → Super-collaborator → Approved) ---
+  // Maps a section status string to a step index in the lower-tier bar.
+  window.GCP.lowerTierSteps = ['Collab. I', 'Collab. II', 'Collaborator', 'Super-collab.', 'Approved'];
+
+  window.GCP.lowerTierStepIndex = function(status) {
+    const s = String(status || 'draft').toLowerCase();
+    // Draft / returned-to-collab-1 → step 0 (Collab I working)
+    if (['draft', 'returned', 'returned_by_collaborator_2'].includes(s)) return 0;
+    // At Collab II
+    if (['submitted_to_collaborator_2'].includes(s)) return 1;
+    // At Collaborator (returned by collab / returned by super)
+    if (['submitted_to_collaborator', 'returned_by_collaborator', 'approved_by_collaborator_2'].includes(s)) return 2;
+    // At Super-collaborator
+    if (['submitted_to_super_collaborator', 'returned_by_super_collaborator', 'approved_by_collaborator'].includes(s)) return 3;
+    // Approved or higher
+    if (['approved_by_super_collaborator', 'submitted_to_supervisor', 'returned_by_supervisor',
+         'approved_by_supervisor', 'submitted_to_chairman', 'approved_by_chairman',
+         'submitted_to_minister', 'approved_by_minister', 'approved', 'locked'].includes(s)) return 4;
+    return 0;
+  };
+
+  window.GCP.renderLowerTierProgress = function(status) {
+    const steps = window.GCP.lowerTierSteps;
+    const active = window.GCP.lowerTierStepIndex(status);
+    const maxIndex = steps.length - 1;
+    const fillPercent = (active / maxIndex) * 100;
+
+    const stepHtml = steps.map((label, idx) => {
+      const state = idx < active ? 'done' : (idx === active ? 'active' : 'todo');
+      return `<div class="wf-step ${state}" role="listitem" aria-current="${idx === active ? 'step' : 'false'}">
+        <div class="wf-step__circle" aria-hidden="true">${idx + 1}</div>
+        <div class="wf-step__label">${escapeHtml(label)}</div>
+      </div>`;
+    }).join('');
+
+    return `<div class="wf-progress lower-tier-progress" style="--wf-count:${steps.length};" role="group" aria-label="Section workflow progress">
+      <div class="wf-progress__steps" role="list">${stepHtml}</div>
+      <div class="wf-progress__track" aria-hidden="true">
+        <div class="wf-progress__fill" style="width:${fillPercent}%;"></div>
+      </div>
+    </div>`;
+  };
+
 })();

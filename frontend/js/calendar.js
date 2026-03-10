@@ -52,7 +52,10 @@
 
   function submitterLabel(role){
     const key = String(role || 'chairman').toLowerCase();
-    return key === 'supervisor' ? 'Supervisor' : key === 'minister' ? 'Minister' : 'Deputy';
+    if (key === 'supervisor') return 'Supervisor';
+    if (key === 'super_collaborator') return 'Super-collaborator';
+    if (key === 'minister') return 'Minister';
+    return 'Deputy';
   }
 
   function statusMeta(rawStatus, isActive){
