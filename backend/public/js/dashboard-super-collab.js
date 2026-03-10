@@ -36,31 +36,117 @@
 
   // ---- Minimal custom dropdown ----
   const dropdownRegistry = new Map();
-  function refreshCustomDropdown(sel){ const e=dropdownRegistry.get(sel); if(e) e.refresh(); }
+
+  function syncDropdownOpenState(){
+    const panel = document.getElementById("supervisorControlPanel");
+    if (!panel) return;
+    const hasOpen = Array.from(dropdownRegistry.values()).some(entry => entry && entry.isOpen && entry.isOpen());
+    panel.classList.toggle("dropdown-open", hasOpen);
+  }
+
+  function closeAllCustomDropdowns(exceptSelect = null){
+    dropdownRegistry.forEach((entry, key) => {
+      if (key !== exceptSelect) entry.close();
+    });
+    syncDropdownOpenState();
+  }
+
+  function refreshCustomDropdown(select){
+    const entry = dropdownRegistry.get(select);
+    if (entry) entry.refresh();
+  }
+
   function setupCustomDropdown(select){
-    if(!select||dropdownRegistry.has(select)) return;
-    select.classList.add('portal-select-native');
-    const wrap=document.createElement('div'); wrap.className='portal-dropdown';
-    const trigger=document.createElement('button'); trigger.type='button'; trigger.className='portal-dropdown__trigger';
-    trigger.setAttribute('aria-haspopup','listbox'); trigger.setAttribute('aria-expanded','false');
-    const triggerText=document.createElement('span'); triggerText.className='portal-dropdown__text';
-    const arrow=document.createElement('span'); arrow.className='portal-dropdown__arrow'; arrow.setAttribute('aria-hidden','true');
-    trigger.appendChild(triggerText); trigger.appendChild(arrow);
-    const panel=document.createElement('div'); panel.className='portal-dropdown__panel'; panel.hidden=true;
-    select.parentNode.insertBefore(wrap,select.nextSibling);
-    wrap.appendChild(trigger); wrap.appendChild(panel);
-    let isOpen=false;
-    function updateTrigger(){ const opt=select.options[select.selectedIndex]||select.options[0]; triggerText.textContent=opt?opt.textContent:'Select...'; trigger.classList.toggle('is-placeholder',!select.value); trigger.disabled=!!select.disabled; wrap.classList.toggle('is-disabled',!!select.disabled); }
-    function buildOptions(){ panel.innerHTML=''; Array.from(select.options).forEach(opt=>{ const btn=document.createElement('button'); btn.type='button'; btn.className='portal-dropdown__option'; btn.dataset.value=opt.value; btn.disabled=!!opt.disabled; const lbl=document.createElement('span'); lbl.className='portal-dropdown__option-label'; lbl.textContent=opt.textContent; btn.appendChild(lbl); if(!opt.value) btn.classList.add('is-placeholder'); if(opt.value===select.value){btn.classList.add('is-selected');btn.setAttribute('aria-selected','true');} btn.addEventListener('click',()=>{ if(opt.disabled)return; select.value=opt.value; select.dispatchEvent(new Event('change',{bubbles:true})); refresh(); close(); trigger.focus(); }); panel.appendChild(btn); }); }
-    function open(){ isOpen=true; wrap.classList.add('is-open'); panel.hidden=false; trigger.setAttribute('aria-expanded','true'); }
-    function close(){ isOpen=false; wrap.classList.remove('is-open'); panel.hidden=true; trigger.setAttribute('aria-expanded','false'); }
+    if (!select || dropdownRegistry.has(select)) return;
+    select.classList.add("portal-select-native");
+    const wrap = document.createElement("div");
+    wrap.className = "portal-dropdown";
+    const trigger = document.createElement("button");
+    trigger.type = "button";
+    trigger.className = "portal-dropdown__trigger";
+    trigger.setAttribute("aria-haspopup", "listbox");
+    trigger.setAttribute("aria-expanded", "false");
+    const triggerText = document.createElement("span");
+    triggerText.className = "portal-dropdown__text";
+    const triggerArrow = document.createElement("span");
+    triggerArrow.className = "portal-dropdown__arrow";
+    triggerArrow.setAttribute("aria-hidden", "true");
+    trigger.appendChild(triggerText);
+    trigger.appendChild(triggerArrow);
+    const panel = document.createElement("div");
+    panel.className = "portal-dropdown__panel";
+    panel.hidden = true;
+    select.parentNode.insertBefore(wrap, select.nextSibling);
+    wrap.appendChild(trigger);
+    wrap.appendChild(panel);
+    let isOpen = false;
+    function getSelectedOption(){ return select.options[select.selectedIndex] || select.options[0] || null; }
+    function updateTrigger(){
+      const selected = getSelectedOption();
+      triggerText.textContent = selected ? selected.textContent : "Select...";
+      trigger.classList.toggle("is-placeholder", !select.value);
+      trigger.disabled = !!select.disabled;
+      wrap.classList.toggle("is-disabled", !!select.disabled);
+    }
+    function buildOptions(){
+      panel.innerHTML = "";
+      Array.from(select.options).forEach((opt, idx) => {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "portal-dropdown__option";
+        btn.setAttribute("role", "option");
+        btn.dataset.value = opt.value;
+        btn.dataset.index = String(idx);
+        btn.disabled = !!opt.disabled;
+        const label = document.createElement("span");
+        label.className = "portal-dropdown__option-label";
+        label.textContent = opt.textContent || "";
+        btn.appendChild(label);
+        if (!opt.value) btn.classList.add("is-placeholder");
+        if (opt.value === select.value){ btn.classList.add("is-selected"); btn.setAttribute("aria-selected", "true"); }
+        btn.addEventListener("click", () => {
+          if (opt.disabled) return;
+          select.value = opt.value;
+          select.dispatchEvent(new Event("change", { bubbles: true }));
+          refresh();
+          close();
+          trigger.focus();
+        });
+        panel.appendChild(btn);
+      });
+    }
+    function open(){
+      if (select.disabled) return;
+      closeAllCustomDropdowns(select);
+      isOpen = true;
+      wrap.classList.add("is-open");
+      panel.hidden = false;
+      trigger.setAttribute("aria-expanded", "true");
+      syncDropdownOpenState();
+    }
+    function close(){
+      isOpen = false;
+      wrap.classList.remove("is-open");
+      panel.hidden = true;
+      trigger.setAttribute("aria-expanded", "false");
+      syncDropdownOpenState();
+    }
     function refresh(){ buildOptions(); updateTrigger(); }
-    trigger.addEventListener('click',()=>{ if(isOpen) close(); else open(); });
-    trigger.addEventListener('keydown',(e)=>{ if(['ArrowDown','Enter',' '].includes(e.key)){e.preventDefault();open();} if(e.key==='Escape')close(); });
-    dropdownRegistry.set(select,{refresh,close,open,isOpen:()=>isOpen});
+    trigger.addEventListener("click", () => { if (isOpen) close(); else open(); });
+    trigger.addEventListener("keydown", (e) => {
+      if (e.key === "ArrowDown" || e.key === "Enter" || e.key === " "){ e.preventDefault(); open(); }
+      if (e.key === "Escape") close();
+    });
+    dropdownRegistry.set(select, { refresh, close, open, isOpen: () => isOpen });
     refresh();
   }
-  document.addEventListener('click',(e)=>{ if(!e.target.closest('.portal-dropdown')) dropdownRegistry.forEach(e=>e.close()); });
+
+  document.addEventListener("click", (e) => {
+    if (!e.target.closest(".portal-dropdown")) closeAllCustomDropdowns();
+  });
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") closeAllCustomDropdowns();
+  });
 
   function setMsg(text, isError=false){ if(msg){msg.textContent=text||''; msg.style.color=isError?'crimson':'#2b445b';} }
 
@@ -165,46 +251,26 @@
   }
 
   function renderCard(s){
-    const last = s.lastUpdatedAt ? window.GCP.formatDateTime(s.lastUpdatedAt) : '';
-    const note = (s.statusComment || '').trim();
-    const updatedBy = s.lastUpdatedBy || '—';
-    const badgeClass = statusBadgeClass(s.status);
-    const progressHtml = window.GCP.renderLowerTierProgress(s.status);
-    const uid = 'prog-' + Math.random().toString(36).slice(2,8);
-
-    const card = document.createElement('article');
-    card.className = 'required-section-card';
-    card.innerHTML = `
+    const last=s.lastUpdatedAt?window.GCP.formatDateTime(s.lastUpdatedAt):'';
+    const note=(s.statusComment||'').trim();
+    const updatedBy=s.lastUpdatedBy||'—';
+    const badgeClass=statusBadgeClass(s.status);
+    const progressHtml=window.GCP.renderLowerTierProgress(s.status);
+    const card=document.createElement('article'); card.className='required-section-card';
+    card.innerHTML=`
       <div class="required-section-card__top">
         <div class="required-section-card__meta">
-          <div class="required-section-name">\${esc(s.sectionLabel)}</div>
-          <div class="required-section-meta">Updated \${esc(last || '—')}</div>
+          <div class="required-section-name">${esc(s.sectionLabel)}</div>
+          <div class="required-section-meta">Last update · ${esc(last||'—')}</div>
         </div>
-        <span class="required-status-badge \${badgeClass}">\${esc(humanStatus(s.status))}</span>
+        <span class="required-status-badge ${badgeClass}">${esc(humanStatus(s.status))}</span>
       </div>
-      <div class="required-section-card__line">
-        <span>Updated by</span>
-        <strong>\${esc(updatedBy)}</strong>
-      </div>
-      \${note ? `<div class="required-section-note"><b>Comment:</b> \${esc(note)}</div>` : ''}
-      <button class="section-progress-toggle" aria-expanded="false" aria-controls="\${uid}">
-        <span class="section-progress-toggle__arrow">▼</span> Progress
-      </button>
-      <div class="section-progress-body" id="\${uid}" role="region">
-        \${progressHtml}
-      </div>
+      <div class="lower-progress-inline" style="margin:8px 0;">${progressHtml}</div>
+      <div class="required-section-card__line"><span>Updated by</span><strong>${esc(updatedBy)}</strong></div>
+      ${note?`<div class="required-section-note"><b>Comment:</b> ${esc(note)}</div>`:''}
       <div class="required-actions-card"></div>
-    \`;
-
-    // Toggle progress bar
-    const toggleBtn = card.querySelector('.section-progress-toggle');
-    const progressBody = card.querySelector('.section-progress-body');
-    toggleBtn.addEventListener('click', () => {
-      const open = progressBody.classList.toggle('is-open');
-      toggleBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
-    });
-
-    appendSectionActions(card.querySelector('.required-actions-card'), s);
+    `;
+    appendSectionActions(card.querySelector('.required-actions-card'),s);
     return card;
   }
 
@@ -300,9 +366,8 @@
 
   setupCustomDropdown(eventSelect);
 
-  // Refresh on back-navigation (e.persisted = true only when restoring from bfcache)
+  // Refresh on back-navigation
   window.addEventListener('pageshow',(e)=>{
-    if (!e.persisted) return;
     const savedId=currentEventId;
     loadUpcoming().then(()=>{ if(savedId){ eventSelect.value=String(savedId); eventSelect.dispatchEvent(new Event('change')); } }).catch(()=>{});
   });
