@@ -298,8 +298,9 @@
 
   setupCustomDropdown(eventSelect);
 
-  // Refresh on back-navigation
+  // Refresh on back-navigation (e.persisted = true only when restoring from bfcache)
   window.addEventListener('pageshow',(e)=>{
+    if (!e.persisted) return;
     const savedId=currentEventId;
     loadUpcoming().then(()=>{ if(savedId){ eventSelect.value=String(savedId); eventSelect.dispatchEvent(new Event('change')); } }).catch(()=>{});
   });

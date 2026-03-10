@@ -357,21 +357,39 @@
         appendSectionActions(tr.querySelector('.required-actions-cell'), s);
         sectionsTbody.appendChild(tr);
 
-        if (sectionsCards){
+          if (sectionsCards){
           const card = document.createElement('article');
           card.className = 'required-section-card';
+          const uid = 'prog-' + Math.random().toString(36).slice(2,8);
           card.innerHTML = `
             <div class="required-section-card__top">
               <div class="required-section-card__meta">
-                <div class="required-section-name">${escape(s.sectionLabel || '')}</div>
-                <div class="required-section-meta">Last update · ${escape(lastUpdate || '—')}</div>
+                <div class="required-section-name">${escape(s.sectionLabel)}</div>
+                <div class="required-section-meta">Updated ${escape(last || '—')}</div>
               </div>
               <span class="required-status-badge ${badgeClass}">${escape(humanStatus(s.status))}</span>
             </div>
-            <div class="required-section-card__line"><span>Updated by</span><strong>${escape(updatedBy)}</strong></div>
+            <div class="required-section-card__line">
+              <span>Updated by</span><strong>${escape(updatedBy)}</strong>
+            </div>
             ${note ? `<div class="required-section-note"><b>Comment:</b> ${escape(note)}</div>` : ''}
+            <button class="section-progress-toggle" aria-expanded="false" aria-controls="${uid}">
+              <span class="section-progress-toggle__arrow">▼</span> Progress
+            </button>
+            <div class="section-progress-body" id="${uid}" role="region"></div>
             <div class="required-actions-card"></div>
           `;
+          const toggleBtn = card.querySelector('.section-progress-toggle');
+          const progressBody = card.querySelector('.section-progress-body');
+          if (window.GCP.renderWorkflowProgress) {
+            const ev = eventsById ? eventsById.get(currentEventId) : null;
+            const subRole = ev ? (ev.submitter_role || ev.submitterRole || 'chairman') : 'chairman';
+            progressBody.innerHTML = window.GCP.renderWorkflowProgress(s.status, subRole);
+          }
+          toggleBtn.addEventListener('click', () => {
+            const open = progressBody.classList.toggle('is-open');
+            toggleBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
+          });
           appendSectionActions(card.querySelector('.required-actions-card'), s);
           sectionsCards.appendChild(card);
         }

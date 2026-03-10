@@ -3909,3 +3909,9 @@ body.gp-shell-ready .gp-sidebar__scrim{
   .required-section-card__top { flex-wrap: wrap; }
   .required-status-badge { max-width: 100%; }
 }
+
+/* Always use cards layout — hide legacy table at all widths */
+.required-sections-table,
+.required-sections-tablewrap table { display: none !important; }
+.required-sections-cards { display: grid !important; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 14px; }
+
