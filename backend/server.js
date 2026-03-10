@@ -271,12 +271,17 @@ function nextSectionSubmitStatus(roleKey) {
 function returnSectionStatus(roleKey) {
   const rk = normalizeRoleKey(roleKey);
   if (rk === 'collaborator_2') return 'returned_by_collaborator_2';
+  if (rk === 'collaborator') return 'returned_by_collaborator';
+  if (rk === 'super_collaborator') return 'returned_by_super_collaborator';
   if (rk === 'supervisor') return 'returned_by_supervisor';
+  if (rk === 'chairman') return 'returned_by_chairman';
+  if (rk === 'minister') return 'returned_by_minister';
   return 'returned';
 }
 
 function approveSectionStatus(roleKey) {
   const rk = normalizeRoleKey(roleKey);
+  if (rk === 'super_collaborator') return 'approved_by_super_collaborator';
   if (rk === 'supervisor') return 'approved_by_supervisor';
   if (rk === 'chairman') return 'approved_by_chairman';
   if (rk === 'minister') return 'approved_by_minister';
@@ -286,11 +291,15 @@ function approveSectionStatus(roleKey) {
 function decisionStatusesForRole(roleKey) {
   const rk = normalizeRoleKey(roleKey);
   if (rk === 'collaborator_2') return ['submitted_to_collaborator_2', 'returned_by_collaborator_2'];
-  if (rk === 'supervisor') return ['submitted_to_supervisor', 'returned_by_supervisor'];
+  if (rk === 'collaborator') return ['submitted_to_collaborator', 'returned_by_collaborator', 'approved_by_collaborator_2'];
+  if (rk === 'super_collaborator') return ['submitted_to_super_collaborator', 'returned_by_super_collaborator', 'approved_by_collaborator'];
+  if (rk === 'supervisor') return ['submitted_to_supervisor', 'returned_by_supervisor', 'approved_by_super_collaborator'];
   if (rk === 'chairman') return ['submitted_to_chairman', 'returned_by_chairman'];
   if (rk === 'minister') return ['submitted_to_minister', 'returned_by_minister'];
   if (rk === 'admin') return [
     'submitted_to_collaborator_2', 'returned_by_collaborator_2',
+    'submitted_to_collaborator', 'returned_by_collaborator',
+    'submitted_to_super_collaborator', 'returned_by_super_collaborator',
     'submitted_to_supervisor', 'returned_by_supervisor',
     'submitted_to_chairman', 'returned_by_chairman',
     'submitted_to_minister', 'returned_by_minister'
@@ -476,12 +485,13 @@ async function ensureDocumentStatus(eventId, countryId) {
 }
 
 async function ensureTpRow(eventId, countryId, sectionId, userId){
-  // tp_content is unique on (event_id, country_id, section_id) in the deployed DB
+  // Create a minimal empty row — do NOT set last_updated_by_user_id or last_updated_at
+  // so the editor can correctly show "No updates yet" for untouched sections.
   await pool.query(
-    `INSERT INTO tp_content (event_id, country_id, section_id, html_content, status, status_comment, last_updated_by_user_id, last_updated_at)
-     VALUES ($1,$2,$3,'','draft',NULL,$4,NOW())
+    `INSERT INTO tp_content (event_id, country_id, section_id, html_content, status, status_comment)
+     VALUES ($1,$2,$3,'','draft',NULL)
      ON CONFLICT (event_id, country_id, section_id) DO NOTHING`,
-    [eventId, countryId, sectionId, userId]
+    [eventId, countryId, sectionId]
   );
 }
 
@@ -1365,7 +1375,7 @@ app.post('/api/events', requireRole('admin', 'chairman', 'minister', 'supervisor
   const { countryId, title, occasion, deadlineDate, requiredSectionIds, submitterRole } = req.body || {};
   if (!countryId || !title) return res.status(400).json({ error: 'countryId and title required' });
 
-  const normalizedSubmitterRole = ['supervisor','chairman','minister'].includes(String(submitterRole||'').toLowerCase())
+  const normalizedSubmitterRole = ['supervisor','chairman','minister','super_collaborator'].includes(String(submitterRole||'').toLowerCase())
     ? String(submitterRole).toLowerCase()
     : 'chairman';
 
@@ -1433,7 +1443,7 @@ app.put('/api/events/:id', requireRole('admin', 'chairman', 'minister', 'supervi
     if (title !== undefined) { fields.push(`title=$${idx++}`); vals.push(String(title)); }
     if (occasion !== undefined) { fields.push(`occasion=$${idx++}`); vals.push(occasion ? String(occasion) : null); }
     if (submitterRole !== undefined) {
-      const nsr = ['supervisor','chairman','minister'].includes(String(submitterRole||'').toLowerCase())
+      const nsr = ['supervisor','chairman','minister','super_collaborator'].includes(String(submitterRole||'').toLowerCase())
         ? String(submitterRole).toLowerCase()
         : 'chairman';
       fields.push(`submitter_role=$${idx++}`);
@@ -1675,7 +1685,7 @@ app.post('/api/tp/submit', authRequired, attachUser, async (req, res) => {
   return res.json({ success:true, status: targetStatus });
 });
 
-app.post('/api/tp/return', requireRole('collaborator_2','supervisor','chairman','admin'), async (req, res) => {
+app.post('/api/tp/return', requireRole('collaborator_2','collaborator','super_collaborator','supervisor','chairman','minister','admin'), async (req, res) => {
   const eventId = Number(req.body?.eventId);
   const sectionId = Number(req.body?.sectionId);
   const note = String((req.body?.note ?? req.body?.comment) || '');
@@ -1716,7 +1726,7 @@ app.post('/api/tp/return', requireRole('collaborator_2','supervisor','chairman',
   return res.json({ success:true, status: returnStatus });
 });
 
-app.post('/api/tp/approve-section', requireRole('supervisor','admin'), async (req, res) => {
+app.post('/api/tp/approve-section', requireRole('super_collaborator','supervisor','admin'), async (req, res) => {
   const eventId = Number(req.body?.eventId);
   const sectionId = Number(req.body?.sectionId);
   if (!Number.isFinite(eventId) || !Number.isFinite(sectionId)) {

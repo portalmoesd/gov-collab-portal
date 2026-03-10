@@ -433,3 +433,34 @@ textarea{min-height:120px; resize:vertical}
 
 /* Status bar: remove background line above circles (per request) */
 .gcp-progress .gcp-line{ display:none !important; }
+
+/* ---- Lower-tier section progress bar (inline in required sections) ---- */
+.lower-progress-inline {
+  margin: 6px 0 4px;
+}
+.lower-progress-inline .wf-progress {
+  --wf-count: 5;
+}
+.lower-progress-inline .wf-step__label {
+  font-size: 10px;
+}
+.lower-progress-inline .wf-step__circle {
+  width: 20px;
+  height: 20px;
+  font-size: 10px;
+}
+.lower-tier-progress {
+  font-size: 11px;
+}
+/* Required sections table: prevent text from collapsing at medium widths */
+.required-sections-row td {
+  min-width: 0;
+  word-break: break-word;
+}
+.required-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  min-width: 100px;
+}
+
