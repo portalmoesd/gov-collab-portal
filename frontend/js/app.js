@@ -337,21 +337,27 @@
     return 0;
   };
 
-  window.GCP.renderLowerTierProgress = function(status) {
-    const steps = window.GCP.lowerTierSteps;
+  // actorName: optional real name shown on the active step (Collab II and above)
+  window.GCP.renderLowerTierProgress = function(status, actorName) {
+    const defaultSteps = ['Collab. I', 'Collab. II', 'Collaborator', 'Super-collab.', 'Approved'];
     const active = window.GCP.lowerTierStepIndex(status);
-    const maxIndex = steps.length - 1;
+    const maxIndex = defaultSteps.length - 1;
     const fillPercent = (active / maxIndex) * 100;
 
-    const stepHtml = steps.map((label, idx) => {
+    const stepHtml = defaultSteps.map((label, idx) => {
       const state = idx < active ? 'done' : (idx === active ? 'active' : 'todo');
+      // For steps 1-3 (Collab II, Collaborator, Super-collab), show real name if active
+      const showName = actorName && idx === active && idx >= 1 && idx <= 3;
+      const displayLabel = showName ? escapeHtml(actorName) : escapeHtml(label);
+      const sublabel = showName ? `<div class="wf-step__sublabel">${escapeHtml(label)}</div>` : '';
       return `<div class="wf-step ${state}" role="listitem" aria-current="${idx === active ? 'step' : 'false'}">
         <div class="wf-step__circle" aria-hidden="true">${idx + 1}</div>
-        <div class="wf-step__label">${escapeHtml(label)}</div>
+        <div class="wf-step__label">${displayLabel}</div>
+        ${sublabel}
       </div>`;
     }).join('');
 
-    return `<div class="wf-progress lower-tier-progress" style="--wf-count:${steps.length};" role="group" aria-label="Section workflow progress">
+    return `<div class="wf-progress lower-tier-progress" style="--wf-count:${defaultSteps.length};" role="group" aria-label="Section workflow progress">
       <div class="wf-progress__steps" role="list">${stepHtml}</div>
       <div class="wf-progress__track" aria-hidden="true">
         <div class="wf-progress__fill" style="width:${fillPercent}%;"></div>
