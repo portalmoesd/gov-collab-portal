@@ -1113,12 +1113,17 @@ app.get('/api/events', authRequired, attachUser, async (req, res) => {
   if (String(include_ended) !== '1') { where.push(`e.ended_at IS NULL`); }
 
   if (isSectionPipelineRole(roleKey)) {
+    // collaborator and super_collaborator see the full event package — filter only by country assignment
+    // collaborator_1 and collaborator_2 also filter by section assignment
     const countries = await getAssignedCountryIds(req.user.id);
-    const sections = await getAssignedSectionIds(req.user.id);
-    if (!countries.length || !sections.length) return res.json([]);
-
+    if (!countries.length) return res.json([]);
     where.push(`e.country_id = ANY($${idx++}::int[])`); vals.push(countries);
-    where.push(`EXISTS (SELECT 1 FROM event_required_sections ers WHERE ers.event_id=e.id AND ers.section_id = ANY($${idx++}::int[]))`); vals.push(sections);
+
+    if (['collaborator_1','collaborator_2'].includes(roleKey)) {
+      const sections = await getAssignedSectionIds(req.user.id);
+      if (!sections.length) return res.json([]);
+      where.push(`EXISTS (SELECT 1 FROM event_required_sections ers WHERE ers.event_id=e.id AND ers.section_id = ANY($${idx++}::int[]))`); vals.push(sections);
+    }
   }
 
   // Document submitter visibility rules
@@ -1175,12 +1180,17 @@ app.get('/api/events/upcoming', authRequired, attachUser, async (req, res) => {
   if (!includeEnded) where.push(`e.ended_at IS NULL`);
 
   if (isSectionPipelineRole(roleKey)) {
+    // collaborator and super_collaborator see the full event package — filter only by country assignment
+    // collaborator_1 and collaborator_2 also filter by section assignment
     const countries = await getAssignedCountryIds(req.user.id);
-    const sections = await getAssignedSectionIds(req.user.id);
-    if (!countries.length || !sections.length) return res.json([]);
-
+    if (!countries.length) return res.json([]);
     where.push(`e.country_id = ANY($${idx++}::int[])`); vals.push(countries);
-    where.push(`EXISTS (SELECT 1 FROM event_required_sections ers WHERE ers.event_id=e.id AND ers.section_id = ANY($${idx++}::int[]))`); vals.push(sections);
+
+    if (['collaborator_1','collaborator_2'].includes(roleKey)) {
+      const sections = await getAssignedSectionIds(req.user.id);
+      if (!sections.length) return res.json([]);
+      where.push(`EXISTS (SELECT 1 FROM event_required_sections ers WHERE ers.event_id=e.id AND ers.section_id = ANY($${idx++}::int[]))`); vals.push(sections);
+    }
   }
 
   // Document submitter visibility rules (keep consistent with /api/events and userCanSeeEvent)
