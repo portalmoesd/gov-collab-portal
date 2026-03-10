@@ -159,26 +159,46 @@
   }
 
   function renderCard(s){
-    const last=s.lastUpdatedAt?window.GCP.formatDateTime(s.lastUpdatedAt):'';
-    const note=(s.statusComment||'').trim();
-    const updatedBy=s.lastUpdatedBy||'—';
-    const badgeClass=statusBadgeClass(s.status);
-    const progressHtml=window.GCP.renderLowerTierProgress(s.status);
-    const card=document.createElement('article'); card.className='required-section-card';
-    card.innerHTML=`
+    const last = s.lastUpdatedAt ? window.GCP.formatDateTime(s.lastUpdatedAt) : '';
+    const note = (s.statusComment || '').trim();
+    const updatedBy = s.lastUpdatedBy || '—';
+    const badgeClass = statusBadgeClass(s.status);
+    const progressHtml = window.GCP.renderLowerTierProgress(s.status);
+    const uid = 'prog-' + Math.random().toString(36).slice(2,8);
+
+    const card = document.createElement('article');
+    card.className = 'required-section-card';
+    card.innerHTML = `
       <div class="required-section-card__top">
         <div class="required-section-card__meta">
-          <div class="required-section-name">${esc(s.sectionLabel)}</div>
-          <div class="required-section-meta">Last update · ${esc(last||'—')}</div>
+          <div class="required-section-name">\${esc(s.sectionLabel)}</div>
+          <div class="required-section-meta">Updated \${esc(last || '—')}</div>
         </div>
-        <span class="required-status-badge ${badgeClass}">${esc(humanStatus(s.status))}</span>
+        <span class="required-status-badge \${badgeClass}">\${esc(humanStatus(s.status))}</span>
       </div>
-      <div class="lower-progress-inline" style="margin:8px 0;">${progressHtml}</div>
-      <div class="required-section-card__line"><span>Updated by</span><strong>${esc(updatedBy)}</strong></div>
-      ${note?`<div class="required-section-note"><b>Comment:</b> ${esc(note)}</div>`:''}
+      <div class="required-section-card__line">
+        <span>Updated by</span>
+        <strong>\${esc(updatedBy)}</strong>
+      </div>
+      \${note ? `<div class="required-section-note"><b>Comment:</b> \${esc(note)}</div>` : ''}
+      <button class="section-progress-toggle" aria-expanded="false" aria-controls="\${uid}">
+        <span class="section-progress-toggle__arrow">▼</span> Progress
+      </button>
+      <div class="section-progress-body" id="\${uid}" role="region">
+        \${progressHtml}
+      </div>
       <div class="required-actions-card"></div>
-    `;
-    appendSectionActions(card.querySelector('.required-actions-card'),s);
+    \`;
+
+    // Toggle progress bar
+    const toggleBtn = card.querySelector('.section-progress-toggle');
+    const progressBody = card.querySelector('.section-progress-body');
+    toggleBtn.addEventListener('click', () => {
+      const open = progressBody.classList.toggle('is-open');
+      toggleBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
+    });
+
+    appendSectionActions(card.querySelector('.required-actions-card'), s);
     return card;
   }
 
