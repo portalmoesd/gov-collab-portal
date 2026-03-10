@@ -301,10 +301,12 @@
       const note = (s.statusComment || '').trim();
       const updatedBy = s.lastUpdatedBy || '—';
       const badgeClass = statusBadgeClass(s.status);
+      const sectionProgressHtml = window.GCP.renderSectionProgress(s.status, s.pipelineNames || null, true);
       tr.innerHTML = `
         <td>
           <div class="required-section-name">${escape(s.sectionLabel)}</div>
           ${note ? `<div class="required-section-note"><b>Comment:</b> ${escape(note)}</div>` : ''}
+          <div class="section-progress-wrap">${sectionProgressHtml}</div>
         </td>
         <td><span class="required-status-badge ${badgeClass}">${escape(humanStatus(s.status))}</span></td>
         <td><span class="required-updated-at">${escape(last || '—')}</span></td>
@@ -317,6 +319,7 @@
       if (sectionsCards){
         const card = document.createElement('article');
         card.className = 'required-section-card';
+        const sectionProgressHtml = window.GCP.renderSectionProgress(s.status, s.pipelineNames || null, true);
         card.innerHTML = `
           <div class="required-section-card__top">
             <div class="required-section-card__meta">
@@ -327,6 +330,7 @@
           </div>
           <div class="required-section-card__line"><span>Updated by</span><strong>${escape(updatedBy)}</strong></div>
           ${note ? `<div class="required-section-note"><b>Comment:</b> ${escape(note)}</div>` : ''}
+          <div class="section-progress-wrap">${sectionProgressHtml}</div>
           <div class="required-actions-card"></div>
         `;
         appendSectionActions(card.querySelector('.required-actions-card'), s);

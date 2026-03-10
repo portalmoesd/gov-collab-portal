@@ -147,6 +147,10 @@
         <div class="gp-sidebar__spacer"></div>
 
         <div class="gp-sidebar__footer">
+          <button class="dm-toggle" id="dmToggleBtn" type="button" aria-label="Toggle dark mode">
+            <span class="dm-icon" id="dmIcon" aria-hidden="true"></span>
+            <span class="gp-nav__label dm-label" id="dmLabel">Dark mode</span>
+          </button>
           <button class="gp-logout" id="logoutBtn" type="button">
             <span class="gp-nav__icon">${iconSvg("logout")}</span>
             <span class="gp-nav__label">Logout</span>
@@ -201,7 +205,34 @@
       localStorage.removeItem("gcp_token");
       location.href = "login.html";
     });
+
+    // Dark mode toggle
+    const SUN_SVG = `<svg viewBox="0 0 24 24" fill="currentColor" style="width:18px;height:18px;"><path d="M12 4.5a.75.75 0 0 1 .75.75v1.5a.75.75 0 0 1-1.5 0v-1.5A.75.75 0 0 1 12 4.5ZM18.364 6.343a.75.75 0 0 1 0 1.06l-1.06 1.061a.75.75 0 1 1-1.06-1.06l1.06-1.061a.75.75 0 0 1 1.06 0ZM19.5 12a.75.75 0 0 1-.75.75h-1.5a.75.75 0 0 1 0-1.5h1.5a.75.75 0 0 1 .75.75ZM17.303 17.303a.75.75 0 0 1-1.06 0l-1.061-1.06a.75.75 0 1 1 1.06-1.06l1.061 1.06a.75.75 0 0 1 0 1.06ZM12 18.75a.75.75 0 0 1 .75.75v1.5a.75.75 0 0 1-1.5 0v-1.5a.75.75 0 0 1 .75-.75ZM6.697 17.303a.75.75 0 0 1 0-1.06l1.06-1.061a.75.75 0 0 1 1.061 1.06L7.757 17.304a.75.75 0 0 1-1.06 0ZM4.5 12a.75.75 0 0 1 .75-.75h1.5a.75.75 0 0 1 0 1.5h-1.5A.75.75 0 0 1 4.5 12ZM6.697 6.343a.75.75 0 0 1 1.06 0l1.061 1.061a.75.75 0 0 1-1.06 1.06L6.697 7.403a.75.75 0 0 1 0-1.06ZM12 8.25a3.75 3.75 0 1 0 0 7.5 3.75 3.75 0 0 0 0-7.5Z"/></svg>`;
+    const MOON_SVG = `<svg viewBox="0 0 24 24" fill="currentColor" style="width:18px;height:18px;"><path fill-rule="evenodd" d="M9.528 1.718a.75.75 0 0 1 .162.819A8.97 8.97 0 0 0 9 6a9 9 0 0 0 9 9 8.97 8.97 0 0 0 3.463-.69.75.75 0 0 1 .981.98 10.503 10.503 0 0 1-9.694 6.46c-5.799 0-10.5-4.7-10.5-10.5 0-4.368 2.667-8.112 6.46-9.694a.75.75 0 0 1 .818.162Z" clip-rule="evenodd"/></svg>`;
+
+    function applyTheme(dark) {
+      document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
+      const dmIcon = document.getElementById('dmIcon');
+      const dmLabel = document.getElementById('dmLabel');
+      if (dmIcon) dmIcon.innerHTML = dark ? SUN_SVG : MOON_SVG;
+      if (dmLabel) dmLabel.textContent = dark ? 'Light mode' : 'Dark mode';
+    }
+
+    const savedTheme = localStorage.getItem('gcp_theme') === 'dark';
+    applyTheme(savedTheme);
+
+    document.getElementById('dmToggleBtn')?.addEventListener('click', () => {
+      const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+      localStorage.setItem('gcp_theme', isDark ? 'light' : 'dark');
+      applyTheme(!isDark);
+    });
   }
+
+  // Apply saved theme before auth (no flash)
+  (function(){
+    const t = localStorage.getItem('gcp_theme');
+    if (t === 'dark') document.documentElement.setAttribute('data-theme', 'dark');
+  })();
 
 
   async function requireAuth(){
@@ -316,40 +347,63 @@
   window.GCP.formatDate = formatTbilisiDate;
   window.GCP.formatDateTime = formatTbilisiDateTime;
 
-  // --- Lower-tier progress bar (Collaborator I → II → Collaborator → Super-collaborator → Approved) ---
-  // Maps a section status string to a step index in the lower-tier bar.
-  window.GCP.lowerTierSteps = ['Collab. I', 'Collab. II', 'Collaborator', 'Super-collab.', 'Approved'];
+  // --- Section pipeline progress bar ---
+  // Full pipeline: Collab I → Collab II → Collaborator → Super-collab → Supervisor → Deputy → Approved
+  // Lower-tier roles (collab I/II/collab) see a 5-step bar (up to Super-collab).
+  // Super-collab+ see the full 7-step bar.
 
-  window.GCP.lowerTierStepIndex = function(status) {
+  const FULL_PIPELINE_LABELS  = ['Collab. I', 'Collab. II', 'Collaborator', 'Super-collab.', 'Supervisor', 'Deputy', 'Approved'];
+  const SHORT_PIPELINE_LABELS = ['Collab. I', 'Collab. II', 'Collaborator', 'Super-collab.', 'Approved'];
+
+  window.GCP.lowerTierSteps = SHORT_PIPELINE_LABELS;
+
+  function sectionStepIndex(status, full) {
     const s = String(status || 'draft').toLowerCase();
-    // Draft / returned-to-collab-1 → step 0 (Collab I working)
-    if (['draft', 'returned', 'returned_by_collaborator_2'].includes(s)) return 0;
-    // At Collab II
-    if (['submitted_to_collaborator_2'].includes(s)) return 1;
-    // At Collaborator (returned by collab / returned by super)
-    if (['submitted_to_collaborator', 'returned_by_collaborator', 'approved_by_collaborator_2'].includes(s)) return 2;
-    // At Super-collaborator
-    if (['submitted_to_super_collaborator', 'returned_by_super_collaborator', 'approved_by_collaborator'].includes(s)) return 3;
-    // Approved or higher
-    if (['approved_by_super_collaborator', 'submitted_to_supervisor', 'returned_by_supervisor',
-         'approved_by_supervisor', 'submitted_to_chairman', 'approved_by_chairman',
-         'submitted_to_minister', 'approved_by_minister', 'approved', 'locked'].includes(s)) return 4;
-    return 0;
-  };
+    const labels = full ? FULL_PIPELINE_LABELS : SHORT_PIPELINE_LABELS;
+    const lastIdx = labels.length - 1;
 
-  // actorName: optional real name shown on the active step (Collab II and above)
-  window.GCP.renderLowerTierProgress = function(status, actorName) {
-    const defaultSteps = ['Collab. I', 'Collab. II', 'Collaborator', 'Super-collab.', 'Approved'];
-    const active = window.GCP.lowerTierStepIndex(status);
-    const maxIndex = defaultSteps.length - 1;
+    if (['draft', 'returned', 'returned_by_collaborator_2'].includes(s)) return 0;
+    if (s === 'submitted_to_collaborator_2') return 1;
+    if (['submitted_to_collaborator', 'returned_by_collaborator', 'approved_by_collaborator_2'].includes(s)) return 2;
+    if (['submitted_to_super_collaborator', 'returned_by_super_collaborator', 'approved_by_collaborator'].includes(s)) return 3;
+    if (full) {
+      if (['approved_by_super_collaborator', 'submitted_to_supervisor', 'returned_by_supervisor', 'approved_by_supervisor'].includes(s)) return 4;
+      if (['submitted_to_chairman', 'returned_by_chairman', 'approved_by_chairman', 'submitted_to_minister', 'approved_by_minister'].includes(s)) return 5;
+      if (['approved', 'locked'].includes(s)) return 6;
+    } else {
+      if (['approved_by_super_collaborator', 'submitted_to_supervisor', 'returned_by_supervisor',
+           'approved_by_supervisor', 'submitted_to_chairman', 'approved_by_chairman',
+           'submitted_to_minister', 'approved_by_minister', 'approved', 'locked'].includes(s)) return lastIdx;
+    }
+    return 0;
+  }
+
+  window.GCP.lowerTierStepIndex = function(status) { return sectionStepIndex(status, false); };
+
+  // Render per-section progress bar with optional user names.
+  // pipelineNames: { collabI, collabII, collaborator, superCollab } — null values fall back to role labels.
+  // full: true = show full 7-step bar (for super-collab+ dashboards)
+  window.GCP.renderSectionProgress = function(status, pipelineNames, full) {
+    const labels = full ? FULL_PIPELINE_LABELS : SHORT_PIPELINE_LABELS;
+    const names = pipelineNames && typeof pipelineNames === 'object' ? [
+      pipelineNames.collabI      || null,
+      pipelineNames.collabII     || null,
+      pipelineNames.collaborator || null,
+      pipelineNames.superCollab  || null,
+      null, // Supervisor — no assignment needed
+      null, // Deputy
+      null, // Approved
+    ] : labels.map(() => null);
+
+    const active = sectionStepIndex(status, full);
+    const maxIndex = labels.length - 1;
     const fillPercent = (active / maxIndex) * 100;
 
-    const stepHtml = defaultSteps.map((label, idx) => {
+    const stepHtml = labels.map((label, idx) => {
       const state = idx < active ? 'done' : (idx === active ? 'active' : 'todo');
-      // For steps 1-3 (Collab II, Collaborator, Super-collab), show real name if active
-      const showName = actorName && idx === active && idx >= 1 && idx <= 3;
-      const displayLabel = showName ? escapeHtml(actorName) : escapeHtml(label);
-      const sublabel = showName ? `<div class="wf-step__sublabel">${escapeHtml(label)}</div>` : '';
+      const name = names[idx];
+      const displayLabel = name ? escapeHtml(name) : escapeHtml(label);
+      const sublabel = name ? `<div class="wf-step__sublabel">${escapeHtml(label)}</div>` : '';
       return `<div class="wf-step ${state}" role="listitem" aria-current="${idx === active ? 'step' : 'false'}">
         <div class="wf-step__circle" aria-hidden="true">${idx + 1}</div>
         <div class="wf-step__label">${displayLabel}</div>
@@ -357,12 +411,17 @@
       </div>`;
     }).join('');
 
-    return `<div class="wf-progress lower-tier-progress" style="--wf-count:${defaultSteps.length};" role="group" aria-label="Section workflow progress">
+    return `<div class="wf-progress section-pipeline-bar" style="--wf-count:${labels.length};" role="group" aria-label="Section workflow progress">
       <div class="wf-progress__steps" role="list">${stepHtml}</div>
       <div class="wf-progress__track" aria-hidden="true">
         <div class="wf-progress__fill" style="width:${fillPercent}%;"></div>
       </div>
     </div>`;
+  };
+
+  // Backward compat alias
+  window.GCP.renderLowerTierProgress = function(status, stepNames) {
+    return window.GCP.renderSectionProgress(status, stepNames, false);
   };
 
 })();

@@ -75,6 +75,8 @@ async function ensureSchema() {
   // Lightweight, idempotent DDL to keep Render deployments working
   await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMP`);
   await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS deleted_by_user_id INTEGER`);
+  await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS entity TEXT`);
+  await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS department TEXT`);
   await pool.query(`ALTER TABLE events ADD COLUMN IF NOT EXISTS ended_at TIMESTAMP`);
   await pool.query(`ALTER TABLE events ADD COLUMN IF NOT EXISTS ended_by_user_id INTEGER`);
   await pool.query(`ALTER TABLE events ADD COLUMN IF NOT EXISTS submitter_role TEXT NOT NULL DEFAULT 'chairman'`).catch(()=>{});
@@ -363,11 +365,12 @@ async function queryAll(text, params) {
 }
 
 function pickUserPayload(row) {
-  // Blueprint wants: { id, fullName, email, role }
   return {
     id: row.id,
     fullName: row.full_name,
     email: row.email,
+    entity: row.entity || null,
+    department: row.department || null,
     role: row.role_key,
     username: row.username,
     isActive: row.is_active,
@@ -597,6 +600,8 @@ app.get('/api/auth/me', authRequired, attachUser, async (req, res) => {
     id: u.id,
     fullName: u.full_name,
     email: u.email,
+    entity: u.entity || null,
+    department: u.department || null,
     role: u.role_key,
     username: u.username,
   });
@@ -609,6 +614,8 @@ app.get('/api/me', authRequired, attachUser, async (req, res) => {
     username: req.user.username,
     fullName: req.user.full_name,
     email: req.user.email,
+    entity: req.user.entity || null,
+    department: req.user.department || null,
     role: req.user.role_key,
   });
 });
@@ -639,7 +646,7 @@ app.get('/api/users', requireRole('admin'), async (req, res) => {
 
 app.post('/api/users', requireRole('admin'), async (req, res) => {
   try {
-    const { username, password, fullName, email, role, isActive } = req.body || {};
+    const { username, password, fullName, email, entity, department, role, isActive } = req.body || {};
     if (!username || !password || !fullName || !role) {
       return res.status(400).json({ error: 'username, password, fullName, role required' });
     }
@@ -652,11 +659,11 @@ app.post('/api/users', requireRole('admin'), async (req, res) => {
 
     const created = await queryOne(
       `
-      INSERT INTO users (username, password_hash, full_name, email, role_id, is_active, created_at, updated_at)
-      VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())
+      INSERT INTO users (username, password_hash, full_name, email, entity, department, role_id, is_active, created_at, updated_at)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW(), NOW())
       RETURNING id
       `,
-      [String(username).trim(), passwordHash, String(fullName).trim(), email ? String(email).trim() : null, roleRow.id, isActive !== false]
+      [String(username).trim(), passwordHash, String(fullName).trim(), email ? String(email).trim() : null, entity ? String(entity).trim() : null, department ? String(department).trim() : null, roleRow.id, isActive !== false]
     );
 
     const out = await queryOne(
@@ -689,7 +696,7 @@ app.put('/api/users/:id', requireRole('admin'), async (req, res) => {
   const id = Number(req.params.id);
   if (!Number.isFinite(id)) return res.status(400).json({ error: 'Invalid id' });
 
-  const { username, password, fullName, email, role, isActive } = req.body || {};
+  const { username, password, fullName, email, entity, department, role, isActive } = req.body || {};
 
   const fields = [];
   const values = [];
@@ -698,6 +705,8 @@ app.put('/api/users/:id', requireRole('admin'), async (req, res) => {
   if (username !== undefined) { fields.push(`username=$${idx++}`); values.push(String(username)); }
   if (fullName !== undefined) { fields.push(`full_name=$${idx++}`); values.push(String(fullName)); }
   if (email !== undefined) { fields.push(`email=$${idx++}`); values.push(email ? String(email) : null); }
+  if (entity !== undefined) { fields.push(`entity=$${idx++}`); values.push(entity ? String(entity) : null); }
+  if (department !== undefined) { fields.push(`department=$${idx++}`); values.push(department ? String(department) : null); }
   if (isActive !== undefined) { fields.push(`is_active=$${idx++}`); values.push(Boolean(isActive)); }
 
   if (role !== undefined) {
@@ -2051,6 +2060,53 @@ app.get('/api/tp/status-grid', authRequired, async (req, res) => {
     const { rows } = await pool.query(q, params);
     const assignedSet = new Set((assignedSectionIds || []).map(Number));
 
+    // Fetch pipeline user names per section (for progress bar display)
+    // collaborator_1 + collaborator_2 → section_assignments (per section)
+    // collaborator + super_collaborator → country_assignments (per country)
+    const sectionIds = rows.map(r => r.id);
+    let pipelineBySection = {};
+    if (sectionIds.length) {
+      const [saRows, caRows] = await Promise.all([
+        pool.query(
+          `SELECT sa.section_id, u.full_name, r.key AS role_key
+           FROM section_assignments sa
+           JOIN users u ON u.id = sa.user_id
+           JOIN roles r ON r.id = u.role_id
+           WHERE sa.section_id = ANY($1::int[]) AND u.deleted_at IS NULL AND u.is_active = TRUE`,
+          [sectionIds]
+        ),
+        pool.query(
+          `SELECT ca.user_id, u.full_name, r.key AS role_key
+           FROM country_assignments ca
+           JOIN users u ON u.id = ca.user_id
+           JOIN roles r ON r.id = u.role_id
+           WHERE ca.country_id = $1 AND u.deleted_at IS NULL AND u.is_active = TRUE`,
+          [countryId]
+        ),
+      ]);
+      // country-level (collaborator, super_collaborator) - shared across all sections
+      const countryNames = { collaborator: [], super_collaborator: [] };
+      for (const row of caRows.rows) {
+        if (row.role_key === 'collaborator') countryNames.collaborator.push(row.full_name);
+        if (row.role_key === 'super_collaborator') countryNames.super_collaborator.push(row.full_name);
+      }
+      // section-level (collaborator_1, collaborator_2)
+      const sectionNames = {};
+      for (const row of saRows.rows) {
+        if (!sectionNames[row.section_id]) sectionNames[row.section_id] = { collaborator_1: [], collaborator_2: [] };
+        if (row.role_key === 'collaborator_1') sectionNames[row.section_id].collaborator_1.push(row.full_name);
+        if (row.role_key === 'collaborator_2') sectionNames[row.section_id].collaborator_2.push(row.full_name);
+      }
+      for (const secId of sectionIds) {
+        pipelineBySection[secId] = {
+          collabI: (sectionNames[secId]?.collaborator_1 || []).join(', ') || null,
+          collabII: (sectionNames[secId]?.collaborator_2 || []).join(', ') || null,
+          collaborator: countryNames.collaborator.join(', ') || null,
+          superCollab: countryNames.super_collaborator.join(', ') || null,
+        };
+      }
+    }
+
     res.json({
       event_id: eventId,
       country_id: countryId,
@@ -2062,6 +2118,7 @@ app.get('/api/tp/status-grid', authRequired, async (req, res) => {
         lastUpdatedAt: r.last_updated_at,
         lastUpdatedBy: r.last_updated_by || null,
         isAssigned: assignedSet.has(Number(r.id)),
+        pipelineNames: pipelineBySection[r.id] || null,
       }))
     });
   } catch (e) {

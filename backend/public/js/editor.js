@@ -14,6 +14,7 @@
   const taskTitleEl = document.getElementById("taskTitle");
   const lastUpdatedEl = document.getElementById("lastUpdated");
   const returnCommentBox = document.getElementById("returnCommentBox");
+  const editorFrame = document.getElementById("editorFrame");
 
   const btnSave = document.getElementById("btnSave");
   const btnSubmit = document.getElementById("btnSubmit");
@@ -54,18 +55,31 @@
     return;
   }
 
-  // Initially hide dynamic buttons; applyButtonRules() sets them correctly after load
   if (btnSubmit) btnSubmit.style.display = "none";
   if (btnApprove) btnApprove.style.display = "none";
   if (btnReturn) btnReturn.style.display = "none";
   if (isViewer) { if(btnSave) btnSave.style.display = "none"; }
 
-  let editorInstance = null;
+  // Rich editor instance
+  let richEditor = null;
+
+  function initRichEditor(html, readOnly) {
+    if (richEditor) { richEditor.destroy(); richEditor = null; }
+    if (!editorFrame) return;
+    richEditor = window.GCP.RichEditor({
+      container: editorFrame,
+      initialHtml: html || '',
+      placeholder: 'Start typing your talking points…',
+    });
+    if (readOnly && richEditor.el) {
+      richEditor.el.contentEditable = 'false';
+      richEditor.el.style.background = 'transparent';
+      richEditor.el.style.cursor = 'default';
+    }
+  }
 
   function applyButtonRules(tp){
     const s = String(tp.status || 'draft').toLowerCase();
-
-    // Reset all
     actionButtons.forEach(b => b && (b.style.display = "none"));
     if (isViewer) return;
 
@@ -80,7 +94,6 @@
     } else if (role === 'collaborator') {
       if (btnSave) btnSave.style.display = "";
       if (btnSubmit) btnSubmit.style.display = "";
-      // Return only if section came from lower tiers
       const canReturn = ['submitted_to_collaborator', 'returned_by_collaborator'].includes(s);
       if (btnReturn) btnReturn.style.display = canReturn ? "" : "none";
     } else if (role === 'super_collaborator') {
@@ -95,7 +108,6 @@
       if (btnSave) btnSave.style.display = "";
     }
 
-    // Highlight first visible button
     const firstVisible = actionButtons.find((btn) => btn && btn.style.display !== 'none');
     actionButtons.forEach((btn) => btn && btn.classList.remove('is-expanded'));
     if (firstVisible) firstVisible.classList.add('is-expanded');
@@ -111,7 +123,6 @@
       <span class="editor-meta-pill">${window.GCP.escapeHtml(tp.sectionLabel || 'Unknown section')}</span>
     `;
 
-    // Only show last-updated when a real user has made a meaningful update
     if (lastUpdatedEl){
       if (tp.lastUpdatedBy && tp.lastUpdatedAt) {
         const updatedAt = window.GCP.escapeHtml(window.GCP.formatDateTime(tp.lastUpdatedAt));
@@ -136,22 +147,12 @@
     setStatus(tp.status || "draft");
     applyButtonRules(tp);
 
-    const textarea = document.getElementById("editor");
-    textarea.value = tp.htmlContent || "";
-
     const canEdit = !isViewer && !isProtocol;
-    if (window.CKEDITOR){
-      if (editorInstance) editorInstance.destroy(true);
-      editorInstance = window.CKEDITOR.replace("editor", { height: 420 });
-      if (!canEdit && editorInstance && typeof editorInstance.setReadOnly === 'function') editorInstance.setReadOnly(true);
-    } else {
-      textarea.disabled = !canEdit;
-    }
+    initRichEditor(tp.htmlContent || '', !canEdit);
   }
 
   function getHtml(){
-    if (editorInstance) return editorInstance.getData();
-    return document.getElementById("editor").value;
+    return richEditor ? richEditor.getHtml() : '';
   }
 
   if (btnSave) btnSave.addEventListener("click", async () => {
@@ -201,7 +202,6 @@
           body: JSON.stringify({ eventId, sectionId })
         });
       } else {
-        // supervisor, super_collaborator, admin
         await window.GCP.apiFetch("/tp/approve-section", {
           method:"POST",
           body: JSON.stringify({ eventId, sectionId })

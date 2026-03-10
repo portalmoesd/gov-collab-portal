@@ -2061,6 +2061,46 @@ app.get('/api/tp/status-grid', authRequired, async (req, res) => {
     const { rows } = await pool.query(q, params);
     const assignedSet = new Set((assignedSectionIds || []).map(Number));
 
+    // Fetch assigned pipeline-role user names for the progress bar step labels.
+    // collaborator_1 / collaborator_2 are section+country scoped;
+    // collaborator / super_collaborator are country-scoped only.
+    const sectionIds = rows.map(r => Number(r.id));
+    let stepNameRows = [];
+    if (sectionIds.length) {
+      const snRes = await pool.query(
+        `SELECT u.full_name, r.key AS role_key, sa.section_id
+         FROM users u
+         JOIN roles r ON r.id = u.role_id
+         JOIN country_assignments ca ON ca.user_id = u.id AND ca.country_id = $1
+         LEFT JOIN section_assignments sa ON sa.user_id = u.id
+         WHERE u.is_active = true AND u.deleted_at IS NULL
+           AND r.key IN ('collaborator_1','collaborator_2','collaborator','super_collaborator')
+           AND (r.key IN ('collaborator','super_collaborator') OR sa.section_id = ANY($2::int[]))`,
+        [countryId, sectionIds]
+      );
+      stepNameRows = snRes.rows;
+    }
+
+    // Build per-section step-name map
+    const stepNames = {};
+    sectionIds.forEach(id => {
+      stepNames[id] = { collabI: null, collabII: null, collaborator: null, superCollab: null };
+    });
+    let sharedCollaborator = null, sharedSuperCollab = null;
+    for (const u of stepNameRows) {
+      if (u.role_key === 'collaborator') sharedCollaborator = u.full_name;
+      if (u.role_key === 'super_collaborator') sharedSuperCollab = u.full_name;
+      const sid = Number(u.section_id);
+      if (stepNames[sid]) {
+        if (u.role_key === 'collaborator_1') stepNames[sid].collabI = u.full_name;
+        if (u.role_key === 'collaborator_2') stepNames[sid].collabII = u.full_name;
+      }
+    }
+    sectionIds.forEach(id => {
+      stepNames[id].collaborator = sharedCollaborator;
+      stepNames[id].superCollab = sharedSuperCollab;
+    });
+
     res.json({
       event_id: eventId,
       country_id: countryId,
@@ -2072,6 +2112,7 @@ app.get('/api/tp/status-grid', authRequired, async (req, res) => {
         lastUpdatedAt: r.last_updated_at,
         lastUpdatedBy: r.last_updated_by || null,
         isAssigned: assignedSet.has(Number(r.id)),
+        stepNames: stepNames[Number(r.id)] || { collabI: null, collabII: null, collaborator: null, superCollab: null },
       }))
     });
   } catch (e) {
