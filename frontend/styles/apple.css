@@ -3655,263 +3655,78 @@ body.gp-shell-ready .gp-sidebar__scrim{
 
 
 /* ============================================================
-   REQUIRED-SECTION CARD REDESIGN  (replaces old rules below)
+   REQUIRED SECTIONS — table fixes: pill overflow + static buttons
    ============================================================ */
 
-/* Card shell */
-.required-section-card {
-  background: #fff;
-  border: 1px solid rgba(39,70,112,.10);
-  border-radius: 20px;
-  padding: 0;
-  box-shadow: 0 4px 18px rgba(15,23,42,.05);
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  transition: box-shadow .18s ease;
-}
-.required-section-card:hover {
-  box-shadow: 0 8px 28px rgba(15,23,42,.09);
-}
-
-/* Top bar — title + badge side by side, no wrapping chaos */
-.required-section-card__top {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 16px 18px 14px;
-  flex-wrap: nowrap;
-}
-.required-section-card__meta {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-  min-width: 0;
-  flex: 1 1 0;
-}
-.required-section-card .required-section-name {
-  font-size: 15px;
-  font-weight: 800;
-  color: #1e3050;
-  line-height: 1.25;
-  overflow-wrap: anywhere;
-}
-.required-section-card .required-section-meta {
-  font-size: 11px;
-  color: #8292ab;
-  font-weight: 600;
-  margin: 0;
-}
-
-/* Status badge — fixed width approach to prevent overflow */
+/* Status pill: never overflow its cell */
 .required-status-badge {
+  white-space: normal !important;
+  word-break: break-word;
+  max-width: 160px;
+  text-align: center;
+  line-height: 1.3;
+  padding: 4px 10px !important;
+  min-height: 26px;
+  height: auto !important;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 4px 11px;
-  border-radius: 999px;
-  font-size: 11px;
-  font-weight: 800;
-  letter-spacing: .03em;
-  border: 1.5px solid transparent;
-  white-space: nowrap;
-  max-width: 180px;
-  text-align: center;
-  flex-shrink: 0;
-  line-height: 1.3;
-}
-.required-status-badge.is-draft   { background:#f3f5f8; color:#4d617d; border-color:rgba(70,92,123,.14); }
-.required-status-badge.is-review  { background:#edf4ff; color:#1f5cc4; border-color:rgba(44,98,182,.18); }
-.required-status-badge.is-submitted{ background:#e9f2ff; color:#1f56ab; border-color:rgba(44,98,182,.20); }
-.required-status-badge.is-approved { background:#e8f7ee; color:#17854b; border-color:rgba(22,163,74,.20); }
-.required-status-badge.is-returned { background:#fef0f0; color:#c53f3f; border-color:rgba(220,38,38,.18); }
-
-/* Meta row — last update + updated by */
-.required-section-card__line {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 0 18px 12px;
-  font-size: 12px;
-  color: #6c7d97;
-  border-bottom: 1px solid rgba(39,70,112,.07);
-}
-.required-section-card__line span { color: #8292ab; font-weight: 600; }
-.required-section-card__line strong { color: #2f4772; font-size: 13px; font-weight: 700; }
-
-/* Return comment note */
-.required-section-card .required-section-note {
-  margin: 0;
-  padding: 8px 18px;
-  border-radius: 0;
-  border: none;
-  border-bottom: 1px solid rgba(220,38,38,.10);
-  background: rgba(254,240,240,.65);
-  font-size: 12px;
-  color: #9b3535;
-  line-height: 1.4;
 }
 
-/* ---- STATIC ACTION BUTTONS ---- */
-.required-actions-card {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 12px 18px;
-  flex-wrap: wrap;
-}
-
-/* Override the collapsing micro-action entirely inside cards */
-.required-actions-card .micro-action,
-.required-actions-card .micro-action:hover,
-.required-actions-card .micro-action:focus-visible {
+/* Action buttons in the table: always fully expanded (no collapse) */
+.required-actions .micro-action,
+.required-actions .micro-action:hover,
+.required-actions .micro-action:focus-visible {
   width: auto !important;
   min-width: 0 !important;
   height: 36px !important;
-  padding: 0 16px 0 10px !important;
+  padding: 0 14px 0 8px !important;
   border-radius: 999px !important;
-  display: inline-flex !important;
-  align-items: center !important;
-  gap: 7px !important;
-  font-size: 12px !important;
-  font-weight: 800 !important;
-  letter-spacing: .05em !important;
-  text-transform: uppercase !important;
   overflow: visible !important;
-  transition: background .15s ease, box-shadow .15s ease, transform .1s ease !important;
+  transition: background .15s ease, transform .1s ease !important;
 }
-.required-actions-card .micro-action:active { transform: translateY(1px) !important; }
-
-.required-actions-card .micro-action__icon {
-  flex: 0 0 22px !important;
-  width: 22px !important;
-  height: 22px !important;
+.required-actions .micro-action .micro-action__icon {
+  flex: 0 0 28px !important;
+  width: 28px !important;
+  height: 28px !important;
 }
-.required-actions-card .micro-action__icon::before {
+.required-actions .micro-action .micro-action__icon::before {
   width: 16px !important;
   height: 16px !important;
 }
-
-/* Always show label */
-.required-actions-card .micro-action .micro-action__label {
+/* Always show the label text */
+.required-actions .micro-action .micro-action__label {
   opacity: 1 !important;
   transform: none !important;
   font-size: 11px !important;
-  letter-spacing: .08em !important;
   white-space: nowrap !important;
   display: block !important;
 }
 
-/* Per-action colour tints */
-.required-actions-card .required-action--open {
-  background: #f0f4fa;
-  color: #1e3050;
-  box-shadow: inset 0 0 0 1.5px rgba(39,70,112,.14);
-}
-.required-actions-card .required-action--open:hover { background: #e4ecf9; }
-
-.required-actions-card .required-action--submit {
-  background: #e8f0ff;
-  color: #1d4ed8;
-  box-shadow: inset 0 0 0 1.5px rgba(44,98,182,.18);
-}
-.required-actions-card .required-action--submit:hover { background: #d6e5ff; }
-
-.required-actions-card .required-action--approve {
-  background: #e8f7ee;
-  color: #16863b;
-  box-shadow: inset 0 0 0 1.5px rgba(22,163,74,.18);
-}
-.required-actions-card .required-action--approve:hover { background: #d5f0e0; }
-
-.required-actions-card .required-action--return {
-  background: #fff0f0;
-  color: #c43a3a;
-  box-shadow: inset 0 0 0 1.5px rgba(220,38,38,.16);
-}
-.required-actions-card .required-action--return:hover { background: #ffe3e3; }
-
-/* "Monitoring" muted text */
-.required-actions-muted {
-  font-size: 12px;
-  font-weight: 600;
-  color: #a0aec0;
-  letter-spacing: .04em;
-  padding: 6px 4px;
-}
-
-/* ---- PROGRESS BAR — collapse/expand ---- */
-.section-progress-toggle {
-  display: flex;
-  align-items: center;
+/* Actions cell: don't collapse */
+.required-actions {
+  display: flex !important;
+  flex-wrap: wrap;
   gap: 6px;
-  padding: 0 18px 12px;
-  font-size: 11px;
-  font-weight: 700;
-  color: #7a90b3;
-  letter-spacing: .05em;
-  text-transform: uppercase;
-  cursor: pointer;
-  user-select: none;
-  background: none;
-  border: none;
-  width: 100%;
-  text-align: left;
-}
-.section-progress-toggle:hover { color: #3b5fd1; }
-.section-progress-toggle__arrow {
-  font-size: 10px;
-  transition: transform .2s ease;
-  display: inline-block;
-}
-.section-progress-toggle[aria-expanded="true"] .section-progress-toggle__arrow {
-  transform: rotate(180deg);
+  align-items: center;
+  min-width: 120px;
 }
 
-.section-progress-body {
-  overflow: hidden;
-  max-height: 0;
-  transition: max-height .28s ease, padding .2s ease;
-  padding: 0 18px;
+/* Table layout: give columns breathing room */
+.required-sections-table td,
+.required-sections-table th {
+  vertical-align: middle;
 }
-.section-progress-body.is-open {
-  max-height: 200px;
-  padding: 0 18px 14px;
+.required-sections-table td:first-child {
+  min-width: 160px;
 }
-.section-progress-body .wf-progress {
-  margin: 0;
-  width: 100%;
+.required-sections-table td:nth-child(2) {
+  min-width: 140px;
+  max-width: 180px;
 }
-.section-progress-body .wf-step__circle {
-  width: 26px;
-  height: 26px;
-  font-size: 12px;
+.required-sections-table td:last-child {
+  min-width: 160px;
 }
-.section-progress-body .wf-step__label {
-  font-size: 10px;
-  margin-top: 6px;
+.required-sections-tablewrap {
+  overflow-x: auto;
 }
-.section-progress-body .wf-progress__track {
-  margin-top: 12px;
-}
-
-/* Cards grid */
-.required-sections-cards {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-  gap: 14px;
-}
-
-@media (max-width: 700px) {
-  .required-sections-cards { grid-template-columns: 1fr; }
-  .required-section-card__top { flex-wrap: wrap; }
-  .required-status-badge { max-width: 100%; }
-}
-
-/* Always use cards layout — hide legacy table at all widths */
-.required-sections-table,
-.required-sections-tablewrap table { display: none !important; }
-.required-sections-cards { display: grid !important; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 14px; }
-
