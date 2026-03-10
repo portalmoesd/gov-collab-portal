@@ -29,6 +29,8 @@ CREATE TABLE IF NOT EXISTS users (
   password_hash  TEXT NOT NULL,
   full_name      TEXT NOT NULL,
   email          TEXT,
+  entity         TEXT,
+  department     TEXT,
   role_id        INTEGER NOT NULL REFERENCES roles(id),
   is_active      BOOLEAN NOT NULL DEFAULT TRUE,
   created_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),

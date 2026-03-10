@@ -49,6 +49,8 @@
         <td>${window.GCP.escapeHtml(u.username || u.email || "")}</td>
         <td>${window.GCP.escapeHtml(u.fullName || u.full_name || "")}</td>
         <td>${window.GCP.escapeHtml(u.email || "")}</td>
+        <td>${window.GCP.escapeHtml(u.entity || "—")}</td>
+        <td>${window.GCP.escapeHtml(u.department || "—")}</td>
         <td>${window.GCP.escapeHtml(window.GCP.roleToTitle(u.role))}</td>
         <td>${u.isActive ? 'Yes' : 'No'}</td>
         <td class="row">
@@ -56,22 +58,7 @@
           <button class="btn danger" data-act="deactivate">Delete</button>
         </td>
       `;
-      tr.querySelector('[data-act="edit"]').addEventListener("click", async () => {
-        const newFull = prompt("Full name:", u.fullName);
-        if (newFull === null) return;
-        const newEmail = prompt("Email:", u.email || "");
-        if (newEmail === null) return;
-        const newRole = prompt("Role (admin/minister/chairman(=deputy)/supervisor/protocol/super_collaborator/collaborator/collaborator_2/collaborator_1/viewer):", u.role);
-        if (newRole === null) return;
-        const pw = prompt("New password (leave blank to keep):", "");
-        try{
-          await window.GCP.apiFetch(`/users/${u.id}`, {
-            method:"PUT",
-            body: JSON.stringify({ fullName: newFull, email: newEmail || null, role: newRole, password: pw || undefined })
-          });
-          await loadUsers();
-        }catch(err){ alert(err.message || "Failed"); }
-      });
+      tr.querySelector('[data-act="edit"]').addEventListener("click", () => openEditModal(u));
       tr.querySelector('[data-act="deactivate"]').addEventListener("click", async () => {
         if (!confirm("Delete this user? (soft delete)")) return;
         try{
@@ -83,17 +70,94 @@
     }
   }
 
+  let editModalEl = null;
+  function openEditModal(u) {
+    if (editModalEl) editModalEl.remove();
+    const backdrop = document.createElement('div');
+    backdrop.className = 'modal-backdrop';
+    backdrop.style.display = 'flex';
+    backdrop.innerHTML = `
+      <div class="modal" style="max-width:520px;">
+        <div class="close-row"><button class="btn" id="editModalClose">&#x2715;</button></div>
+        <h2 style="margin:0 0 14px;">Edit user</h2>
+        <div class="row" style="flex-direction:column; gap:10px;">
+          <div class="field" style="min-width:100%;"><label>Full name</label><input id="editFullName" value="${window.GCP.escapeHtml(u.fullName||'')}"></div>
+          <div class="field" style="min-width:100%;"><label>Email</label><input type="email" id="editEmail" value="${window.GCP.escapeHtml(u.email||'')}"></div>
+          <div class="field" style="min-width:100%;"><label>Entity</label><input id="editEntity" value="${window.GCP.escapeHtml(u.entity||'')}"></div>
+          <div class="field" style="min-width:100%;"><label>Department</label><input id="editDepartment" value="${window.GCP.escapeHtml(u.department||'')}"></div>
+          <div class="field" style="min-width:100%;">
+            <label>Role</label>
+            <select id="editRole">
+              <option value="admin">Admin</option>
+              <option value="chairman">Deputy</option>
+              <option value="minister">Minister</option>
+              <option value="supervisor">Supervisor</option>
+              <option value="super_collaborator">Super-collaborator</option>
+              <option value="protocol">Protocol</option>
+              <option value="collaborator_1">Collaborator I</option>
+              <option value="collaborator_2">Collaborator II</option>
+              <option value="collaborator">Collaborator</option>
+              <option value="viewer">Viewer</option>
+            </select>
+          </div>
+          <div class="field" style="min-width:100%;"><label>New password (leave blank to keep)</label><input type="password" id="editPassword"></div>
+          <div style="display:flex; gap:10px; margin-top:4px;">
+            <button class="btn primary" id="editSaveBtn">Save</button>
+            <button class="btn" id="editCancelBtn">Cancel</button>
+          </div>
+          <div id="editMsg" class="small" style="color:var(--danger); font-weight:800;"></div>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(backdrop);
+    editModalEl = backdrop;
+
+    const roleSelect = backdrop.querySelector('#editRole');
+    if (roleSelect) roleSelect.value = u.role || 'viewer';
+
+    backdrop.querySelector('#editModalClose').addEventListener('click', () => backdrop.remove());
+    backdrop.querySelector('#editCancelBtn').addEventListener('click', () => backdrop.remove());
+    backdrop.addEventListener('click', (e) => { if (e.target === backdrop) backdrop.remove(); });
+
+    backdrop.querySelector('#editSaveBtn').addEventListener('click', async () => {
+      const editMsg = backdrop.querySelector('#editMsg');
+      editMsg.textContent = '';
+      const payload = {
+        fullName: backdrop.querySelector('#editFullName').value.trim(),
+        email: backdrop.querySelector('#editEmail').value.trim() || null,
+        entity: backdrop.querySelector('#editEntity').value.trim() || null,
+        department: backdrop.querySelector('#editDepartment').value.trim() || null,
+        role: backdrop.querySelector('#editRole').value,
+      };
+      const pw = backdrop.querySelector('#editPassword').value;
+      if (pw) payload.password = pw;
+      try {
+        await window.GCP.apiFetch(`/users/${u.id}`, { method:"PUT", body: JSON.stringify(payload) });
+        backdrop.remove();
+        await loadUsers();
+      } catch(err) {
+        editMsg.textContent = err.message || "Failed";
+      }
+    });
+  }
+
   createUserForm.addEventListener("submit", async (e) => {
     e.preventDefault();
     msgUsers.textContent = "";
     const username = document.getElementById("newUsername").value.trim();
     const fullName = document.getElementById("newFullName").value.trim();
     const email = document.getElementById("newEmail").value.trim();
+    const entity = document.getElementById("newEntity").value.trim();
+    const department = document.getElementById("newDepartment").value.trim();
     const role = document.getElementById("newRole").value;
     const password = document.getElementById("newPassword").value;
 
     try{
-      await window.GCP.apiFetch("/users", { method:"POST", body: JSON.stringify({ username, fullName, email: email || null, role, password }) });
+      await window.GCP.apiFetch("/users", { method:"POST", body: JSON.stringify({
+        username, fullName, email: email || null,
+        entity: entity || null, department: department || null,
+        role, password
+      })});
       createUserForm.reset();
       await loadUsers();
     }catch(err){

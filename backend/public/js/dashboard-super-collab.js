@@ -233,12 +233,12 @@
     const note=(s.statusComment||'').trim();
     const updatedBy=s.lastUpdatedBy||'—';
     const badgeClass=statusBadgeClass(s.status);
-    const progressHtml=window.GCP.renderLowerTierProgress(s.status, s.stepNames);
+    const progressHtml=window.GCP.renderSectionProgress(s.status, s.pipelineNames||null, false);
     const tr=document.createElement('tr'); tr.className='required-sections-row';
     tr.innerHTML=`
       <td>
         <div class="required-section-name">${esc(s.sectionLabel)}</div>
-        <div class="lower-progress-inline">${progressHtml}</div>
+        <div class="section-progress-wrap">${progressHtml}</div>
         ${note?`<div class="required-section-note"><b>Comment:</b> ${esc(note)}</div>`:''}
       </td>
       <td><span class="required-status-badge ${badgeClass}">${esc(humanStatus(s.status))}</span></td>
@@ -255,7 +255,7 @@
     const note=(s.statusComment||'').trim();
     const updatedBy=s.lastUpdatedBy||'—';
     const badgeClass=statusBadgeClass(s.status);
-    const progressHtml=window.GCP.renderLowerTierProgress(s.status, s.stepNames);
+    const progressHtml=window.GCP.renderSectionProgress(s.status, s.pipelineNames||null, false);
     const card=document.createElement('article'); card.className='required-section-card';
     card.innerHTML=`
       <div class="required-section-card__top">
@@ -265,7 +265,7 @@
         </div>
         <span class="required-status-badge ${badgeClass}">${esc(humanStatus(s.status))}</span>
       </div>
-      <div class="lower-progress-inline" style="margin:8px 0;">${progressHtml}</div>
+      <div class="section-progress-wrap">${progressHtml}</div>
       <div class="required-section-card__line"><span>Updated by</span><strong>${esc(updatedBy)}</strong></div>
       ${note?`<div class="required-section-note"><b>Comment:</b> ${esc(note)}</div>`:''}
       <div class="required-actions-card"></div>
@@ -302,6 +302,24 @@
               'submitted_to_minister','approved_by_minister','approved','locked'].includes(st);
     });
     if(submitDocBtn){ submitDocBtn.disabled=!allApproved; submitDocBtn.style.display=''; }
+
+    // Document-level progress bar (super-collab+ can see it)
+    if(docStatusBox){
+      try{
+        const ds=await window.GCP.apiFetch(`/tp/document-status?event_id=${encodeURIComponent(currentEventId)}`,{method:'GET'});
+        const submitterRole=ds.submitterRole||'chairman';
+        const last=ds.updatedAt?window.GCP.formatDateTime(ds.updatedAt):'';
+        docStatusBox.innerHTML=`
+          <div class="doc-progress-strip">
+            <div style="display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:8px;">
+              <b>Document status</b>
+              ${last?`<span class="muted small">${window.GCP.escapeHtml(last)}</span>`:''}
+            </div>
+            ${window.GCP.renderWorkflowProgress(ds.status,submitterRole)}
+          </div>
+        `;
+      }catch(e){/* non-fatal */}
+    }
   }
 
   async function loadUpcoming(){
