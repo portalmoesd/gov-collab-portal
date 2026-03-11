@@ -1571,7 +1571,25 @@ return res.json({
   status: row.status || 'draft',
   statusComment: row.status_comment || null,
   lastUpdatedAt: row.last_updated_at,
-  lastUpdatedBy: row.last_updated_by || null
+  lastUpdatedBy: row.last_updated_by || null,
+  stepNames: await (async () => {
+    const snRes = await pool.query(
+      `SELECT u.full_name, r.key AS role_key
+       FROM users u
+       JOIN roles r ON r.id = u.role_id
+       JOIN country_assignments ca ON ca.user_id = u.id AND ca.country_id = $1
+       JOIN section_assignments sa ON sa.user_id = u.id AND sa.section_id = $2
+       WHERE u.is_active = true AND u.deleted_at IS NULL
+         AND r.key IN ('collaborator_1','collaborator_2')`,
+      [countryId, sectionId]
+    );
+    const sn = { collabI: null, collabII: null };
+    for (const u of snRes.rows) {
+      if (u.role_key === 'collaborator_1') sn.collabI = u.full_name;
+      if (u.role_key === 'collaborator_2') sn.collabII = u.full_name;
+    }
+    return sn;
+  })()
 });
 } catch (e) {
     console.error('GET /api/tp failed', e);
