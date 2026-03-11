@@ -2412,6 +2412,19 @@ app.get('/api/library/document', requireRole('admin','chairman','minister','supe
 /** File upload endpoints **/
 const UPLOADS_DIR = path.join(__dirname, 'uploads');
 
+app.get('/api/tp/files/download', authRequired, attachUser, async (req, res) => {
+  try {
+    const { event_id, section_id, filename } = req.query;
+    if (!event_id || !section_id || !filename) return res.status(400).json({ error: 'Missing params' });
+    const safeName = path.basename(String(filename));
+    const filePath = path.join(UPLOADS_DIR, String(event_id), String(section_id), safeName);
+    if (!fs.existsSync(filePath)) return res.status(404).json({ error: 'File not found' });
+    res.sendFile(filePath);
+  } catch (e) {
+    res.status(500).json({ error: 'Download failed' });
+  }
+});
+
 app.post('/api/tp/files/upload', authRequired, attachUser, async (req, res) => {
   try {
     const { eventId, sectionId, filename, mimeType, base64 } = req.body || {};
@@ -2444,8 +2457,6 @@ app.get('/api/tp/files', authRequired, attachUser, async (req, res) => {
     res.status(500).json({ error: 'Failed to list files' });
   }
 });
-
-app.use('/uploads', authRequired, express.static(UPLOADS_DIR));
 
 /** Static frontend (served from backend/public for Render) **/
 const PUBLIC_DIR = path.join(__dirname, 'public');
