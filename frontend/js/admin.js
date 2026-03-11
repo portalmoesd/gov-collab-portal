@@ -347,7 +347,7 @@
     const users = await window.GCP.apiFetch("/users", { method:"GET" });
     assignableUsersCache = (users || []).filter(u => {
       const rk = String(u.role || '').toLowerCase();
-      return (rk === 'collaborator' || rk === 'super_collaborator') && u.isActive;
+      return ['collaborator_1','collaborator_2','collaborator_3','collaborator','super_collaborator'].includes(rk) && u.isActive;
     });
 
     assignUserSelect.innerHTML = `<option value="">Select…</option>` + assignableUsersCache.map(u => {
