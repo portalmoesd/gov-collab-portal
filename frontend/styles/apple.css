@@ -3792,8 +3792,9 @@ body.gp-shell-ready .gp-sidebar__scrim{
 .micro-action--upload{ --icon-url:url('../assets/save-icon.svg'); --icon-color:#6d28d9; --hover-color:#6d28d9; --hover-bg:#ede9fe; }
 .editor-files-list{ margin-top:12px; display:flex; flex-direction:column; gap:8px; }
 .editor-file-item{ display:flex; align-items:center; gap:10px; padding:8px 12px; border-radius:12px; border:1px solid rgba(39,70,112,.08); background:#fbfdff; font-size:13px; }
-.editor-file-item a{ color:#0a84ff; font-weight:700; text-decoration:none; flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-.editor-file-item a:hover{ text-decoration:underline; }
+.editor-file-download{ background:none; border:none; padding:0; color:#0a84ff; font-weight:700; font-size:13px; cursor:pointer; flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; text-align:left; }
+.editor-file-download:hover{ text-decoration:underline; }
+.editor-file-error{ padding:8px 12px; border-radius:12px; border:1px solid rgba(220,38,38,.2); background:rgba(254,226,226,.5); font-size:13px; color:#b91c1c; }
 
 /* Dark mode toggle button (light mode color) */
 .dm-toggle{
