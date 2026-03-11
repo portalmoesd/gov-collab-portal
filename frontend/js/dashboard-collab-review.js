@@ -227,7 +227,7 @@
         try{
           const endpoint=s==='draft'?'/tp/submit':'/tp/submit-approved-to-super-collaborator';
           const body=s==='draft'
-            ?JSON.stringify({eventId:currentEventId,sectionId:section.sectionId,htmlContent:''})
+            ?JSON.stringify({eventId:currentEventId,sectionId:section.sectionId})
             :JSON.stringify({eventId:currentEventId});
           await window.GCP.apiFetch(endpoint,{method:'POST',body});
           setMsg('Section submitted to Super-collaborator.'); await refreshStatusGrid();

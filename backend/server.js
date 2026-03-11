@@ -1715,7 +1715,9 @@ app.post('/api/tp/save', authRequired, async (req, res) => {
 app.post('/api/tp/submit', authRequired, attachUser, async (req, res) => {
   const eventId = Number(req.body?.eventId);
   const sectionId = Number(req.body?.sectionId);
-  const htmlContent = String(req.body?.htmlContent || '');
+  // null = not provided (dashboard submit — preserve existing content)
+  // string = editor submit — update content
+  const htmlContent = req.body?.htmlContent != null ? String(req.body.htmlContent) : null;
 
   if (!Number.isFinite(eventId) || !Number.isFinite(sectionId)) {
     return res.status(400).json({ error: 'eventId and sectionId required' });
@@ -1756,20 +1758,39 @@ app.post('/api/tp/submit', authRequired, attachUser, async (req, res) => {
   const isNewRound = fromStatus === 'draft' || fromStatus.startsWith('returned_by');
 
   if (isNewRound) {
-    await pool.query(
-      `UPDATE tp_content
-       SET html_content=$4, last_updated_at=NOW(), last_updated_by_user_id=$5, status=$6, status_comment=NULL,
-           original_submitter_role=$7, return_target_role=NULL
-       WHERE event_id=$1 AND country_id=$2 AND section_id=$3`,
-      [eventId, countryId, sectionId, htmlContent, req.user.id, targetStatus, roleKey]
-    );
+    if (htmlContent !== null) {
+      await pool.query(
+        `UPDATE tp_content
+         SET html_content=$4, last_updated_at=NOW(), last_updated_by_user_id=$5, status=$6, status_comment=NULL,
+             original_submitter_role=$7, return_target_role=NULL
+         WHERE event_id=$1 AND country_id=$2 AND section_id=$3`,
+        [eventId, countryId, sectionId, htmlContent, req.user.id, targetStatus, roleKey]
+      );
+    } else {
+      await pool.query(
+        `UPDATE tp_content
+         SET last_updated_at=NOW(), last_updated_by_user_id=$4, status=$5, status_comment=NULL,
+             original_submitter_role=$6, return_target_role=NULL
+         WHERE event_id=$1 AND country_id=$2 AND section_id=$3`,
+        [eventId, countryId, sectionId, req.user.id, targetStatus, roleKey]
+      );
+    }
   } else {
-    await pool.query(
-      `UPDATE tp_content
-       SET html_content=$4, last_updated_at=NOW(), last_updated_by_user_id=$5, status=$6, status_comment=NULL
-       WHERE event_id=$1 AND country_id=$2 AND section_id=$3`,
-      [eventId, countryId, sectionId, htmlContent, req.user.id, targetStatus]
-    );
+    if (htmlContent !== null) {
+      await pool.query(
+        `UPDATE tp_content
+         SET html_content=$4, last_updated_at=NOW(), last_updated_by_user_id=$5, status=$6, status_comment=NULL
+         WHERE event_id=$1 AND country_id=$2 AND section_id=$3`,
+        [eventId, countryId, sectionId, htmlContent, req.user.id, targetStatus]
+      );
+    } else {
+      await pool.query(
+        `UPDATE tp_content
+         SET last_updated_at=NOW(), last_updated_by_user_id=$4, status=$5, status_comment=NULL
+         WHERE event_id=$1 AND country_id=$2 AND section_id=$3`,
+        [eventId, countryId, sectionId, req.user.id, targetStatus]
+      );
+    }
   }
 
   await recordHistory({ eventId, countryId, sectionId, action: 'submitted', fromStatus, toStatus: targetStatus,
