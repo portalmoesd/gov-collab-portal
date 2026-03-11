@@ -78,6 +78,7 @@ async function ensureSchema() {
   await pool.query(`ALTER TABLE events ADD COLUMN IF NOT EXISTS ended_at TIMESTAMP`);
   await pool.query(`ALTER TABLE events ADD COLUMN IF NOT EXISTS ended_by_user_id INTEGER`);
   await pool.query(`ALTER TABLE events ADD COLUMN IF NOT EXISTS submitter_role TEXT NOT NULL DEFAULT 'chairman'`).catch(()=>{});
+  await pool.query(`ALTER TABLE events ADD COLUMN IF NOT EXISTS lower_submitter_role TEXT DEFAULT 'collaborator_2'`).catch(()=>{});
 
   // Ensure enum value exists for minister approvals (legacy DBs)
   await pool.query(`ALTER TYPE tp_section_status ADD VALUE IF NOT EXISTS 'approved_by_minister'`).catch(async ()=>{
@@ -591,6 +592,7 @@ async function getEventWithSections(eventId, countryIdForStatuses = null) {
     title: event.title,
     occasion: event.occasion,
     submitterRole: event.submitter_role,
+    lowerSubmitterRole: event.lower_submitter_role || 'collaborator_2',
     deadlineDate: event.deadline_date,
     isActive: event.is_active,
     createdAt: event.created_at,
@@ -1190,7 +1192,7 @@ app.get('/api/events', authRequired, attachUser, async (req, res) => {
   const rows = await queryAll(
     `
     SELECT e.id, e.country_id, c.name_en AS country_name_en, c.code AS country_code,
-           e.title, e.occasion, e.submitter_role, e.deadline_date, e.is_active, e.ended_at, e.created_at, e.updated_at
+           e.title, e.occasion, e.submitter_role, e.lower_submitter_role, e.deadline_date, e.is_active, e.ended_at, e.created_at, e.updated_at
     FROM events e
     JOIN countries c ON c.id = e.country_id
     ${where.length ? `WHERE ${where.join(' AND ')}` : ''}
@@ -1234,7 +1236,7 @@ app.get('/api/events/upcoming', authRequired, attachUser, async (req, res) => {
   const rows = await queryAll(
     `
     SELECT e.id, e.country_id, c.name_en AS country_name_en, c.code AS country_code,
-           e.title, e.occasion, e.submitter_role, e.deadline_date, e.ended_at
+           e.title, e.occasion, e.submitter_role, e.lower_submitter_role, e.deadline_date, e.ended_at
     FROM events e
     JOIN countries c ON c.id = e.country_id
     WHERE ${where.join(' AND ')}
@@ -1409,12 +1411,13 @@ app.get('/api/my/sections', authRequired, attachUser, async (req, res) => {
 
 // Super-collaborators can also create/update events (they still cannot end events)
 app.post('/api/events', requireRole('admin', 'chairman', 'minister', 'supervisor', 'protocol', 'super_collaborator', 'collaborator'), async (req, res) => {
-  const { countryId, title, occasion, deadlineDate, requiredSectionIds, submitterRole } = req.body || {};
+  const { countryId, title, occasion, deadlineDate, requiredSectionIds, submitterRole, lowerSubmitterRole } = req.body || {};
   if (!countryId || !title) return res.status(400).json({ error: 'countryId and title required' });
 
   const normalizedSubmitterRole = ['supervisor','chairman','minister','super_collaborator'].includes(String(submitterRole||'').toLowerCase())
     ? String(submitterRole).toLowerCase()
     : 'chairman';
+  const normalizedLowerSubmitterRole = String(lowerSubmitterRole||'').toLowerCase() === 'collaborator_3' ? 'collaborator_3' : 'collaborator_2';
 
   const client = await pool.connect();
   try {
@@ -1422,8 +1425,8 @@ app.post('/api/events', requireRole('admin', 'chairman', 'minister', 'supervisor
 
     const ev = await client.query(
       `
-      INSERT INTO events (country_id, title, occasion, submitter_role, deadline_date, created_by_user_id, is_active, created_at, updated_at)
-      VALUES ($1, $2, $3, $4, $5, $6, true, NOW(), NOW())
+      INSERT INTO events (country_id, title, occasion, submitter_role, lower_submitter_role, deadline_date, created_by_user_id, is_active, created_at, updated_at)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, true, NOW(), NOW())
       RETURNING id
       `,
       [
@@ -1431,6 +1434,7 @@ app.post('/api/events', requireRole('admin', 'chairman', 'minister', 'supervisor
         String(title),
         occasion ? String(occasion) : null,
         normalizedSubmitterRole,
+        normalizedLowerSubmitterRole,
         deadlineDate ? String(deadlineDate) : null,
         req.user.id
       ]
@@ -1466,7 +1470,7 @@ app.put('/api/events/:id', requireRole('admin', 'chairman', 'minister', 'supervi
   const eventId = Number(req.params.id);
   if (!Number.isFinite(eventId)) return res.status(400).json({ error: 'Invalid id' });
 
-  const { countryId, title, occasion, deadlineDate, isActive, requiredSectionIds, submitterRole } = req.body || {};
+  const { countryId, title, occasion, deadlineDate, isActive, requiredSectionIds, submitterRole, lowerSubmitterRole } = req.body || {};
 
   const client = await pool.connect();
   try {
@@ -1485,6 +1489,11 @@ app.put('/api/events/:id', requireRole('admin', 'chairman', 'minister', 'supervi
         : 'chairman';
       fields.push(`submitter_role=$${idx++}`);
       vals.push(nsr);
+    }
+    if (lowerSubmitterRole !== undefined) {
+      const nlsr = String(lowerSubmitterRole||'').toLowerCase() === 'collaborator_3' ? 'collaborator_3' : 'collaborator_2';
+      fields.push(`lower_submitter_role=$${idx++}`);
+      vals.push(nlsr);
     }
     if (deadlineDate !== undefined) { fields.push(`deadline_date=$${idx++}`); vals.push(deadlineDate ? String(deadlineDate) : null); }
     if (isActive !== undefined) { fields.push(`is_active=$${idx++}`); vals.push(Boolean(isActive)); }
@@ -1731,7 +1740,12 @@ app.post('/api/tp/submit', authRequired, attachUser, async (req, res) => {
   await ensureDocumentStatus(eventId, countryId);
   await ensureTpRow(eventId, countryId, sectionId, req.user.id);
 
-  const targetStatus = nextSectionSubmitStatus(roleKey);
+  let targetStatus = nextSectionSubmitStatus(roleKey);
+  if (roleKey === 'collaborator_2') {
+    const evMetaLsr = await queryOne(`SELECT lower_submitter_role FROM events WHERE id=$1`, [eventId]);
+    const lsr = String(evMetaLsr?.lower_submitter_role || 'collaborator_2').toLowerCase();
+    if (lsr !== 'collaborator_3') targetStatus = 'submitted_to_collaborator';
+  }
   if (!targetStatus) return res.status(400).json({ error: 'Unsupported role for submit' });
 
   const fromStatusRow = await queryOne(`SELECT status::text AS status FROM tp_content WHERE event_id=$1 AND country_id=$2 AND section_id=$3`, [eventId, countryId, sectionId]);
@@ -1908,6 +1922,15 @@ app.post('/api/tp/submit-approved-to-collaborator-3', requireRole('collaborator_
   const countryId = await resolveCountryIdForEvent(eventId);
   if (!countryId) return res.status(404).json({ error: 'Event not found' });
 
+  // Check event's lower_submitter_role to determine routing
+  const evMetaBatch = await queryOne(`SELECT lower_submitter_role FROM events WHERE id=$1`, [eventId]);
+  const batchLsr = String(evMetaBatch?.lower_submitter_role || 'collaborator_2').toLowerCase();
+  const skipCurator = batchLsr !== 'collaborator_3';
+  const targetBatchStatus = skipCurator ? 'submitted_to_collaborator' : 'submitted_to_collaborator_3';
+  const eligibleStatuses = skipCurator
+    ? ['approved_by_collaborator_2', 'returned_by_collaborator']
+    : ['approved_by_collaborator_2', 'returned_by_collaborator_3'];
+
   let sectionIds = await queryAll(
     `SELECT section_id FROM event_required_sections WHERE event_id=$1 ORDER BY section_id ASC`,
     [eventId]
@@ -1925,30 +1948,31 @@ app.post('/api/tp/submit-approved-to-collaborator-3', requireRole('collaborator_
     await ensureTpRow(eventId, countryId, sid, req.user.id);
   }
 
+  const eligibleStatusSql = eligibleStatuses.map(s => `'${s}'`).join(',');
   const beforeRows3 = await queryAll(
-    `SELECT section_id, status::text AS status FROM tp_content WHERE event_id=$1 AND country_id=$2 AND section_id=ANY($3::int[]) AND status IN ('approved_by_collaborator_2','returned_by_collaborator_3')`,
+    `SELECT section_id, status::text AS status FROM tp_content WHERE event_id=$1 AND country_id=$2 AND section_id=ANY($3::int[]) AND status IN (${eligibleStatusSql})`,
     [eventId, countryId, sectionIds]
   );
   const { rows } = await pool.query(
     `
     UPDATE tp_content
-    SET status='submitted_to_collaborator_3', status_comment=NULL, last_updated_at=NOW(), last_updated_by_user_id=$4
+    SET status=$5, status_comment=NULL, last_updated_at=NOW(), last_updated_by_user_id=$4
     WHERE event_id=$1 AND country_id=$2 AND section_id = ANY($3::int[])
-      AND status IN ('approved_by_collaborator_2','returned_by_collaborator_3')
+      AND status IN (${eligibleStatusSql})
     RETURNING section_id
     `,
-    [eventId, countryId, sectionIds, req.user.id]
+    [eventId, countryId, sectionIds, req.user.id, targetBatchStatus]
   );
   const updatedSet3 = new Set(rows.map(r => Number(r.section_id)));
   for (const br of beforeRows3) {
     if (updatedSet3.has(Number(br.section_id))) {
       await recordHistory({ eventId, countryId, sectionId: Number(br.section_id), action: 'submitted',
-        fromStatus: br.status, toStatus: 'submitted_to_collaborator_3',
+        fromStatus: br.status, toStatus: targetBatchStatus,
         userId: req.user.id, userName: req.user.full_name || req.user.username, userRole: normalizeRoleKey(req.user.role_key) });
     }
   }
 
-  return res.json({ success:true, submitted: rows.length, status: 'submitted_to_collaborator_3' });
+  return res.json({ success:true, submitted: rows.length, status: targetBatchStatus });
 });
 
 app.post('/api/tp/submit-approved-to-collaborator', requireRole('collaborator_3','admin'), async (req, res) => {
@@ -2181,6 +2205,9 @@ app.get('/api/tp/status-grid', authRequired, async (req, res) => {
     const countryId = await resolveCountryIdForEvent(eventId);
     if (!countryId) return res.status(404).json({ error: 'event not found' });
 
+    const evMetaGrid = await queryOne(`SELECT lower_submitter_role FROM events WHERE id=$1`, [eventId]);
+    const lowerSubmitterRole = String(evMetaGrid?.lower_submitter_role || 'collaborator_2').toLowerCase();
+
     let q = `
       SELECT
         ers.section_id AS id,
@@ -2260,6 +2287,7 @@ app.get('/api/tp/status-grid', authRequired, async (req, res) => {
     res.json({
       event_id: eventId,
       country_id: countryId,
+      lowerSubmitterRole,
       sections: rows.map(r => ({
         sectionId: r.id,
         sectionLabel: r.label,
@@ -2268,6 +2296,7 @@ app.get('/api/tp/status-grid', authRequired, async (req, res) => {
         lastUpdatedAt: r.last_updated_at,
         lastUpdatedBy: r.last_updated_by || null,
         isAssigned: assignedSet.has(Number(r.id)),
+        lowerSubmitterRole,
         stepNames: stepNames[Number(r.id)] || { collabI: null, collabII: null, collabIII: null, collaborator: null, superCollab: null },
       }))
     });

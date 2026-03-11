@@ -222,7 +222,7 @@
     const last=s.lastUpdatedAt?window.GCP.formatDateTime(s.lastUpdatedAt):'';
     const note=(s.statusComment||'').trim();
     const updatedBy=s.lastUpdatedBy||'—';
-    const progressHtml=window.GCP.renderCollabSimpleProgress(s.status, s.stepNames);
+    const progressHtml=window.GCP.renderCollabSimpleProgress(s.status, s.stepNames, s.lowerSubmitterRole);
     const tr=document.createElement('tr'); tr.className='required-sections-row';
     tr.innerHTML=`
       <td>
@@ -242,7 +242,7 @@
     const last=s.lastUpdatedAt?window.GCP.formatDateTime(s.lastUpdatedAt):'';
     const note=(s.statusComment||'').trim();
     const updatedBy=s.lastUpdatedBy||'—';
-    const progressHtml=window.GCP.renderCollabSimpleProgress(s.status, s.stepNames);
+    const progressHtml=window.GCP.renderCollabSimpleProgress(s.status, s.stepNames, s.lowerSubmitterRole);
     const card=document.createElement('article'); card.className='required-section-card';
     card.innerHTML=`
       <div class="required-section-card__head">

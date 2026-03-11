@@ -29,12 +29,8 @@
 
   let currentEventId = null;
   let currentSections = [];
+  let currentLowerSubmitterRole = 'collaborator_2';
   const eventsById = new Map();
-
-  // Update submit button label to be Head Collaborator-appropriate
-  if (submitDocBtn) {
-    submitDocBtn.textContent = 'Submit to Curator';
-  }
 
   // ---- Minimal custom dropdown ----
   const dropdownRegistry = new Map();
@@ -219,10 +215,11 @@
         }catch(e){setMsg(e.message||'Return failed',true);}
       }));
       wrap.appendChild(createMicroAction('Submit','submit',async()=>{
-        if(!confirm('Submit this section to Curator?')) return;
+        const dest=currentLowerSubmitterRole!=='collaborator_3'?'Collaborator':'Curator';
+        if(!confirm(`Submit this section to ${dest}?`)) return;
         try{
           await window.GCP.apiFetch('/tp/submit',{method:'POST',body:JSON.stringify({eventId:currentEventId,sectionId:section.sectionId,htmlContent:''})});
-          setMsg('Section submitted to Curator.'); await refreshStatusGrid();
+          setMsg(`Section submitted to ${dest}.`); await refreshStatusGrid();
         }catch(e){setMsg(e.message||'Submit failed',true);}
       }));
     }
@@ -237,7 +234,7 @@
     const last=s.lastUpdatedAt?window.GCP.formatDateTime(s.lastUpdatedAt):'';
     const note=(s.statusComment||'').trim();
     const updatedBy=s.lastUpdatedBy||'—';
-    const progressHtml=window.GCP.renderCollabSimpleProgress(s.status, s.stepNames);
+    const progressHtml=window.GCP.renderCollabSimpleProgress(s.status, s.stepNames, s.lowerSubmitterRole);
     const tr=document.createElement('tr'); tr.className='required-sections-row';
     tr.innerHTML=`
       <td>
@@ -257,7 +254,7 @@
     const last=s.lastUpdatedAt?window.GCP.formatDateTime(s.lastUpdatedAt):'';
     const note=(s.statusComment||'').trim();
     const updatedBy=s.lastUpdatedBy||'—';
-    const progressHtml=window.GCP.renderCollabSimpleProgress(s.status, s.stepNames);
+    const progressHtml=window.GCP.renderCollabSimpleProgress(s.status, s.stepNames, s.lowerSubmitterRole);
     const card=document.createElement('article'); card.className='required-section-card';
     card.innerHTML=`
       <div class="required-section-card__head">
@@ -278,6 +275,11 @@
     if(!currentEventId) return;
     const data=await window.GCP.apiFetch(`/tp/status-grid?event_id=${currentEventId}`,{method:'GET'});
     currentSections=data.sections||[];
+    currentLowerSubmitterRole=String(data.lowerSubmitterRole||'collaborator_2').toLowerCase();
+    const skipCurator=currentLowerSubmitterRole!=='collaborator_3';
+    if(submitDocBtn){
+      submitDocBtn.textContent=skipCurator?'Submit approved sections to Collaborator':'Submit approved sections to Curator';
+    }
     if(sectionsTbody) sectionsTbody.innerHTML='';
     if(sectionsCards) sectionsCards.innerHTML='';
     if(sectionsEmpty) sectionsEmpty.hidden=true;
@@ -294,9 +296,10 @@
       if(sectionsCards) sectionsCards.appendChild(renderCard(s));
     }
 
-    // Enable submit if any assigned section is approved_by_collaborator_2 or returned_by_collaborator_3
+    // Enable submit based on pipeline: if skipping Curator, ready when approved_by_collaborator_2 or returned_by_collaborator
     const canSubmit=currentSections.some(s=>{
       const st=String(s.status||'').toLowerCase();
+      if(skipCurator) return st==='approved_by_collaborator_2'||st==='returned_by_collaborator';
       return st==='approved_by_collaborator_2'||st==='returned_by_collaborator_3';
     });
     if(submitDocBtn){ submitDocBtn.disabled=!canSubmit; submitDocBtn.style.display=''; }
@@ -334,11 +337,12 @@
 
   if(submitDocBtn) submitDocBtn.addEventListener('click', async()=>{
     if(!currentEventId||submitDocBtn.disabled) return;
-    if(!confirm('Submit approved sections to Curator?')) return;
+    const dest=currentLowerSubmitterRole!=='collaborator_3'?'Collaborator':'Curator';
+    if(!confirm(`Submit approved sections to ${dest}?`)) return;
     setMsg('');
     try{
       const result=await window.GCP.apiFetch('/tp/submit-approved-to-collaborator-3',{method:'POST',body:JSON.stringify({eventId:currentEventId})});
-      if(result&&Number(result.submitted||0)>0) setMsg('Sections submitted to Curator.');
+      if(result&&Number(result.submitted||0)>0) setMsg(`Sections submitted to ${dest}.`);
       else setMsg('No sections were ready to submit. Approve sections first.');
       await refreshStatusGrid();
     }catch(e){ setMsg(e.message||'Submit failed',true); }

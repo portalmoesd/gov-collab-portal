@@ -17,6 +17,7 @@
   const occasionInput = document.getElementById("occasion");
   const deadlineInput = document.getElementById("deadlineDate");
   const submitterSelect = document.getElementById("submitterRole");
+  const lowerSubmitterSelect = document.getElementById("lowerSubmitterRole");
   const requiredBox = document.getElementById("requiredSectionsBox");
   const saveBtn = document.getElementById("saveEventBtn");
   const resetBtn = document.getElementById("resetFormBtn");
@@ -123,6 +124,7 @@
     occasionInput.value = details.occasion || "";
     deadlineInput.value = formatDate(details.deadline_date);
     if (submitterSelect) submitterSelect.value = String(details.submitterRole || details.submitter_role || "chairman");
+    if (lowerSubmitterSelect) lowerSubmitterSelect.value = String(details.lowerSubmitterRole || details.lower_submitter_role || "collaborator_2");
     const req = (details.required_sections || details.requiredSections || []);
     const reqIds = new Set((Array.isArray(req) ? req : []).map(s => String(s.id)));
     for (const cb of requiredBox.querySelectorAll('input[type=checkbox]')){
@@ -248,6 +250,7 @@
     editEventId = null;
     form.reset();
     if (submitterSelect) submitterSelect.value = "chairman";
+    if (lowerSubmitterSelect) lowerSubmitterSelect.value = "collaborator_2";
     saveBtn.textContent = "Create event";
     msg.style.color = "var(--danger)";
     msg.textContent = "";
@@ -270,6 +273,7 @@
     const occasion = (occasionInput.value || "").trim();
     const deadlineDate = (deadlineInput.value || "").trim();
     const submitterRole = submitterSelect ? String(submitterSelect.value || "chairman") : "chairman";
+    const lowerSubmitterRole = lowerSubmitterSelect ? String(lowerSubmitterSelect.value || "collaborator_2") : "collaborator_2";
     const requiredSectionIds = Array.from(requiredBox.querySelectorAll('input[type=checkbox]:checked')).map(cb => Number(cb.value)).filter(Number.isFinite);
 
     if (!Number.isFinite(countryId) || !title) {
@@ -277,7 +281,7 @@
       return;
     }
 
-    const payload = { countryId, title, occasion, deadlineDate, requiredSectionIds, submitterRole };
+    const payload = { countryId, title, occasion, deadlineDate, requiredSectionIds, submitterRole, lowerSubmitterRole };
 
     try {
       saveBtn.disabled = true;
