@@ -202,7 +202,11 @@
     }));
 
     // Approve — at super-collaborator review stage, explicitly returned to super-collab, or draft (acting as lowest)
-    const isAtMe=['submitted_to_super_collaborator','returned_by_super_collaborator','approved_by_collaborator'].includes(s)||rtr==='super_collaborator';
+    // Super-collaborator can also skip the Collaborator stage entirely
+    const isAtMe=[
+      'submitted_to_super_collaborator','returned_by_super_collaborator','approved_by_collaborator',
+      'submitted_to_collaborator','returned_by_collaborator','approved_by_collaborator_3',
+    ].includes(s)||rtr==='super_collaborator';
     const canActAsLowest=s==='draft';
     const canApprove=isAtMe||canActAsLowest;
     if(canApprove){
@@ -216,8 +220,8 @@
     }
 
     // Return — when section is at super-collab stage or any stage below supervisor
-    const canReturn=isAtMe||['submitted_to_collaborator','submitted_to_collaborator_2','submitted_to_collaborator_3',
-      'approved_by_collaborator_2','approved_by_collaborator_3'].includes(s);
+    // Return available for the same stages as approve
+    const canReturn=canApprove;
     if(canReturn){
       wrap.appendChild(createMicroAction('Return','return',async()=>{
         const note=prompt('Return comment:','');

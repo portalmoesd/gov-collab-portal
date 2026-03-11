@@ -331,7 +331,11 @@ function decisionStatusesForRole(roleKey) {
   if (rk === 'collaborator_2') return ['submitted_to_collaborator_2', 'returned_by_collaborator_2'];
   if (rk === 'collaborator_3') return ['submitted_to_collaborator_3', 'returned_by_collaborator_3'];
   if (rk === 'collaborator') return ['submitted_to_collaborator', 'returned_by_collaborator', 'approved_by_collaborator_2', 'approved_by_collaborator_3'];
-  if (rk === 'super_collaborator') return ['submitted_to_super_collaborator', 'returned_by_super_collaborator', 'approved_by_collaborator'];
+  if (rk === 'super_collaborator') return [
+    'submitted_to_super_collaborator', 'returned_by_super_collaborator', 'approved_by_collaborator',
+    // Super-collaborator can skip the Collaborator stage entirely
+    'submitted_to_collaborator', 'returned_by_collaborator', 'approved_by_collaborator_3',
+  ];
   if (rk === 'supervisor') return ['submitted_to_supervisor', 'returned_by_supervisor', 'approved_by_super_collaborator'];
   if (rk === 'chairman') return ['submitted_to_chairman', 'returned_by_chairman'];
   if (rk === 'minister') return ['submitted_to_minister', 'returned_by_minister'];
