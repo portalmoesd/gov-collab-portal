@@ -43,6 +43,23 @@
     <div id="msg" class="small" style="color:var(--danger); font-weight:800; margin-top:10px;"></div>
   </section>
 
+  <section class="card col-12 required-sections-panel" id="requiredSectionsPanel">
+    <div class="required-sections-head">
+      <div>
+        <div class="required-sections-title">Required sections</div>
+        <div class="required-sections-subtitle">Your assigned sections and their current progress.</div>
+      </div>
+    </div>
+    <div class="required-sections-tablewrap">
+      <table class="table required-sections-table">
+        <thead><tr><th style="width:35%">Section</th><th style="width:45%">Progress</th><th style="width:20%">Actions</th></tr></thead>
+        <tbody id="sectionsTbody"></tbody>
+      </table>
+    </div>
+    <div id="sectionsCards" class="required-sections-cards"></div>
+    <div id="sectionsEmpty" class="required-sections-empty" hidden>Select an event to see your sections.</div>
+  </section>
+
   <section class="card col-12">
     <div style="font-weight:900; margin-bottom:10px;">Upcoming events</div>
     <div class="upcoming-split">

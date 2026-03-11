@@ -233,18 +233,15 @@
     const last=s.lastUpdatedAt?window.GCP.formatDateTime(s.lastUpdatedAt):'';
     const note=(s.statusComment||'').trim();
     const updatedBy=s.lastUpdatedBy||'—';
-    const badgeClass=statusBadgeClass(s.status);
     const progressHtml=window.GCP.renderCollabSimpleProgress(s.status, s.stepNames);
     const tr=document.createElement('tr'); tr.className='required-sections-row';
     tr.innerHTML=`
       <td>
         <div class="required-section-name">${esc(s.sectionLabel)}</div>
-        <details class="progress-toggle"><summary>Progress</summary><div class="lower-progress-inline">${progressHtml}</div></details>
+        <div class="required-section-meta">${esc(last||'—')} · ${esc(updatedBy)}</div>
         ${note?`<div class="required-section-note"><b>Comment:</b> ${esc(note)}</div>`:''}
       </td>
-      <td><span class="required-status-badge ${badgeClass}">${esc(humanStatus(s.status))}</span></td>
-      <td><span class="required-updated-at">${esc(last||'—')}</span></td>
-      <td><span class="required-updated-by">${esc(updatedBy)}</span></td>
+      <td class="required-progress-cell"><div class="lower-progress-inline">${progressHtml}</div></td>
       <td class="required-actions-cell"></td>
     `;
     appendSectionActions(tr.querySelector('.required-actions-cell'),s);
@@ -255,20 +252,15 @@
     const last=s.lastUpdatedAt?window.GCP.formatDateTime(s.lastUpdatedAt):'';
     const note=(s.statusComment||'').trim();
     const updatedBy=s.lastUpdatedBy||'—';
-    const badgeClass=statusBadgeClass(s.status);
     const progressHtml=window.GCP.renderCollabSimpleProgress(s.status, s.stepNames);
     const card=document.createElement('article'); card.className='required-section-card';
     card.innerHTML=`
-      <div class="required-section-card__top">
-        <div class="required-section-card__meta">
-          <div class="required-section-name">${esc(s.sectionLabel)}</div>
-          <div class="required-section-meta">Last update · ${esc(last||'—')}</div>
-        </div>
-        <span class="required-status-badge ${badgeClass}">${esc(humanStatus(s.status))}</span>
+      <div class="required-section-card__head">
+        <div class="required-section-name">${esc(s.sectionLabel)}</div>
+        <div class="required-section-meta">${esc(last||'—')} · ${esc(updatedBy)}</div>
+        ${note?`<div class="required-section-note"><b>Comment:</b> ${esc(note)}</div>`:''}
       </div>
-      <details class="progress-toggle"><summary>Progress</summary><div class="lower-progress-inline">${progressHtml}</div></details>
-      <div class="required-section-card__line"><span>Updated by</span><strong>${esc(updatedBy)}</strong></div>
-      ${note?`<div class="required-section-note"><b>Comment:</b> ${esc(note)}</div>`:''}
+      <div class="lower-progress-inline">${progressHtml}</div>
       <div class="required-actions-card"></div>
     `;
     appendSectionActions(card.querySelector('.required-actions-card'),s);
@@ -285,7 +277,7 @@
 
     if(!currentSections.length){
       if(sectionsEmpty) sectionsEmpty.hidden=false;
-      if(sectionsTbody) sectionsTbody.innerHTML=`<tr class="required-sections-empty-row"><td colspan="5">No sections assigned to you for this event.</td></tr>`;
+      if(sectionsTbody) sectionsTbody.innerHTML=`<tr class="required-sections-empty-row"><td colspan="3">No sections assigned to you for this event.</td></tr>`;
       if(submitDocBtn) submitDocBtn.disabled=true;
       return;
     }
