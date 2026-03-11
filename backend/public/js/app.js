@@ -471,4 +471,160 @@
     </div>`;
   };
 
+  // ---- Section history panel ----
+
+  // Ordered pipeline stages for the history timeline
+  const HISTORY_STAGES = [
+    { role: 'collaborator_1',    label: 'Collaborator I' },
+    { role: 'collaborator_2',    label: 'Head Collaborator' },
+    { role: 'collaborator_3',    label: 'Curator' },
+    { role: 'collaborator',      label: 'Collaborator' },
+    { role: 'super_collaborator',label: 'Super-collaborator' },
+    { role: 'supervisor',        label: 'Supervisor' },
+    { role: 'chairman',          label: 'Deputy' },
+    { role: 'minister',          label: 'Minister' },
+  ];
+
+  // Returns 0-7 stage index based on the current status string
+  function historyStageLevel(status) {
+    const s = String(status || '').toLowerCase();
+    if (['submitted_to_collaborator_2','returned_by_collaborator_2','approved_by_collaborator_2'].includes(s)) return 1;
+    if (['submitted_to_collaborator_3','returned_by_collaborator_3','approved_by_collaborator_3'].includes(s)) return 2;
+    if (['submitted_to_collaborator','returned_by_collaborator','approved_by_collaborator'].includes(s)) return 3;
+    if (['submitted_to_super_collaborator','returned_by_super_collaborator','approved_by_super_collaborator'].includes(s)) return 4;
+    if (['submitted_to_supervisor','returned_by_supervisor','approved_by_supervisor'].includes(s)) return 5;
+    if (['submitted_to_chairman','returned_by_chairman','approved_by_chairman'].includes(s)) return 6;
+    if (['submitted_to_minister','approved_by_minister','approved','locked'].includes(s)) return 7;
+    return 0; // draft / in_progress / returned_by_collaborator_1
+  }
+
+  function renderHistoryTimeline(history, currentStatus) {
+    const currentLevel = historyStageLevel(currentStatus);
+    // Group history events by role
+    const byRole = {};
+    for (const ev of (history || [])) {
+      const r = ev.user_role || '';
+      if (!byRole[r]) byRole[r] = [];
+      byRole[r].push(ev);
+    }
+
+    const stagesHtml = HISTORY_STAGES.map((stage, idx) => {
+      const events = byRole[stage.role] || [];
+      const isPast    = idx < currentLevel;
+      const isCurrent = idx === currentLevel;
+      const isPending = idx > currentLevel;
+
+      let dotClass = 'sh-stage--pending';
+      if (isPending) dotClass = 'sh-stage--pending';
+      else if (isCurrent && events.length) dotClass = 'sh-stage--active';
+      else if (isCurrent) dotClass = 'sh-stage--active';
+      else if (isPast && events.length) dotClass = 'sh-stage--done';
+      else if (isPast) dotClass = 'sh-stage--warn'; // passed without recorded action
+
+      let eventsHtml = '';
+      if (isPending) {
+        eventsHtml = `<div class="sh-pending-label">Pending</div>`;
+      } else if (events.length === 0) {
+        eventsHtml = `<div class="sh-no-action">${isPast ? 'No action recorded' : 'In progress — no actions yet'}</div>`;
+      } else {
+        // Deduplicate: collapse consecutive saves by same actor into one
+        const collapsed = [];
+        for (const ev of events) {
+          const last = collapsed[collapsed.length - 1];
+          if (last && last.action === 'saved' && ev.action === 'saved' && last.user_name === ev.user_name) {
+            last.acted_at = ev.acted_at; // keep latest save date
+            last._count = (last._count || 1) + 1;
+          } else {
+            collapsed.push({ ...ev });
+          }
+        }
+        eventsHtml = collapsed.map(ev => {
+          const actor = escapeHtml(ev.user_name || 'Unknown');
+          const tagLabel = ev.action === 'saved' ? (ev._count > 1 ? `Edited (×${ev._count})` : 'Edited') :
+                           ev.action === 'submitted' ? 'Submitted' :
+                           ev.action === 'approved'  ? 'Approved'  :
+                           ev.action === 'returned'  ? 'Returned'  : ev.action;
+          const tagClass = `sh-action-tag sh-action-tag--${ev.action === 'saved' ? 'saved' : ev.action}`;
+          const date = ev.acted_at ? new Date(ev.acted_at).toLocaleString('en-GB', { day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' }) : '';
+          const noteHtml = (ev.action === 'returned' && ev.note) ? `<div class="sh-note">↩ "${escapeHtml(ev.note)}"</div>` : '';
+          return `<div class="sh-event"><span class="sh-actor">${actor}</span><span class="${tagClass}">${tagLabel}</span><span class="sh-date">${date}</span></div>${noteHtml}`;
+        }).join('');
+      }
+
+      return `<div class="sh-stage ${dotClass}">
+        <div class="sh-dot"></div>
+        <div class="sh-body">
+          <div class="sh-stage-label">${escapeHtml(stage.label)}</div>
+          <div class="sh-events">${eventsHtml}</div>
+        </div>
+      </div>`;
+    }).join('');
+
+    return `<div class="sh-timeline">${stagesHtml}</div>`;
+  }
+
+  // Attaches a history toggle button + lazy-loaded history row to a table row (tr) or card element.
+  // section: { sectionId, status }, eventId: number
+  window.GCP.attachSectionHistoryToggle = function(container, section, eventId, isCard) {
+    const toggleBtn = document.createElement('button');
+    toggleBtn.type = 'button';
+    toggleBtn.className = 'section-history-toggle';
+    toggleBtn.innerHTML = `<span>History</span><span class="hist-arrow">▼</span>`;
+    container.appendChild(toggleBtn);
+
+    let loaded = false;
+    let open = false;
+
+    if (isCard) {
+      // Card layout: inject a panel div directly
+      const panel = document.createElement('div');
+      panel.className = 'section-history-panel';
+      panel.hidden = true;
+      container.parentElement?.appendChild(panel);
+
+      toggleBtn.addEventListener('click', async () => {
+        open = !open;
+        toggleBtn.classList.toggle('is-open', open);
+        panel.hidden = !open;
+        if (open && !loaded) {
+          loaded = true;
+          panel.innerHTML = '<div class="sh-no-action">Loading…</div>';
+          try {
+            const data = await window.GCP.apiFetch(`/tp/section-history?event_id=${encodeURIComponent(eventId)}&section_id=${encodeURIComponent(section.sectionId)}`, { method:'GET' });
+            panel.innerHTML = renderHistoryTimeline(data.history || [], section.status);
+          } catch (e) {
+            panel.innerHTML = `<div class="sh-no-action">Could not load history: ${escapeHtml(e.message||'error')}</div>`;
+          }
+        }
+      });
+    } else {
+      // Table row layout: insert a sibling <tr> with colspan
+      const tr = container.closest('tr');
+      if (!tr) return;
+      const histRow = document.createElement('tr');
+      histRow.className = 'section-history-row';
+      histRow.hidden = true;
+      const colspan = tr.children.length || 3;
+      histRow.innerHTML = `<td colspan="${colspan}"><div class="section-history-panel"></div></td>`;
+      tr.after(histRow);
+      const panel = histRow.querySelector('.section-history-panel');
+
+      toggleBtn.addEventListener('click', async () => {
+        open = !open;
+        toggleBtn.classList.toggle('is-open', open);
+        histRow.hidden = !open;
+        if (open && !loaded) {
+          loaded = true;
+          panel.innerHTML = '<div class="sh-no-action">Loading…</div>';
+          try {
+            const data = await window.GCP.apiFetch(`/tp/section-history?event_id=${encodeURIComponent(eventId)}&section_id=${encodeURIComponent(section.sectionId)}`, { method:'GET' });
+            panel.innerHTML = renderHistoryTimeline(data.history || [], section.status);
+          } catch (e) {
+            panel.innerHTML = `<div class="sh-no-action">Could not load history: ${escapeHtml(e.message||'error')}</div>`;
+          }
+        }
+      });
+    }
+  };
+
 })();

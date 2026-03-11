@@ -230,10 +230,11 @@
         <div class="required-section-meta">${esc(last||'—')} · ${esc(updatedBy)}</div>
         ${note?`<div class="required-section-note"><b>Comment:</b> ${esc(note)}</div>`:''}
       </td>
-      <td class="required-progress-cell"><div class="lower-progress-inline">${progressHtml}</div></td>
+      <td class="required-progress-cell"><div class="lower-progress-inline">${progressHtml}</div><div class="section-history-toggle-mount"></div></td>
       <td class="required-actions-cell"></td>
     `;
     appendSectionActions(tr.querySelector('.required-actions-cell'),s);
+    window.GCP.attachSectionHistoryToggle(tr.querySelector('.section-history-toggle-mount'), s, currentEventId, false);
     return tr;
   }
 
@@ -250,9 +251,11 @@
         ${note?`<div class="required-section-note"><b>Comment:</b> ${esc(note)}</div>`:''}
       </div>
       <div class="lower-progress-inline">${progressHtml}</div>
+      <div class="section-history-toggle-mount"></div>
       <div class="required-actions-card"></div>
     `;
     appendSectionActions(card.querySelector('.required-actions-card'),s);
+    window.GCP.attachSectionHistoryToggle(card.querySelector('.section-history-toggle-mount'), s, currentEventId, true);
     return card;
   }
 
