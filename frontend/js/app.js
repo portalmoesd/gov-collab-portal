@@ -74,8 +74,8 @@
       protocol:"Protocol",
       super_collaborator:"Super-collaborator",
       collaborator:"Collaborator",
-      collaborator_3:"Collaborator III",
-      collaborator_2:"Collaborator II",
+      collaborator_3:"Curator",
+      collaborator_2:"Head Collaborator",
       collaborator_1:"Collaborator I",
       viewer:"Viewer"
     };
@@ -358,8 +358,8 @@
   // Lower-tier roles (collab I/II/collab) see a 5-step bar (up to Super-collab).
   // Super-collab+ see the full 7-step bar.
 
-  const FULL_PIPELINE_LABELS  = ['Collab. I', 'Collab. II', 'Collab. III', 'Collaborator', 'Super-collab.', 'Supervisor', 'Deputy', 'Approved'];
-  const SHORT_PIPELINE_LABELS = ['Collab. I', 'Collab. II', 'Collab. III', 'Collaborator', 'Super-collab.', 'Approved'];
+  const FULL_PIPELINE_LABELS  = ['Collab. I', 'Head Collab.', 'Curator', 'Collaborator', 'Super-collab.', 'Supervisor', 'Deputy', 'Approved'];
+  const SHORT_PIPELINE_LABELS = ['Collab. I', 'Head Collab.', 'Curator', 'Collaborator', 'Super-collab.', 'Approved'];
 
   window.GCP.lowerTierSteps = SHORT_PIPELINE_LABELS;
 
@@ -447,7 +447,7 @@
   };
 
   window.GCP.renderCollabSimpleProgress = function(status, stepNames) {
-    const steps = ['Collaborator I', 'Collaborator II', 'Collaborator III', 'Waiting for Approval', 'Approved'];
+    const steps = ['Collaborator I', 'Head Collaborator', 'Curator', 'Waiting for Approval', 'Approved'];
     const names = stepNames && typeof stepNames === 'object'
       ? [stepNames.collabI || null, stepNames.collabII || null, stepNames.collabIII || null, null, null]
       : [null, null, null, null, null];

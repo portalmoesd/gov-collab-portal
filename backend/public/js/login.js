@@ -14,18 +14,7 @@
     }
   }
 
-    function safeNext() {
-    const raw = new URLSearchParams(window.location.search).get('next');
-    if (!raw) return null;
-    let decoded;
-    try { decoded = decodeURIComponent(raw); } catch { decoded = raw; }
-    // allow only same-origin relative pages
-    if (decoded.includes('://') || decoded.startsWith('//')) return null;
-    const allowed = /^(dashboard-[a-z-]+\.html|calendar\.html|library\.html|admin\.html|tp-editor\.html|editor\.html)([?#].*)?$/i;
-    return allowed.test(decoded) ? decoded : null;
-  }
-
-function redirectByRole(role){
+    function redirectByRole(role){
     const r = String(role||"").toLowerCase();
     if (r === "admin") location.href = "admin.html";
     else if (r === "chairman") location.href = "dashboard-chairman.html"; // Deputy
@@ -54,8 +43,6 @@ function redirectByRole(role){
       });
       localStorage.setItem("gcp_token", data.token);
       localStorage.setItem("gcp_user", JSON.stringify(data.user));
-      const next = safeNext();
-      if (next) return (window.location.href = next);
       redirectByRole(data.user.role);
     }catch(err){
       errBox.textContent = err.message || "Login failed";

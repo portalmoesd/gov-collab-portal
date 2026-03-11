@@ -153,9 +153,9 @@
   function humanStatus(s){
     const map={
       draft:'Draft', in_progress:'Draft',
-      submitted_to_collaborator_2:'At Collaborator II',
-      returned_by_collaborator_2:'Returned by Collaborator II',
-      approved_by_collaborator_2:'Approved by Collaborator II',
+      submitted_to_collaborator_2:'At Head Collaborator',
+      returned_by_collaborator_2:'Returned by Head Collaborator',
+      approved_by_collaborator_2:'Approved by Head Collaborator',
       submitted_to_collaborator:'At Collaborator',
       returned_by_collaborator:'Returned by Collaborator',
       approved_by_collaborator:'Approved by Collaborator',
