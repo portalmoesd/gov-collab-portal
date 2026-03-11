@@ -61,6 +61,7 @@
   if (isViewer) { if(btnSave) btnSave.style.display = "none"; }
 
   let editorInstance = null;
+  let richEditorInstance = null;
 
   function applyButtonRules(tp){
     const s = String(tp.status || 'draft').toLowerCase();
@@ -137,21 +138,33 @@
     applyButtonRules(tp);
 
     const textarea = document.getElementById("editor");
-    textarea.value = tp.htmlContent || "";
+    if (textarea) textarea.value = tp.htmlContent || "";
+    const editorFrame = document.getElementById("editorFrame");
 
     const canEdit = !isViewer && !isProtocol;
-    if (window.CKEDITOR){
+    if (window.CKEDITOR && textarea){
       if (editorInstance) editorInstance.destroy(true);
       editorInstance = window.CKEDITOR.replace("editor", { height: 420 });
       if (!canEdit && editorInstance && typeof editorInstance.setReadOnly === 'function') editorInstance.setReadOnly(true);
-    } else {
+    } else if (window.GCP && window.GCP.RichEditor && editorFrame){
+      if (richEditorInstance){
+        richEditorInstance.setHtml(tp.htmlContent || '');
+      } else {
+        richEditorInstance = window.GCP.RichEditor({ container: editorFrame, initialHtml: tp.htmlContent || '' });
+      }
+      if (richEditorInstance && richEditorInstance.el){
+        richEditorInstance.el.contentEditable = canEdit ? 'true' : 'false';
+      }
+    } else if (textarea){
       textarea.disabled = !canEdit;
     }
   }
 
   function getHtml(){
     if (editorInstance) return editorInstance.getData();
-    return document.getElementById("editor").value;
+    if (richEditorInstance) return richEditorInstance.getHtml();
+    const ta = document.getElementById("editor");
+    return ta ? ta.value : '';
   }
 
   if (btnSave) btnSave.addEventListener("click", async () => {
