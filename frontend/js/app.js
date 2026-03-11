@@ -339,12 +339,11 @@
     const stepHtml = steps.map((label, idx) => {
       const state = idx < active ? 'done' : (idx === active ? 'active' : 'todo');
       const name = names[idx];
-      const displayLabel = name ? escapeHtml(name) : escapeHtml(label);
-      const sublabel = name ? `<div class="wf-step__sublabel">${escapeHtml(label)}</div>` : '';
+      // Collab I/II steps: show only the assigned name, no role title
+      const displayLabel = idx < 2 ? (name ? escapeHtml(name) : '') : escapeHtml(label);
       return `<div class="wf-step ${state}" role="listitem" aria-current="${idx === active ? 'step' : 'false'}">
         <div class="wf-step__circle" aria-hidden="true">${idx + 1}</div>
         <div class="wf-step__label">${displayLabel}</div>
-        ${sublabel}
       </div>`;
     }).join('');
     return `<div class="wf-progress lower-tier-progress" style="--wf-count:${steps.length};" role="group" aria-label="Section workflow progress">
