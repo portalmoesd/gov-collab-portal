@@ -103,7 +103,7 @@ async function ensureSchema() {
   await pool.query(`ALTER TABLE document_status ADD COLUMN IF NOT EXISTS chairman_comment TEXT`).catch(()=>{});
   await pool.query(`ALTER TABLE document_status ALTER COLUMN status TYPE TEXT USING status::text`).catch(()=>{});
 
-  // Collaborator III tier statuses
+  // Curator tier statuses
   await pool.query(`ALTER TYPE tp_section_status ADD VALUE IF NOT EXISTS 'submitted_to_collaborator_3'`).catch(()=>{});
   await pool.query(`ALTER TYPE tp_section_status ADD VALUE IF NOT EXISTS 'returned_by_collaborator_3'`).catch(()=>{});
   await pool.query(`ALTER TYPE tp_section_status ADD VALUE IF NOT EXISTS 'approved_by_collaborator_3'`).catch(()=>{});
@@ -118,8 +118,8 @@ async function ensureRolesExist() {
     ['protocol','Protocol'],
     ['super_collaborator','Super-collaborator'],
     ['collaborator','Collaborator'],
-    ['collaborator_3','Collaborator III'],
-    ['collaborator_2','Collaborator II'],
+    ['collaborator_3','Curator'],
+    ['collaborator_2','Head Collaborator'],
     ['collaborator_1','Collaborator I'],
     ['viewer','Viewer'],
   ];

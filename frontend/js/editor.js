@@ -197,8 +197,8 @@
       });
       await load();
       const msgMap = {
-        collaborator_1: "Submitted to Collaborator II.",
-        collaborator_2: "Submitted to Collaborator III.",
+        collaborator_1: "Submitted to Head Collaborator.",
+        collaborator_2: "Submitted to Curator.",
         collaborator_3: "Submitted to Collaborator.",
         collaborator: "Submitted to Super-collaborator.",
         super_collaborator: "Submitted to Supervisor.",

@@ -146,10 +146,10 @@
   function humanSectionStatus(s){
     const map={
       draft:'Draft', returned:'Draft (Returned)',
-      returned_by_collaborator_2:'Returned by Collaborator II',
-      submitted_to_collaborator_2:'At Collaborator II',
+      returned_by_collaborator_2:'Returned by Head Collaborator',
+      submitted_to_collaborator_2:'At Head Collaborator',
       submitted_to_collaborator:'At Collaborator',
-      approved_by_collaborator_2:'Approved by Collaborator II',
+      approved_by_collaborator_2:'Approved by Head Collaborator',
       submitted_to_super_collaborator:'At Super-collaborator',
       approved_by_collaborator:'Approved by Collaborator',
       approved_by_super_collaborator:'Approved by Super-collaborator',
