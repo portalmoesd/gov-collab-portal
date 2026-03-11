@@ -2115,7 +2115,10 @@ app.post('/api/tp/submit-approved-to-super-collaborator', requireRole('collabora
   }
 
   const beforeRowsSC = await queryAll(
-    `SELECT section_id, status::text AS status FROM tp_content WHERE event_id=$1 AND country_id=$2 AND section_id=ANY($3::int[]) AND (status IN ('approved_by_collaborator','returned_by_super_collaborator') OR return_target_role='collaborator')`,
+    `SELECT section_id, status::text AS status FROM tp_content WHERE event_id=$1 AND country_id=$2 AND section_id=ANY($3::int[])
+     AND (status IN ('submitted_to_collaborator','returned_by_collaborator','approved_by_collaborator',
+                     'approved_by_collaborator_2','approved_by_collaborator_3','returned_by_super_collaborator')
+          OR return_target_role='collaborator')`,
     [eventId, countryId, sectionIds]
   );
   const { rows } = await pool.query(
@@ -2123,7 +2126,9 @@ app.post('/api/tp/submit-approved-to-super-collaborator', requireRole('collabora
     UPDATE tp_content
     SET status='submitted_to_super_collaborator', status_comment=NULL, last_updated_at=NOW(), last_updated_by_user_id=$4, return_target_role=NULL
     WHERE event_id=$1 AND country_id=$2 AND section_id = ANY($3::int[])
-      AND (status IN ('approved_by_collaborator','returned_by_super_collaborator') OR return_target_role='collaborator')
+      AND (status IN ('submitted_to_collaborator','returned_by_collaborator','approved_by_collaborator',
+                      'approved_by_collaborator_2','approved_by_collaborator_3','returned_by_super_collaborator')
+           OR return_target_role='collaborator')
     RETURNING section_id
     `,
     [eventId, countryId, sectionIds, req.user.id]
