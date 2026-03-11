@@ -163,7 +163,7 @@
     sectionStatusBox.style.display='block';
     sectionStatusBox.innerHTML=`
       <div style="margin-bottom:8px;"><b>Status:</b> ${esc(humanSectionStatus(status))}</div>
-      <div style="margin:10px 0;">${progressHtml}</div>
+      <details class="progress-toggle" style="margin:10px 0;"><summary>Progress</summary><div class="lower-progress-inline">${progressHtml}</div></details>
       ${note?`<div style="margin-top:8px;padding:8px 10px;border-radius:10px;border:1px solid rgba(220,38,38,.25);background:rgba(254,226,226,.55);"><b>Return comment:</b> ${esc(note)}</div>`:''}
     `;
   }

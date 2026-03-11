@@ -32,7 +32,7 @@
 
   // Update submit button label to be Collaborator II-appropriate
   if (submitDocBtn) {
-    submitDocBtn.textContent = 'Submit Approved Sections to Collaborator';
+    submitDocBtn.textContent = 'Submit for Approval';
   }
 
   // ---- Minimal custom dropdown ----
@@ -239,7 +239,7 @@
     tr.innerHTML=`
       <td>
         <div class="required-section-name">${esc(s.sectionLabel)}</div>
-        <div class="lower-progress-inline">${progressHtml}</div>
+        <details class="progress-toggle"><summary>Progress</summary><div class="lower-progress-inline">${progressHtml}</div></details>
         ${note?`<div class="required-section-note"><b>Comment:</b> ${esc(note)}</div>`:''}
       </td>
       <td><span class="required-status-badge ${badgeClass}">${esc(humanStatus(s.status))}</span></td>
@@ -266,7 +266,7 @@
         </div>
         <span class="required-status-badge ${badgeClass}">${esc(humanStatus(s.status))}</span>
       </div>
-      <div class="lower-progress-inline" style="margin:8px 0;">${progressHtml}</div>
+      <details class="progress-toggle"><summary>Progress</summary><div class="lower-progress-inline">${progressHtml}</div></details>
       <div class="required-section-card__line"><span>Updated by</span><strong>${esc(updatedBy)}</strong></div>
       ${note?`<div class="required-section-note"><b>Comment:</b> ${esc(note)}</div>`:''}
       <div class="required-actions-card"></div>

@@ -440,4 +440,47 @@ textarea{min-height:120px; resize:vertical}
   gap: 4px;
   min-width: 100px;
 }
+/* Uniform button width across all roles in the required-sections action cells */
+.required-actions .micro-action {
+  width: 130px;
+}
+.required-actions .micro-action .micro-action__label {
+  opacity: 1;
+  transform: none;
+}
+.required-actions .micro-action:hover,
+.required-actions .micro-action:focus-visible,
+.required-actions .micro-action[disabled]:hover,
+.required-actions .micro-action[disabled]:focus-visible {
+  width: 130px;
+}
+
+/* Progress bar dropdown toggle in required-sections */
+.progress-toggle {
+  margin: 5px 0 2px;
+}
+.progress-toggle > summary {
+  list-style: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--primary, #0a84ff);
+  cursor: pointer;
+  user-select: none;
+  padding: 2px 4px;
+  border-radius: 5px;
+}
+.progress-toggle > summary::-webkit-details-marker { display: none; }
+.progress-toggle > summary::after {
+  content: "▾";
+  font-size: 10px;
+}
+.progress-toggle[open] > summary::after {
+  content: "▴";
+}
+.progress-toggle > summary:hover {
+  background: rgba(10,132,255,.08);
+}
 
