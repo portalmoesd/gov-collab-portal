@@ -437,15 +437,22 @@
     return 0;
   };
 
-  window.GCP.renderCollabSimpleProgress = function(status) {
+  window.GCP.renderCollabSimpleProgress = function(status, stepNames) {
     const steps = ['Collaborator I', 'Collaborator II', 'Waiting for Approval', 'Approved'];
+    const names = stepNames && typeof stepNames === 'object'
+      ? [stepNames.collabI || null, stepNames.collabII || null, null, null]
+      : [null, null, null, null];
     const active = window.GCP.collabSimpleStepIndex(status);
     const fillPercent = (active / (steps.length - 1)) * 100;
     const stepHtml = steps.map((label, idx) => {
       const state = idx < active ? 'done' : (idx === active ? 'active' : 'todo');
+      const name = names[idx];
+      const displayLabel = name ? escapeHtml(name) : escapeHtml(label);
+      const sublabel = name ? `<div class="wf-step__sublabel">${escapeHtml(label)}</div>` : '';
       return `<div class="wf-step ${state}" role="listitem" aria-current="${idx === active ? 'step' : 'false'}">
         <div class="wf-step__circle" aria-hidden="true">${idx + 1}</div>
-        <div class="wf-step__label">${label}</div>
+        <div class="wf-step__label">${displayLabel}</div>
+        ${sublabel}
       </div>`;
     }).join('');
     return `<div class="wf-progress lower-tier-progress" style="--wf-count:${steps.length};" role="group" aria-label="Section workflow progress">
