@@ -424,4 +424,36 @@
     return window.GCP.renderSectionProgress(status, stepNames, false);
   };
 
+  // Collab I/II simplified 4-step bar: Collaborator I → II → Waiting for Approval → Approved
+  window.GCP.collabSimpleStepIndex = function(status) {
+    const s = String(status || 'draft').toLowerCase();
+    if (['draft', 'returned', 'returned_by_collaborator_2'].includes(s)) return 0;
+    if (['submitted_to_collaborator_2'].includes(s)) return 1;
+    if (['submitted_to_collaborator', 'approved_by_collaborator_2', 'returned_by_collaborator',
+         'submitted_to_super_collaborator', 'returned_by_super_collaborator', 'approved_by_collaborator'].includes(s)) return 2;
+    if (['approved_by_super_collaborator', 'submitted_to_supervisor', 'returned_by_supervisor',
+         'approved_by_supervisor', 'submitted_to_chairman', 'approved_by_chairman',
+         'submitted_to_minister', 'approved_by_minister', 'approved', 'locked'].includes(s)) return 3;
+    return 0;
+  };
+
+  window.GCP.renderCollabSimpleProgress = function(status) {
+    const steps = ['Collaborator I', 'Collaborator II', 'Waiting for Approval', 'Approved'];
+    const active = window.GCP.collabSimpleStepIndex(status);
+    const fillPercent = (active / (steps.length - 1)) * 100;
+    const stepHtml = steps.map((label, idx) => {
+      const state = idx < active ? 'done' : (idx === active ? 'active' : 'todo');
+      return `<div class="wf-step ${state}" role="listitem" aria-current="${idx === active ? 'step' : 'false'}">
+        <div class="wf-step__circle" aria-hidden="true">${idx + 1}</div>
+        <div class="wf-step__label">${label}</div>
+      </div>`;
+    }).join('');
+    return `<div class="wf-progress lower-tier-progress" style="--wf-count:${steps.length};" role="group" aria-label="Section workflow progress">
+      <div class="wf-progress__steps" role="list">${stepHtml}</div>
+      <div class="wf-progress__track" aria-hidden="true">
+        <div class="wf-progress__fill" style="width:${fillPercent}%;"></div>
+      </div>
+    </div>`;
+  };
+
 })();

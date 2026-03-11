@@ -159,7 +159,7 @@
     if(!tp){ sectionStatusBox.style.display='none'; return; }
     const note=(tp.statusComment||'').trim();
     const status=tp.status||'draft';
-    const progressHtml = window.GCP.renderLowerTierProgress(status);
+    const progressHtml = window.GCP.renderCollabSimpleProgress(status);
     sectionStatusBox.style.display='block';
     sectionStatusBox.innerHTML=`
       <div style="margin-bottom:8px;"><b>Status:</b> ${esc(humanSectionStatus(status))}</div>
