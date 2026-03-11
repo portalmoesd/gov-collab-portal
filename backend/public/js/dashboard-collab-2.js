@@ -234,7 +234,7 @@
     const note=(s.statusComment||'').trim();
     const updatedBy=s.lastUpdatedBy||'—';
     const badgeClass=statusBadgeClass(s.status);
-    const progressHtml=window.GCP.renderLowerTierProgress(s.status, s.stepNames);
+    const progressHtml=window.GCP.renderCollabSimpleProgress(s.status);
     const tr=document.createElement('tr'); tr.className='required-sections-row';
     tr.innerHTML=`
       <td>
@@ -256,7 +256,7 @@
     const note=(s.statusComment||'').trim();
     const updatedBy=s.lastUpdatedBy||'—';
     const badgeClass=statusBadgeClass(s.status);
-    const progressHtml=window.GCP.renderLowerTierProgress(s.status, s.stepNames);
+    const progressHtml=window.GCP.renderCollabSimpleProgress(s.status);
     const card=document.createElement('article'); card.className='required-section-card';
     card.innerHTML=`
       <div class="required-section-card__top">
