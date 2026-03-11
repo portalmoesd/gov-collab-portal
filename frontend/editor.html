@@ -50,12 +50,19 @@
           <span class="micro-action__icon" aria-hidden="true"></span>
           <span class="micro-action__label">Return</span>
         </button>
+        <button class="micro-action micro-action--upload" id="btnUpload" type="button" aria-label="Upload file">
+          <span class="micro-action__icon" aria-hidden="true"></span>
+          <span class="micro-action__label">Upload</span>
+        </button>
+        <input type="file" id="fileInput" multiple style="display:none;" />
         </div>
       </div>
     </div>
   </div>
 
   <div class="editor-frame"><textarea id="editor"></textarea></div>
+
+  <div id="filesSection" class="editor-files-list" style="display:none;"></div>
 
   <div class="editor-foot">
     <div id="msg" class="small editor-msg"></div>

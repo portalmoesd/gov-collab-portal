@@ -985,7 +985,8 @@ body.gp-shell-ready .gp-nav{
   padding: 6px 0 8px;
 }
 body.gp-shell-ready .gp-nav__link,
-body.gp-shell-ready .gp-logout{
+body.gp-shell-ready .gp-logout,
+body.gp-shell-ready .dm-toggle{
   display:flex;
   align-items:center;
   gap: 14px;
@@ -3474,6 +3475,21 @@ body.gp-shell-ready .gp-sidebar__scrim{
 
 .supervisor-event-action--preview{ --icon-url:url('../assets/view-icon.svg'); --icon-color:#20314d; --hover-color:#20314d; --hover-bg:#eef3f8; }
 
+/* Preview button: always expanded on desktop */
+@media (min-width: 981px){
+  #previewFullBtn.supervisor-event-action,
+  #previewFullBtn.chairman-event-action{
+    width:132px;
+  }
+  #previewFullBtn .micro-action__label{
+    opacity:1;
+    transform:translateX(0);
+  }
+}
+
+/* Required-action submit variant */
+.required-action--submit{ --icon-url:url('../assets/submit-icon.svg'); --icon-color:#1d4ed8; --hover-color:#1d4ed8; --hover-bg:#e8f0ff; }
+
 .chairman-control-panel .field .portal-dropdown__trigger{
   width: 100%;
 }
@@ -3748,3 +3764,39 @@ body.gp-shell-ready .gp-sidebar__scrim{
 .wf-step.active .wf-step__sublabel {
   color: #5a78a8;
 }
+
+/* Required sections mobile overflow fix */
+.required-section-card{
+  overflow:hidden;
+  max-width:100%;
+  box-sizing:border-box;
+}
+@media (max-width: 900px){
+  .required-section-card .lower-progress-inline{
+    overflow-x:auto;
+    -webkit-overflow-scrolling:touch;
+    padding-bottom:4px;
+    overflow-y:visible;
+  }
+  .required-sections-panel{
+    max-width:100%;
+    overflow:hidden;
+  }
+}
+
+/* Required sections table header alignment */
+.required-sections-table thead th.th-progress{ text-align:center; }
+.required-sections-table thead th.th-actions{ text-align:right; }
+
+/* File upload action */
+.micro-action--upload{ --icon-url:url('../assets/save-icon.svg'); --icon-color:#6d28d9; --hover-color:#6d28d9; --hover-bg:#ede9fe; }
+.editor-files-list{ margin-top:12px; display:flex; flex-direction:column; gap:8px; }
+.editor-file-item{ display:flex; align-items:center; gap:10px; padding:8px 12px; border-radius:12px; border:1px solid rgba(39,70,112,.08); background:#fbfdff; font-size:13px; }
+.editor-file-item a{ color:#0a84ff; font-weight:700; text-decoration:none; flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.editor-file-item a:hover{ text-decoration:underline; }
+
+/* Dark mode toggle button (light mode color) */
+.dm-toggle{
+  color:#4b5563;
+}
+[data-theme="dark"] .dm-toggle{ color:#c0cce0; }

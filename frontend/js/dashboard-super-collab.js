@@ -28,7 +28,6 @@
 
   // Update button labels for Super-collaborator
   if (submitDocBtn) submitDocBtn.textContent = 'Approve Document to Supervisor';
-  if (approveAllSectionsBtn) approveAllSectionsBtn.style.display = 'none';
 
   let currentEventId = null;
   let currentSections = [];
@@ -232,18 +231,15 @@
     const last=s.lastUpdatedAt?window.GCP.formatDateTime(s.lastUpdatedAt):'';
     const note=(s.statusComment||'').trim();
     const updatedBy=s.lastUpdatedBy||'—';
-    const badgeClass=statusBadgeClass(s.status);
     const progressHtml=window.GCP.renderLowerTierProgress(s.status, s.stepNames);
     const tr=document.createElement('tr'); tr.className='required-sections-row';
     tr.innerHTML=`
       <td>
         <div class="required-section-name">${esc(s.sectionLabel)}</div>
-        <div class="lower-progress-inline">${progressHtml}</div>
+        <div class="required-section-meta">${esc(last||'—')} · ${esc(updatedBy)}</div>
         ${note?`<div class="required-section-note"><b>Comment:</b> ${esc(note)}</div>`:''}
       </td>
-      <td><span class="required-status-badge ${badgeClass}">${esc(humanStatus(s.status))}</span></td>
-      <td><span class="required-updated-at">${esc(last||'—')}</span></td>
-      <td><span class="required-updated-by">${esc(updatedBy)}</span></td>
+      <td class="required-progress-cell"><div class="lower-progress-inline">${progressHtml}</div></td>
       <td class="required-actions-cell"></td>
     `;
     appendSectionActions(tr.querySelector('.required-actions-cell'),s);
@@ -254,20 +250,15 @@
     const last=s.lastUpdatedAt?window.GCP.formatDateTime(s.lastUpdatedAt):'';
     const note=(s.statusComment||'').trim();
     const updatedBy=s.lastUpdatedBy||'—';
-    const badgeClass=statusBadgeClass(s.status);
     const progressHtml=window.GCP.renderLowerTierProgress(s.status, s.stepNames);
     const card=document.createElement('article'); card.className='required-section-card';
     card.innerHTML=`
-      <div class="required-section-card__top">
-        <div class="required-section-card__meta">
-          <div class="required-section-name">${esc(s.sectionLabel)}</div>
-          <div class="required-section-meta">Last update · ${esc(last||'—')}</div>
-        </div>
-        <span class="required-status-badge ${badgeClass}">${esc(humanStatus(s.status))}</span>
+      <div class="required-section-card__head">
+        <div class="required-section-name">${esc(s.sectionLabel)}</div>
+        <div class="required-section-meta">${esc(last||'—')} · ${esc(updatedBy)}</div>
+        ${note?`<div class="required-section-note"><b>Comment:</b> ${esc(note)}</div>`:''}
       </div>
-      <div class="lower-progress-inline" style="margin:8px 0;">${progressHtml}</div>
-      <div class="required-section-card__line"><span>Updated by</span><strong>${esc(updatedBy)}</strong></div>
-      ${note?`<div class="required-section-note"><b>Comment:</b> ${esc(note)}</div>`:''}
+      <div class="lower-progress-inline">${progressHtml}</div>
       <div class="required-actions-card"></div>
     `;
     appendSectionActions(card.querySelector('.required-actions-card'),s);
@@ -284,7 +275,7 @@
 
     if(!currentSections.length){
       if(sectionsEmpty) sectionsEmpty.hidden=false;
-      if(sectionsTbody) sectionsTbody.innerHTML=`<tr class="required-sections-empty-row"><td colspan="5">No required sections for this event.</td></tr>`;
+      if(sectionsTbody) sectionsTbody.innerHTML=`<tr class="required-sections-empty-row"><td colspan="3">No required sections for this event.</td></tr>`;
       if(submitDocBtn) submitDocBtn.disabled=true;
       return;
     }
@@ -345,6 +336,24 @@
       else setMsg('No sections ready for Supervisor. Approve all sections first.');
       await refreshStatusGrid();
     }catch(e){ setMsg(e.message||'Submit failed',true); }
+  });
+
+  if(approveAllSectionsBtn) approveAllSectionsBtn.addEventListener('click', async()=>{
+    if(!currentEventId) return;
+    const eligible=currentSections.filter(s=>{
+      const st=String(s.status||'').toLowerCase();
+      return ['submitted_to_super_collaborator','returned_by_super_collaborator','approved_by_collaborator'].includes(st);
+    });
+    if(!eligible.length){ setMsg('No sections ready for approval.'); return; }
+    if(!confirm(`Approve ${eligible.length} section(s)?`)) return;
+    setMsg('');
+    try{
+      for(const s of eligible){
+        await window.GCP.apiFetch('/tp/approve-section',{method:'POST',body:JSON.stringify({eventId:currentEventId,sectionId:s.sectionId})});
+      }
+      setMsg('All eligible sections approved.');
+      await refreshStatusGrid();
+    }catch(e){ setMsg(e.message||'Approve failed',true); }
   });
 
   if(previewFullBtn) previewFullBtn.addEventListener('click', async()=>{
