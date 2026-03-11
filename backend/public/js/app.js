@@ -41,6 +41,11 @@
       { href: "calendar.html", label: "Calendar (Read)" },
       { href: "statistics.html", label: "Statistics" },
     ],
+    collaborator_3: [
+      { href: "dashboard-collab-3.html", label: "Dashboard" },
+      { href: "calendar.html", label: "Calendar (Read)" },
+      { href: "statistics.html", label: "Statistics" },
+    ],
     collaborator_2: [
       { href: "dashboard-collab-2.html", label: "Dashboard" },
       { href: "calendar.html", label: "Calendar (Read)" },
@@ -69,6 +74,7 @@
       protocol:"Protocol",
       super_collaborator:"Super-collaborator",
       collaborator:"Collaborator",
+      collaborator_3:"Collaborator III",
       collaborator_2:"Collaborator II",
       collaborator_1:"Collaborator I",
       viewer:"Viewer"
@@ -352,8 +358,8 @@
   // Lower-tier roles (collab I/II/collab) see a 5-step bar (up to Super-collab).
   // Super-collab+ see the full 7-step bar.
 
-  const FULL_PIPELINE_LABELS  = ['Collab. I', 'Collab. II', 'Collaborator', 'Super-collab.', 'Supervisor', 'Deputy', 'Approved'];
-  const SHORT_PIPELINE_LABELS = ['Collab. I', 'Collab. II', 'Collaborator', 'Super-collab.', 'Approved'];
+  const FULL_PIPELINE_LABELS  = ['Collab. I', 'Collab. II', 'Collab. III', 'Collaborator', 'Super-collab.', 'Supervisor', 'Deputy', 'Approved'];
+  const SHORT_PIPELINE_LABELS = ['Collab. I', 'Collab. II', 'Collab. III', 'Collaborator', 'Super-collab.', 'Approved'];
 
   window.GCP.lowerTierSteps = SHORT_PIPELINE_LABELS;
 
@@ -364,12 +370,13 @@
 
     if (['draft', 'returned', 'returned_by_collaborator_2'].includes(s)) return 0;
     if (s === 'submitted_to_collaborator_2') return 1;
-    if (['submitted_to_collaborator', 'returned_by_collaborator', 'approved_by_collaborator_2'].includes(s)) return 2;
-    if (['submitted_to_super_collaborator', 'returned_by_super_collaborator', 'approved_by_collaborator'].includes(s)) return 3;
+    if (['submitted_to_collaborator_3', 'returned_by_collaborator_3', 'approved_by_collaborator_2'].includes(s)) return 2;
+    if (['submitted_to_collaborator', 'returned_by_collaborator', 'approved_by_collaborator_3'].includes(s)) return 3;
+    if (['submitted_to_super_collaborator', 'returned_by_super_collaborator', 'approved_by_collaborator'].includes(s)) return 4;
     if (full) {
-      if (['approved_by_super_collaborator', 'submitted_to_supervisor', 'returned_by_supervisor', 'approved_by_supervisor'].includes(s)) return 4;
-      if (['submitted_to_chairman', 'returned_by_chairman', 'approved_by_chairman', 'submitted_to_minister', 'approved_by_minister'].includes(s)) return 5;
-      if (['approved', 'locked'].includes(s)) return 6;
+      if (['approved_by_super_collaborator', 'submitted_to_supervisor', 'returned_by_supervisor', 'approved_by_supervisor'].includes(s)) return 5;
+      if (['submitted_to_chairman', 'returned_by_chairman', 'approved_by_chairman', 'submitted_to_minister', 'approved_by_minister'].includes(s)) return 6;
+      if (['approved', 'locked'].includes(s)) return 7;
     } else {
       if (['approved_by_super_collaborator', 'submitted_to_supervisor', 'returned_by_supervisor',
            'approved_by_supervisor', 'submitted_to_chairman', 'approved_by_chairman',
@@ -381,13 +388,14 @@
   window.GCP.lowerTierStepIndex = function(status) { return sectionStepIndex(status, false); };
 
   // Render per-section progress bar with optional user names.
-  // pipelineNames: { collabI, collabII, collaborator, superCollab } — null values fall back to role labels.
-  // full: true = show full 7-step bar (for super-collab+ dashboards)
+  // pipelineNames: { collabI, collabII, collabIII, collaborator, superCollab } — null values fall back to role labels.
+  // full: true = show full 8-step bar (for super-collab+ dashboards)
   window.GCP.renderSectionProgress = function(status, pipelineNames, full) {
     const labels = full ? FULL_PIPELINE_LABELS : SHORT_PIPELINE_LABELS;
     const names = pipelineNames && typeof pipelineNames === 'object' ? [
       pipelineNames.collabI      || null,
       pipelineNames.collabII     || null,
+      pipelineNames.collabIII    || null,
       pipelineNames.collaborator || null,
       pipelineNames.superCollab  || null,
       null, // Supervisor — no assignment needed
@@ -424,24 +432,25 @@
     return window.GCP.renderSectionProgress(status, stepNames, false);
   };
 
-  // Collab I/II simplified 4-step bar: Collaborator I → II → Waiting for Approval → Approved
+  // Collab I/II/III simplified 5-step bar: Collaborator I → II → III → Waiting for Approval → Approved
   window.GCP.collabSimpleStepIndex = function(status) {
     const s = String(status || 'draft').toLowerCase();
     if (['draft', 'returned', 'returned_by_collaborator_2'].includes(s)) return 0;
     if (['submitted_to_collaborator_2'].includes(s)) return 1;
-    if (['submitted_to_collaborator', 'approved_by_collaborator_2', 'returned_by_collaborator',
-         'submitted_to_super_collaborator', 'returned_by_super_collaborator', 'approved_by_collaborator'].includes(s)) return 2;
+    if (['submitted_to_collaborator_3', 'approved_by_collaborator_2', 'returned_by_collaborator_3'].includes(s)) return 2;
+    if (['submitted_to_collaborator', 'approved_by_collaborator_3', 'returned_by_collaborator',
+         'submitted_to_super_collaborator', 'returned_by_super_collaborator', 'approved_by_collaborator'].includes(s)) return 3;
     if (['approved_by_super_collaborator', 'submitted_to_supervisor', 'returned_by_supervisor',
          'approved_by_supervisor', 'submitted_to_chairman', 'approved_by_chairman',
-         'submitted_to_minister', 'approved_by_minister', 'approved', 'locked'].includes(s)) return 3;
+         'submitted_to_minister', 'approved_by_minister', 'approved', 'locked'].includes(s)) return 4;
     return 0;
   };
 
   window.GCP.renderCollabSimpleProgress = function(status, stepNames) {
-    const steps = ['Collaborator I', 'Collaborator II', 'Waiting for Approval', 'Approved'];
+    const steps = ['Collaborator I', 'Collaborator II', 'Collaborator III', 'Waiting for Approval', 'Approved'];
     const names = stepNames && typeof stepNames === 'object'
-      ? [stepNames.collabI || null, stepNames.collabII || null, null, null]
-      : [null, null, null, null];
+      ? [stepNames.collabI || null, stepNames.collabII || null, stepNames.collabIII || null, null, null]
+      : [null, null, null, null, null];
     const active = window.GCP.collabSimpleStepIndex(status);
     const fillPercent = (active / (steps.length - 1)) * 100;
     const stepHtml = steps.map((label, idx) => {

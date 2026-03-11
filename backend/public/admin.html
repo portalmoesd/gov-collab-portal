@@ -27,25 +27,24 @@
     <div class="grid">
       <div class="col-12">
         <div style="font-weight:900; margin-bottom:10px;">Create user</div>
-        <form id="createUserForm" class="row" style="flex-wrap:wrap;">
+        <form id="createUserForm" class="row">
           <div class="field"><label>Username</label><input id="newUsername" required></div>
           <div class="field"><label>Full name</label><input id="newFullName" required></div>
           <div class="field"><label>Email</label><input id="newEmail" type="email"></div>
-          <div class="field"><label>Entity</label><input id="newEntity" placeholder="e.g. Ministry of Finance"></div>
-          <div class="field"><label>Department</label><input id="newDepartment" placeholder="e.g. Trade Division"></div>
           <div class="field">
             <label>Role</label>
             <select id="newRole">
-              <option value="admin">Admin</option>
-              <option value="chairman">Deputy</option>
-              <option value="minister">Minister</option>
-              <option value="supervisor">Supervisor</option>
-              <option value="super_collaborator">Super-collaborator</option>
-              <option value="protocol">Protocol</option>
+              <option value="admin">admin</option>
+              <option value="chairman">deputy</option>
+              <option value="minister">minister</option>
+              <option value="supervisor">supervisor</option>
+              <option value="super_collaborator">super-collaborator</option>
+              <option value="protocol">protocol</option>
               <option value="collaborator_1">Collaborator I</option>
               <option value="collaborator_2">Collaborator II</option>
+              <option value="collaborator_3">Collaborator III</option>
               <option value="collaborator">Collaborator</option>
-              <option value="viewer">Viewer</option>
+              <option value="viewer">viewer</option>
             </select>
           </div>
           <div class="field"><label>Password</label><input id="newPassword" type="password" required></div>
@@ -56,12 +55,10 @@
 
       <div class="col-12" style="margin-top:8px;">
         <div style="font-weight:900; margin-bottom:10px;">Users</div>
-        <div style="overflow-x:auto;">
         <table class="table">
-          <thead><tr><th>Username</th><th>Full name</th><th>Email</th><th>Entity</th><th>Department</th><th>Role</th><th>Active</th><th></th></tr></thead>
+          <thead><tr><th>Username</th><th>Full name</th><th>Email</th><th>Role</th><th>Active</th><th></th></tr></thead>
           <tbody id="usersTbody"></tbody>
         </table>
-        </div>
       </div>
     </div>
   </div>

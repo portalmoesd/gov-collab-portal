@@ -8,6 +8,7 @@
   const roleHome = {
     super_collaborator:'dashboard-super-collab.html',
     collaborator:'dashboard-collab-review.html',
+    collaborator_3:'dashboard-collab-3.html',
     collaborator_2:'dashboard-collab-2.html',
     collaborator_1:'dashboard-collab.html'
   };
@@ -32,7 +33,7 @@
 
   // Update submit button label to be Collaborator II-appropriate
   if (submitDocBtn) {
-    submitDocBtn.textContent = 'Submit for Approval';
+    submitDocBtn.textContent = 'Submit to Collaborator III';
   }
 
   // ---- Minimal custom dropdown ----
@@ -157,6 +158,9 @@
       submitted_to_collaborator_2:'At Collaborator II',
       returned_by_collaborator_2:'Returned by Collaborator II',
       approved_by_collaborator_2:'Approved by Collaborator II',
+      submitted_to_collaborator_3:'At Collaborator III',
+      returned_by_collaborator_3:'Returned by Collaborator III',
+      approved_by_collaborator_3:'Approved by Collaborator III',
       submitted_to_collaborator:'Submitted to Collaborator',
       returned_by_collaborator:'Returned by Collaborator',
       approved_by_collaborator:'Approved by Collaborator',
@@ -215,10 +219,10 @@
         }catch(e){setMsg(e.message||'Return failed',true);}
       }));
       wrap.appendChild(createMicroAction('Submit','submit',async()=>{
-        if(!confirm('Submit this section upward to Collaborator?')) return;
+        if(!confirm('Submit this section to Collaborator III?')) return;
         try{
           await window.GCP.apiFetch('/tp/submit',{method:'POST',body:JSON.stringify({eventId:currentEventId,sectionId:section.sectionId,htmlContent:''})});
-          setMsg('Section submitted to Collaborator.'); await refreshStatusGrid();
+          setMsg('Section submitted to Collaborator III.'); await refreshStatusGrid();
         }catch(e){setMsg(e.message||'Submit failed',true);}
       }));
     }
@@ -287,10 +291,10 @@
       if(sectionsCards) sectionsCards.appendChild(renderCard(s));
     }
 
-    // Enable submit if any assigned section is approved_by_collaborator_2 or returned_by_collaborator
+    // Enable submit if any assigned section is approved_by_collaborator_2 or returned_by_collaborator_3
     const canSubmit=currentSections.some(s=>{
       const st=String(s.status||'').toLowerCase();
-      return st==='approved_by_collaborator_2'||st==='returned_by_collaborator';
+      return st==='approved_by_collaborator_2'||st==='returned_by_collaborator_3';
     });
     if(submitDocBtn){ submitDocBtn.disabled=!canSubmit; submitDocBtn.style.display=''; }
   }
@@ -327,11 +331,11 @@
 
   if(submitDocBtn) submitDocBtn.addEventListener('click', async()=>{
     if(!currentEventId||submitDocBtn.disabled) return;
-    if(!confirm('Submit approved sections to Collaborator?')) return;
+    if(!confirm('Submit approved sections to Collaborator III?')) return;
     setMsg('');
     try{
-      const result=await window.GCP.apiFetch('/tp/submit-approved-to-collaborator',{method:'POST',body:JSON.stringify({eventId:currentEventId})});
-      if(result&&Number(result.submitted||0)>0) setMsg('Sections submitted to Collaborator.');
+      const result=await window.GCP.apiFetch('/tp/submit-approved-to-collaborator-3',{method:'POST',body:JSON.stringify({eventId:currentEventId})});
+      if(result&&Number(result.submitted||0)>0) setMsg('Sections submitted to Collaborator III.');
       else setMsg('No sections were ready to submit. Approve sections first.');
       await refreshStatusGrid();
     }catch(e){ setMsg(e.message||'Submit failed',true); }

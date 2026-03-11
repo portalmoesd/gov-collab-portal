@@ -8,6 +8,7 @@
   const roleHome = {
     super_collaborator:'dashboard-super-collab.html',
     collaborator:'dashboard-collab-review.html',
+    collaborator_3:'dashboard-collab-3.html',
     collaborator_2:'dashboard-collab-2.html',
     collaborator_1:'dashboard-collab.html'
   };
