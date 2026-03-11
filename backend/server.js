@@ -107,6 +107,25 @@ async function ensureSchema() {
   await pool.query(`ALTER TYPE tp_section_status ADD VALUE IF NOT EXISTS 'submitted_to_collaborator_3'`).catch(()=>{});
   await pool.query(`ALTER TYPE tp_section_status ADD VALUE IF NOT EXISTS 'returned_by_collaborator_3'`).catch(()=>{});
   await pool.query(`ALTER TYPE tp_section_status ADD VALUE IF NOT EXISTS 'approved_by_collaborator_3'`).catch(()=>{});
+
+  // Section audit history
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS tp_section_history (
+      id SERIAL PRIMARY KEY,
+      event_id INTEGER NOT NULL,
+      country_id INTEGER NOT NULL,
+      section_id INTEGER NOT NULL,
+      action TEXT NOT NULL,
+      from_status TEXT,
+      to_status TEXT NOT NULL,
+      user_id INTEGER,
+      user_name TEXT,
+      user_role TEXT,
+      note TEXT,
+      acted_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `).catch(()=>{});
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_tsh_lookup ON tp_section_history(event_id, section_id, acted_at)`).catch(()=>{});
 }
 
 async function ensureRolesExist() {
@@ -239,6 +258,14 @@ async function ensureInitialAdmin() {
 async function resolveCountryIdForEvent(eventId){
   const row = await queryOne(`SELECT country_id FROM events WHERE id=$1`, [eventId]);
   return row ? row.country_id : null;
+}
+
+async function recordHistory({ eventId, countryId, sectionId, action, fromStatus, toStatus, userId, userName, userRole, note }) {
+  await pool.query(
+    `INSERT INTO tp_section_history (event_id, country_id, section_id, action, from_status, to_status, user_id, user_name, user_role, note)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
+    [eventId, countryId, sectionId, action, fromStatus||null, toStatus, userId||null, userName||null, userRole||null, note||null]
+  ).catch(e => console.error('recordHistory failed', e.message));
 }
 
 async function getAssignedCountryIds(userId){
@@ -1645,6 +1672,9 @@ app.post('/api/tp/save', authRequired, async (req, res) => {
   // Save behavior:
   // - Pipeline roles keep the current workflow stage while editing.
   // - Elevated approvers save content only; they do not change stage on save.
+  const currentStatusRow = await queryOne(`SELECT status::text AS status FROM tp_content WHERE event_id=$1 AND country_id=$2 AND section_id=$3`, [eventId, countryId, sectionId]);
+  const currentStatus = currentStatusRow?.status || 'draft';
+
   if (isCollab) {
     await pool.query(
       `
@@ -1664,6 +1694,9 @@ app.post('/api/tp/save', authRequired, async (req, res) => {
       [eventId, countryId, sectionId, htmlContent, req.user.id]
     );
   }
+
+  await recordHistory({ eventId, countryId, sectionId, action: 'saved', fromStatus: currentStatus, toStatus: currentStatus,
+    userId: req.user.id, userName: req.user.full_name || req.user.username, userRole: roleKey });
 
   return res.json({ success:true });
 });
@@ -1701,6 +1734,9 @@ app.post('/api/tp/submit', authRequired, attachUser, async (req, res) => {
   const targetStatus = nextSectionSubmitStatus(roleKey);
   if (!targetStatus) return res.status(400).json({ error: 'Unsupported role for submit' });
 
+  const fromStatusRow = await queryOne(`SELECT status::text AS status FROM tp_content WHERE event_id=$1 AND country_id=$2 AND section_id=$3`, [eventId, countryId, sectionId]);
+  const fromStatus = fromStatusRow?.status || 'draft';
+
   await pool.query(
     `
     UPDATE tp_content
@@ -1709,6 +1745,9 @@ app.post('/api/tp/submit', authRequired, attachUser, async (req, res) => {
     `,
     [eventId, countryId, sectionId, htmlContent, req.user.id, targetStatus]
   );
+
+  await recordHistory({ eventId, countryId, sectionId, action: 'submitted', fromStatus, toStatus: targetStatus,
+    userId: req.user.id, userName: req.user.full_name || req.user.username, userRole: roleKey });
 
   return res.json({ success:true, status: targetStatus });
 });
@@ -1751,6 +1790,9 @@ app.post('/api/tp/return', requireRole('collaborator_2','collaborator_3','collab
     [eventId, countryId, sectionId, returnStatus, note, req.user.id]
   );
 
+  await recordHistory({ eventId, countryId, sectionId, action: 'returned', fromStatus: currentStatus, toStatus: returnStatus,
+    userId: req.user.id, userName: req.user.full_name || req.user.username, userRole: roleKey, note });
+
   return res.json({ success:true, status: returnStatus });
 });
 
@@ -1790,6 +1832,9 @@ app.post('/api/tp/approve-section', requireRole('super_collaborator','supervisor
     [eventId, countryId, sectionId, targetStatus, req.user.id]
   );
 
+  await recordHistory({ eventId, countryId, sectionId, action: 'approved', fromStatus: currentStatus, toStatus: targetStatus,
+    userId: req.user.id, userName: req.user.full_name || req.user.username, userRole: roleKey });
+
   return res.json({ success:true, status: targetStatus });
 });
 
@@ -1823,6 +1868,11 @@ app.post('/api/tp/approve-all-sections', requireRole('supervisor','chairman','mi
     if (!targetStatus) return res.status(400).json({ error: 'Unsupported role for bulk approve' });
 
     const allowedStatuses = decisionStatusesForRole(roleKey);
+    // Fetch from-statuses before update so we can record accurate history
+    const beforeRows = await queryAll(
+      `SELECT section_id, status::text AS status FROM tp_content WHERE event_id=$1 AND country_id=$2 AND section_id=ANY($3::int[]) AND status=ANY($4::text[])`,
+      [eventId, countryId, sectionIds, allowedStatuses]
+    );
     const { rows } = await pool.query(
       `
       UPDATE tp_content
@@ -1833,6 +1883,14 @@ app.post('/api/tp/approve-all-sections', requireRole('supervisor','chairman','mi
       `,
       [eventId, countryId, sectionIds, targetStatus, req.user.id, allowedStatuses]
     );
+    const updatedSet = new Set(rows.map(r => Number(r.section_id)));
+    for (const br of beforeRows) {
+      if (updatedSet.has(Number(br.section_id))) {
+        await recordHistory({ eventId, countryId, sectionId: Number(br.section_id), action: 'approved',
+          fromStatus: br.status, toStatus: targetStatus,
+          userId: req.user.id, userName: req.user.full_name || req.user.username, userRole: roleKey });
+      }
+    }
 
     return res.json({ success:true, approved: rows.length, status: targetStatus });
   } catch (e) {
@@ -1867,6 +1925,10 @@ app.post('/api/tp/submit-approved-to-collaborator-3', requireRole('collaborator_
     await ensureTpRow(eventId, countryId, sid, req.user.id);
   }
 
+  const beforeRows3 = await queryAll(
+    `SELECT section_id, status::text AS status FROM tp_content WHERE event_id=$1 AND country_id=$2 AND section_id=ANY($3::int[]) AND status IN ('approved_by_collaborator_2','returned_by_collaborator_3')`,
+    [eventId, countryId, sectionIds]
+  );
   const { rows } = await pool.query(
     `
     UPDATE tp_content
@@ -1877,6 +1939,14 @@ app.post('/api/tp/submit-approved-to-collaborator-3', requireRole('collaborator_
     `,
     [eventId, countryId, sectionIds, req.user.id]
   );
+  const updatedSet3 = new Set(rows.map(r => Number(r.section_id)));
+  for (const br of beforeRows3) {
+    if (updatedSet3.has(Number(br.section_id))) {
+      await recordHistory({ eventId, countryId, sectionId: Number(br.section_id), action: 'submitted',
+        fromStatus: br.status, toStatus: 'submitted_to_collaborator_3',
+        userId: req.user.id, userName: req.user.full_name || req.user.username, userRole: normalizeRoleKey(req.user.role_key) });
+    }
+  }
 
   return res.json({ success:true, submitted: rows.length, status: 'submitted_to_collaborator_3' });
 });
@@ -1905,6 +1975,10 @@ app.post('/api/tp/submit-approved-to-collaborator', requireRole('collaborator_3'
     await ensureTpRow(eventId, countryId, sid, req.user.id);
   }
 
+  const beforeRowsC = await queryAll(
+    `SELECT section_id, status::text AS status FROM tp_content WHERE event_id=$1 AND country_id=$2 AND section_id=ANY($3::int[]) AND status IN ('approved_by_collaborator_3','returned_by_collaborator')`,
+    [eventId, countryId, sectionIds]
+  );
   const { rows } = await pool.query(
     `
     UPDATE tp_content
@@ -1915,6 +1989,7 @@ app.post('/api/tp/submit-approved-to-collaborator', requireRole('collaborator_3'
     `,
     [eventId, countryId, sectionIds, req.user.id]
   );
+  { const us = new Set(rows.map(r=>Number(r.section_id))); for (const br of beforeRowsC) { if (us.has(Number(br.section_id))) await recordHistory({ eventId, countryId, sectionId: Number(br.section_id), action:'submitted', fromStatus:br.status, toStatus:'submitted_to_collaborator', userId:req.user.id, userName:req.user.full_name||req.user.username, userRole:normalizeRoleKey(req.user.role_key) }); } }
 
   return res.json({ success:true, submitted: rows.length, status: 'submitted_to_collaborator' });
 });
@@ -1945,6 +2020,10 @@ app.post('/api/tp/submit-approved-to-super-collaborator', requireRole('collabora
     await ensureTpRow(eventId, countryId, sid, req.user.id);
   }
 
+  const beforeRowsSC = await queryAll(
+    `SELECT section_id, status::text AS status FROM tp_content WHERE event_id=$1 AND country_id=$2 AND section_id=ANY($3::int[]) AND status IN ('approved_by_collaborator','returned_by_super_collaborator')`,
+    [eventId, countryId, sectionIds]
+  );
   const { rows } = await pool.query(
     `
     UPDATE tp_content
@@ -1955,6 +2034,7 @@ app.post('/api/tp/submit-approved-to-super-collaborator', requireRole('collabora
     `,
     [eventId, countryId, sectionIds, req.user.id]
   );
+  { const us = new Set(rows.map(r=>Number(r.section_id))); for (const br of beforeRowsSC) { if (us.has(Number(br.section_id))) await recordHistory({ eventId, countryId, sectionId: Number(br.section_id), action:'submitted', fromStatus:br.status, toStatus:'submitted_to_super_collaborator', userId:req.user.id, userName:req.user.full_name||req.user.username, userRole:normalizeRoleKey(req.user.role_key) }); } }
 
   return res.json({ success:true, submitted: rows.length, status: 'submitted_to_super_collaborator' });
 });
@@ -1985,6 +2065,10 @@ app.post('/api/tp/submit-approved-to-supervisor', requireRole('super_collaborato
     await ensureTpRow(eventId, countryId, sid, req.user.id);
   }
 
+  const beforeRowsSup = await queryAll(
+    `SELECT section_id, status::text AS status FROM tp_content WHERE event_id=$1 AND country_id=$2 AND section_id=ANY($3::int[]) AND status IN ('approved_by_super_collaborator','returned_by_supervisor')`,
+    [eventId, countryId, sectionIds]
+  );
   const { rows } = await pool.query(
     `
     UPDATE tp_content
@@ -1995,6 +2079,7 @@ app.post('/api/tp/submit-approved-to-supervisor', requireRole('super_collaborato
     `,
     [eventId, countryId, sectionIds, req.user.id]
   );
+  { const us = new Set(rows.map(r=>Number(r.section_id))); for (const br of beforeRowsSup) { if (us.has(Number(br.section_id))) await recordHistory({ eventId, countryId, sectionId: Number(br.section_id), action:'submitted', fromStatus:br.status, toStatus:'submitted_to_supervisor', userId:req.user.id, userName:req.user.full_name||req.user.username, userRole:normalizeRoleKey(req.user.role_key) }); } }
 
   return res.json({ success:true, submitted: rows.length, status: 'submitted_to_supervisor' });
 });
@@ -2015,6 +2100,9 @@ app.post('/api/tp/approve-section-chairman', requireRole('chairman','minister','
   const roleKey = normalizeRoleKey(req.user.role_key);
   const targetStatus = (roleKey === 'minister') ? 'approved_by_minister' : 'approved_by_chairman';
 
+  const fromStatusRow2 = await queryOne(`SELECT status::text AS status FROM tp_content WHERE event_id=$1 AND country_id=$2 AND section_id=$3`, [eventId, countryId, sectionId]);
+  const fromStatus2 = fromStatusRow2?.status || 'draft';
+
   await pool.query(
     `
     UPDATE tp_content
@@ -2023,6 +2111,9 @@ app.post('/api/tp/approve-section-chairman', requireRole('chairman','minister','
     `,
     [eventId, countryId, sectionId, req.user.id, targetStatus]
   );
+
+  await recordHistory({ eventId, countryId, sectionId, action: 'approved', fromStatus: fromStatus2, toStatus: targetStatus,
+    userId: req.user.id, userName: req.user.full_name || req.user.username, userRole: roleKey });
 
   return res.json({ success:true });
 });
@@ -2182,6 +2273,28 @@ app.get('/api/tp/status-grid', authRequired, async (req, res) => {
     });
   } catch (e) {
     console.error('status-grid error', e);
+    res.status(500).json({ error: 'server error' });
+  }
+});
+
+// Section audit history
+app.get('/api/tp/section-history', authRequired, async (req, res) => {
+  try {
+    const eventId = parseInt(req.query.event_id, 10);
+    const sectionId = parseInt(req.query.section_id, 10);
+    if (!eventId || !sectionId) return res.status(400).json({ error: 'event_id and section_id required' });
+    const countryId = await resolveCountryIdForEvent(eventId);
+    if (!countryId) return res.status(404).json({ error: 'Event not found' });
+    const { rows } = await pool.query(
+      `SELECT id, action, from_status, to_status, user_name, user_role, note, acted_at
+       FROM tp_section_history
+       WHERE event_id=$1 AND section_id=$2
+       ORDER BY acted_at ASC`,
+      [eventId, sectionId]
+    );
+    res.json({ history: rows });
+  } catch (e) {
+    console.error('section-history error', e);
     res.status(500).json({ error: 'server error' });
   }
 });
