@@ -432,9 +432,23 @@
     return window.GCP.renderSectionProgress(status, stepNames, false);
   };
 
-  // Collab I/II/III simplified 5-step bar: Collaborator I → II → III → Waiting for Approval → Approved
-  window.GCP.collabSimpleStepIndex = function(status) {
+  // Collab simplified step index (supports skipping Curator when lsr === 'collaborator_2')
+  window.GCP.collabSimpleStepIndex = function(status, lsr) {
     const s = String(status || 'draft').toLowerCase();
+    const skipCurator = String(lsr || 'collaborator_2').toLowerCase() !== 'collaborator_3';
+    if (skipCurator) {
+      // 4-step: Collab I → Head Collab → Waiting for Approval → Approved
+      if (['draft', 'returned', 'returned_by_collaborator_2'].includes(s)) return 0;
+      if (['submitted_to_collaborator_2', 'approved_by_collaborator_2'].includes(s)) return 1;
+      if (['submitted_to_collaborator', 'returned_by_collaborator',
+           'submitted_to_super_collaborator', 'returned_by_super_collaborator', 'approved_by_collaborator',
+           'approved_by_collaborator_3'].includes(s)) return 2;
+      if (['approved_by_super_collaborator', 'submitted_to_supervisor', 'returned_by_supervisor',
+           'approved_by_supervisor', 'submitted_to_chairman', 'approved_by_chairman',
+           'submitted_to_minister', 'approved_by_minister', 'approved', 'locked'].includes(s)) return 3;
+      return 0;
+    }
+    // 5-step: Collab I → Head Collab → Curator → Waiting for Approval → Approved
     if (['draft', 'returned', 'returned_by_collaborator_2'].includes(s)) return 0;
     if (['submitted_to_collaborator_2'].includes(s)) return 1;
     if (['submitted_to_collaborator_3', 'approved_by_collaborator_2', 'returned_by_collaborator_3'].includes(s)) return 2;
@@ -446,12 +460,17 @@
     return 0;
   };
 
-  window.GCP.renderCollabSimpleProgress = function(status, stepNames) {
-    const steps = ['Collaborator I', 'Head Collaborator', 'Curator', 'Waiting for Approval', 'Approved'];
+  window.GCP.renderCollabSimpleProgress = function(status, stepNames, lsr) {
+    const skipCurator = String(lsr || 'collaborator_2').toLowerCase() !== 'collaborator_3';
+    const steps = skipCurator
+      ? ['Collaborator I', 'Head Collaborator', 'Waiting for Approval', 'Approved']
+      : ['Collaborator I', 'Head Collaborator', 'Curator', 'Waiting for Approval', 'Approved'];
     const names = stepNames && typeof stepNames === 'object'
-      ? [stepNames.collabI || null, stepNames.collabII || null, stepNames.collabIII || null, null, null]
-      : [null, null, null, null, null];
-    const active = window.GCP.collabSimpleStepIndex(status);
+      ? (skipCurator
+          ? [stepNames.collabI || null, stepNames.collabII || null, null, null]
+          : [stepNames.collabI || null, stepNames.collabII || null, stepNames.collabIII || null, null, null])
+      : steps.map(() => null);
+    const active = window.GCP.collabSimpleStepIndex(status, lsr);
     const fillPercent = (active / (steps.length - 1)) * 100;
     const stepHtml = steps.map((label, idx) => {
       const state = idx < active ? 'done' : (idx === active ? 'active' : 'todo');
@@ -485,21 +504,25 @@
     { role: 'minister',          label: 'Minister' },
   ];
 
-  // Returns 0-7 stage index based on the current status string
-  function historyStageLevel(status) {
+  // Returns stage index based on the current status string
+  // When skipCurator=true, curator stage (index 2) is removed so collab and beyond shift down by 1
+  function historyStageLevel(status, skipCurator) {
     const s = String(status || '').toLowerCase();
     if (['submitted_to_collaborator_2','returned_by_collaborator_2','approved_by_collaborator_2'].includes(s)) return 1;
-    if (['submitted_to_collaborator_3','returned_by_collaborator_3','approved_by_collaborator_3'].includes(s)) return 2;
-    if (['submitted_to_collaborator','returned_by_collaborator','approved_by_collaborator'].includes(s)) return 3;
-    if (['submitted_to_super_collaborator','returned_by_super_collaborator','approved_by_super_collaborator'].includes(s)) return 4;
-    if (['submitted_to_supervisor','returned_by_supervisor','approved_by_supervisor'].includes(s)) return 5;
-    if (['submitted_to_chairman','returned_by_chairman','approved_by_chairman'].includes(s)) return 6;
-    if (['submitted_to_minister','approved_by_minister','approved','locked'].includes(s)) return 7;
+    if (!skipCurator && ['submitted_to_collaborator_3','returned_by_collaborator_3','approved_by_collaborator_3'].includes(s)) return 2;
+    const collabIdx = skipCurator ? 2 : 3;
+    if (['submitted_to_collaborator','returned_by_collaborator','approved_by_collaborator'].includes(s)) return collabIdx;
+    if (['submitted_to_super_collaborator','returned_by_super_collaborator','approved_by_super_collaborator'].includes(s)) return collabIdx + 1;
+    if (['submitted_to_supervisor','returned_by_supervisor','approved_by_supervisor'].includes(s)) return collabIdx + 2;
+    if (['submitted_to_chairman','returned_by_chairman','approved_by_chairman'].includes(s)) return collabIdx + 3;
+    if (['submitted_to_minister','approved_by_minister','approved','locked'].includes(s)) return collabIdx + 4;
     return 0; // draft / in_progress / returned_by_collaborator_1
   }
 
-  function renderHistoryTimeline(history, currentStatus) {
-    const currentLevel = historyStageLevel(currentStatus);
+  function renderHistoryTimeline(history, currentStatus, lsr) {
+    const skipCurator = String(lsr || 'collaborator_2').toLowerCase() !== 'collaborator_3';
+    const stages = skipCurator ? HISTORY_STAGES.filter(s => s.role !== 'collaborator_3') : HISTORY_STAGES;
+    const currentLevel = historyStageLevel(currentStatus, skipCurator);
     // Group history events by role
     const byRole = {};
     for (const ev of (history || [])) {
@@ -508,7 +531,7 @@
       byRole[r].push(ev);
     }
 
-    const stagesHtml = HISTORY_STAGES.map((stage, idx) => {
+    const stagesHtml = stages.map((stage, idx) => {
       const events = byRole[stage.role] || [];
       const isPast    = idx < currentLevel;
       const isCurrent = idx === currentLevel;
@@ -540,16 +563,16 @@
         }
         eventsHtml = collapsed.map(ev => {
           const actor = escapeHtml(ev.user_name || 'Unknown');
+          const date = ev.acted_at ? new Date(ev.acted_at).toLocaleString('en-GB', { day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' }) : '';
+          if (ev.action === 'returned') {
+            const noteInner = ev.note ? escapeHtml(ev.note) : '<span class="sh-return-note__empty">No comment provided</span>';
+            return `<div class="sh-event"><span class="sh-actor">${actor}</span><details class="sh-return-details"><summary>Returned</summary><div class="sh-return-note">${noteInner}</div></details><span class="sh-date">${date}</span></div>`;
+          }
           const tagLabel = ev.action === 'saved' ? (ev._count > 1 ? `Edited (×${ev._count})` : 'Edited') :
                            ev.action === 'submitted' ? 'Submitted' :
-                           ev.action === 'approved'  ? 'Approved'  :
-                           ev.action === 'returned'  ? 'Returned'  : ev.action;
+                           ev.action === 'approved'  ? 'Approved'  : ev.action;
           const tagClass = `sh-action-tag sh-action-tag--${ev.action === 'saved' ? 'saved' : ev.action}`;
-          const date = ev.acted_at ? new Date(ev.acted_at).toLocaleString('en-GB', { day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' }) : '';
-          const noteHtml = ev.action === 'returned'
-            ? `<div class="sh-return-note">${ev.note ? `↩ ${escapeHtml(ev.note)}` : '<span class="sh-return-note__empty">No comment provided</span>'}</div>`
-            : '';
-          return `<div class="sh-event"><span class="sh-actor">${actor}</span><span class="${tagClass}">${tagLabel}</span><span class="sh-date">${date}</span></div>${noteHtml}`;
+          return `<div class="sh-event"><span class="sh-actor">${actor}</span><span class="${tagClass}">${tagLabel}</span><span class="sh-date">${date}</span></div>`;
         }).join('');
       }
 
@@ -593,7 +616,7 @@
           panel.innerHTML = '<div class="sh-no-action">Loading…</div>';
           try {
             const data = await window.GCP.apiFetch(`/tp/section-history?event_id=${encodeURIComponent(eventId)}&section_id=${encodeURIComponent(section.sectionId)}`, { method:'GET' });
-            panel.innerHTML = renderHistoryTimeline(data.history || [], section.status);
+            panel.innerHTML = renderHistoryTimeline(data.history || [], section.status, section.lowerSubmitterRole);
           } catch (e) {
             panel.innerHTML = `<div class="sh-no-action">Could not load history: ${escapeHtml(e.message||'error')}</div>`;
           }
@@ -620,7 +643,7 @@
           panel.innerHTML = '<div class="sh-no-action">Loading…</div>';
           try {
             const data = await window.GCP.apiFetch(`/tp/section-history?event_id=${encodeURIComponent(eventId)}&section_id=${encodeURIComponent(section.sectionId)}`, { method:'GET' });
-            panel.innerHTML = renderHistoryTimeline(data.history || [], section.status);
+            panel.innerHTML = renderHistoryTimeline(data.history || [], section.status, section.lowerSubmitterRole);
           } catch (e) {
             panel.innerHTML = `<div class="sh-no-action">Could not load history: ${escapeHtml(e.message||'error')}</div>`;
           }
