@@ -224,7 +224,7 @@
         const dest=currentLowerSubmitterRole!=='collaborator_3'?'Collaborator':'Curator';
         if(!confirm(`Submit this section to ${dest}?`)) return;
         try{
-          await window.GCP.apiFetch('/tp/submit',{method:'POST',body:JSON.stringify({eventId:currentEventId,sectionId:section.sectionId,htmlContent:''})});
+          await window.GCP.apiFetch('/tp/submit',{method:'POST',body:JSON.stringify({eventId:currentEventId,sectionId:section.sectionId})});
           setMsg(`Section submitted to ${dest}.`); await refreshStatusGrid();
         }catch(e){setMsg(e.message||'Submit failed',true);}
       }));

@@ -193,7 +193,7 @@
       wrap.appendChild(createMicroAction('Submit','submit',async()=>{
         if(!confirm('Submit this section to Head Collaborator?')) return;
         try{
-          await window.GCP.apiFetch('/tp/submit',{method:'POST',body:JSON.stringify({eventId:currentEventId,sectionId:section.sectionId,htmlContent:''})});
+          await window.GCP.apiFetch('/tp/submit',{method:'POST',body:JSON.stringify({eventId:currentEventId,sectionId:section.sectionId})});
           await refreshStatusGrid();
         }catch(e){setMsg(e.message||'Submit failed',true);}
       }));
