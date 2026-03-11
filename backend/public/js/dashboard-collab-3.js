@@ -184,9 +184,13 @@
   function appendSectionActions(target, section){
     const wrap=document.createElement('div'); wrap.className='required-actions';
     const s=String(section.status||'').toLowerCase();
+    const rtr=String(section.returnTargetRole||'').toLowerCase();
     const isAssigned=!!section.isAssigned;
-    const isAtMe=['submitted_to_collaborator_3','returned_by_collaborator_3'].includes(s);
-    const canOpen=isAssigned||isAtMe;
+    // At me: section submitted/returned to Curator, OR explicitly returned to Curator
+    const isAtMe=['submitted_to_collaborator_3','returned_by_collaborator_3'].includes(s)||rtr==='collaborator_3';
+    // Can act as lowest: assigned section at draft state (skip Collab I and Head Collab)
+    const canActAsLowest=isAssigned&&s==='draft';
+    const canOpen=isAssigned||isAtMe||canActAsLowest;
 
     if(canOpen){
       wrap.appendChild(createMicroAction('Open','open',()=>{
@@ -194,15 +198,17 @@
       }));
     }
 
-    if(isAtMe){
-      wrap.appendChild(createMicroAction('Return','return',async()=>{
-        const note=prompt('Return comment (required):','');
-        if(note===null) return;
-        try{
-          await window.GCP.apiFetch('/tp/return',{method:'POST',body:JSON.stringify({eventId:currentEventId,sectionId:section.sectionId,note})});
-          setMsg('Section returned.'); await refreshStatusGrid();
-        }catch(e){setMsg(e.message||'Return failed',true);}
-      }));
+    if(isAtMe||canActAsLowest){
+      if(isAtMe){
+        wrap.appendChild(createMicroAction('Return','return',async()=>{
+          const note=prompt('Return comment (required):','');
+          if(note===null) return;
+          try{
+            await window.GCP.apiFetch('/tp/return',{method:'POST',body:JSON.stringify({eventId:currentEventId,sectionId:section.sectionId,note})});
+            setMsg('Section returned.'); await refreshStatusGrid();
+          }catch(e){setMsg(e.message||'Return failed',true);}
+        }));
+      }
       wrap.appendChild(createMicroAction('Submit','submit',async()=>{
         if(!confirm('Submit this section to Collaborator?')) return;
         try{
@@ -212,7 +218,7 @@
       }));
     }
 
-    if(!canOpen && !isAtMe){
+    if(!canOpen && !isAtMe && !canActAsLowest){
       wrap.innerHTML='<span class="required-actions-muted">—</span>';
     }
     target.appendChild(wrap);
@@ -222,7 +228,7 @@
     const last=s.lastUpdatedAt?window.GCP.formatDateTime(s.lastUpdatedAt):'';
     const note=(s.statusComment||'').trim();
     const updatedBy=s.lastUpdatedBy||'—';
-    const progressHtml=window.GCP.renderCollabSimpleProgress(s.status, s.stepNames, s.lowerSubmitterRole);
+    const progressHtml=window.GCP.renderCollabSimpleProgress(s.status, s.stepNames, s.lowerSubmitterRole, s.originalSubmitterRole, s.returnTargetRole);
     const tr=document.createElement('tr'); tr.className='required-sections-row';
     tr.innerHTML=`
       <td>
@@ -242,7 +248,7 @@
     const last=s.lastUpdatedAt?window.GCP.formatDateTime(s.lastUpdatedAt):'';
     const note=(s.statusComment||'').trim();
     const updatedBy=s.lastUpdatedBy||'—';
-    const progressHtml=window.GCP.renderCollabSimpleProgress(s.status, s.stepNames, s.lowerSubmitterRole);
+    const progressHtml=window.GCP.renderCollabSimpleProgress(s.status, s.stepNames, s.lowerSubmitterRole, s.originalSubmitterRole, s.returnTargetRole);
     const card=document.createElement('article'); card.className='required-section-card';
     card.innerHTML=`
       <div class="required-section-card__head">

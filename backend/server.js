@@ -79,6 +79,8 @@ async function ensureSchema() {
   await pool.query(`ALTER TABLE events ADD COLUMN IF NOT EXISTS ended_by_user_id INTEGER`);
   await pool.query(`ALTER TABLE events ADD COLUMN IF NOT EXISTS submitter_role TEXT NOT NULL DEFAULT 'chairman'`).catch(()=>{});
   await pool.query(`ALTER TABLE events ADD COLUMN IF NOT EXISTS lower_submitter_role TEXT DEFAULT 'collaborator_2'`).catch(()=>{});
+  await pool.query(`ALTER TABLE tp_content ADD COLUMN IF NOT EXISTS original_submitter_role TEXT DEFAULT NULL`).catch(()=>{});
+  await pool.query(`ALTER TABLE tp_content ADD COLUMN IF NOT EXISTS return_target_role TEXT DEFAULT NULL`).catch(()=>{});
 
   // Ensure enum value exists for minister approvals (legacy DBs)
   await pool.query(`ALTER TYPE tp_section_status ADD VALUE IF NOT EXISTS 'approved_by_minister'`).catch(async ()=>{
@@ -1748,17 +1750,27 @@ app.post('/api/tp/submit', authRequired, attachUser, async (req, res) => {
   }
   if (!targetStatus) return res.status(400).json({ error: 'Unsupported role for submit' });
 
-  const fromStatusRow = await queryOne(`SELECT status::text AS status FROM tp_content WHERE event_id=$1 AND country_id=$2 AND section_id=$3`, [eventId, countryId, sectionId]);
+  const fromStatusRow = await queryOne(`SELECT status::text AS status, original_submitter_role FROM tp_content WHERE event_id=$1 AND country_id=$2 AND section_id=$3`, [eventId, countryId, sectionId]);
   const fromStatus = fromStatusRow?.status || 'draft';
+  // Set original_submitter_role when starting a new round (from draft or any returned state)
+  const isNewRound = fromStatus === 'draft' || fromStatus.startsWith('returned_by');
 
-  await pool.query(
-    `
-    UPDATE tp_content
-    SET html_content=$4, last_updated_at=NOW(), last_updated_by_user_id=$5, status=$6, status_comment=NULL
-    WHERE event_id=$1 AND country_id=$2 AND section_id=$3
-    `,
-    [eventId, countryId, sectionId, htmlContent, req.user.id, targetStatus]
-  );
+  if (isNewRound) {
+    await pool.query(
+      `UPDATE tp_content
+       SET html_content=$4, last_updated_at=NOW(), last_updated_by_user_id=$5, status=$6, status_comment=NULL,
+           original_submitter_role=$7, return_target_role=NULL
+       WHERE event_id=$1 AND country_id=$2 AND section_id=$3`,
+      [eventId, countryId, sectionId, htmlContent, req.user.id, targetStatus, roleKey]
+    );
+  } else {
+    await pool.query(
+      `UPDATE tp_content
+       SET html_content=$4, last_updated_at=NOW(), last_updated_by_user_id=$5, status=$6, status_comment=NULL
+       WHERE event_id=$1 AND country_id=$2 AND section_id=$3`,
+      [eventId, countryId, sectionId, htmlContent, req.user.id, targetStatus]
+    );
+  }
 
   await recordHistory({ eventId, countryId, sectionId, action: 'submitted', fromStatus, toStatus: targetStatus,
     userId: req.user.id, userName: req.user.full_name || req.user.username, userRole: roleKey });
@@ -1789,19 +1801,37 @@ app.post('/api/tp/return', requireRole('collaborator_2','collaborator_3','collab
   await ensureDocumentStatus(eventId, countryId);
   await ensureTpRow(eventId, countryId, sectionId, req.user.id);
 
-  const currentStatus = await getCurrentSectionStatus(eventId, countryId, sectionId);
+  const contentRow = await queryOne(
+    `SELECT status::text AS status, original_submitter_role FROM tp_content WHERE event_id=$1 AND country_id=$2 AND section_id=$3`,
+    [eventId, countryId, sectionId]
+  );
+  const currentStatus = contentRow?.status || 'draft';
+  const originalSubmitterRole = contentRow?.original_submitter_role || null;
+
   const allowedStatuses = decisionStatusesForRole(roleKey);
-  if (allowedStatuses.length && !allowedStatuses.includes(currentStatus)) {
+  // Allow return if section is in allowed statuses OR if this role is the return_target
+  const retTargetRow = await queryOne(
+    `SELECT return_target_role FROM tp_content WHERE event_id=$1 AND country_id=$2 AND section_id=$3`,
+    [eventId, countryId, sectionId]
+  );
+  const isReturnTarget = retTargetRow?.return_target_role === roleKey;
+  if (allowedStatuses.length && !allowedStatuses.includes(currentStatus) && !isReturnTarget) {
     return res.status(400).json({ error: 'Section is not at your review stage' });
   }
 
+  // Determine where to return: collab_2 always returns to collab_1; others return to original submitter
+  let returnTarget;
+  if (roleKey === 'collaborator_2') {
+    returnTarget = 'collaborator_1';
+  } else {
+    returnTarget = originalSubmitterRole || 'collaborator_1';
+  }
+
   await pool.query(
-    `
-    UPDATE tp_content
-    SET status=$4, status_comment=$5, last_updated_at=NOW(), last_updated_by_user_id=$6
-    WHERE event_id=$1 AND country_id=$2 AND section_id=$3
-    `,
-    [eventId, countryId, sectionId, returnStatus, note, req.user.id]
+    `UPDATE tp_content
+     SET status=$4, status_comment=$5, last_updated_at=NOW(), last_updated_by_user_id=$6, return_target_role=$7
+     WHERE event_id=$1 AND country_id=$2 AND section_id=$3`,
+    [eventId, countryId, sectionId, returnStatus, note, req.user.id, returnTarget]
   );
 
   await recordHistory({ eventId, countryId, sectionId, action: 'returned', fromStatus: currentStatus, toStatus: returnStatus,
@@ -1831,20 +1861,35 @@ app.post('/api/tp/approve-section', requireRole('super_collaborator','supervisor
   await ensureDocumentStatus(eventId, countryId);
   await ensureTpRow(eventId, countryId, sectionId, req.user.id);
 
-  const currentStatus = await getCurrentSectionStatus(eventId, countryId, sectionId);
+  const contentRowApp = await queryOne(
+    `SELECT status::text AS status, original_submitter_role FROM tp_content WHERE event_id=$1 AND country_id=$2 AND section_id=$3`,
+    [eventId, countryId, sectionId]
+  );
+  const currentStatus = contentRowApp?.status || 'draft';
   const allowedStatuses = decisionStatusesForRole(roleKey);
-  if (allowedStatuses.length && !allowedStatuses.includes(currentStatus)) {
+  // super_collaborator can act as lowest: approve sections at draft state
+  const canActAsLowest = roleKey === 'super_collaborator' && currentStatus === 'draft';
+  if (allowedStatuses.length && !allowedStatuses.includes(currentStatus) && !canActAsLowest) {
     return res.status(400).json({ error: 'Section is not at your review stage' });
   }
 
-  await pool.query(
-    `
-    UPDATE tp_content
-    SET status=$4, status_comment=NULL, last_updated_at=NOW(), last_updated_by_user_id=$5
-    WHERE event_id=$1 AND country_id=$2 AND section_id=$3
-    `,
-    [eventId, countryId, sectionId, targetStatus, req.user.id]
-  );
+  if (canActAsLowest) {
+    // Acting as lowest: set original_submitter_role
+    await pool.query(
+      `UPDATE tp_content
+       SET status=$4, status_comment=NULL, last_updated_at=NOW(), last_updated_by_user_id=$5,
+           original_submitter_role=$6, return_target_role=NULL
+       WHERE event_id=$1 AND country_id=$2 AND section_id=$3`,
+      [eventId, countryId, sectionId, targetStatus, req.user.id, roleKey]
+    );
+  } else {
+    await pool.query(
+      `UPDATE tp_content
+       SET status=$4, status_comment=NULL, last_updated_at=NOW(), last_updated_by_user_id=$5
+       WHERE event_id=$1 AND country_id=$2 AND section_id=$3`,
+      [eventId, countryId, sectionId, targetStatus, req.user.id]
+    );
+  }
 
   await recordHistory({ eventId, countryId, sectionId, action: 'approved', fromStatus: currentStatus, toStatus: targetStatus,
     userId: req.user.id, userName: req.user.full_name || req.user.username, userRole: roleKey });
@@ -1950,15 +1995,15 @@ app.post('/api/tp/submit-approved-to-collaborator-3', requireRole('collaborator_
 
   const eligibleStatusSql = eligibleStatuses.map(s => `'${s}'`).join(',');
   const beforeRows3 = await queryAll(
-    `SELECT section_id, status::text AS status FROM tp_content WHERE event_id=$1 AND country_id=$2 AND section_id=ANY($3::int[]) AND status IN (${eligibleStatusSql})`,
+    `SELECT section_id, status::text AS status FROM tp_content WHERE event_id=$1 AND country_id=$2 AND section_id=ANY($3::int[]) AND (status IN (${eligibleStatusSql}) OR return_target_role='collaborator_2')`,
     [eventId, countryId, sectionIds]
   );
   const { rows } = await pool.query(
     `
     UPDATE tp_content
-    SET status=$5, status_comment=NULL, last_updated_at=NOW(), last_updated_by_user_id=$4
+    SET status=$5, status_comment=NULL, last_updated_at=NOW(), last_updated_by_user_id=$4, return_target_role=NULL
     WHERE event_id=$1 AND country_id=$2 AND section_id = ANY($3::int[])
-      AND status IN (${eligibleStatusSql})
+      AND (status IN (${eligibleStatusSql}) OR return_target_role='collaborator_2')
     RETURNING section_id
     `,
     [eventId, countryId, sectionIds, req.user.id, targetBatchStatus]
@@ -2000,15 +2045,15 @@ app.post('/api/tp/submit-approved-to-collaborator', requireRole('collaborator_3'
   }
 
   const beforeRowsC = await queryAll(
-    `SELECT section_id, status::text AS status FROM tp_content WHERE event_id=$1 AND country_id=$2 AND section_id=ANY($3::int[]) AND status IN ('approved_by_collaborator_3','returned_by_collaborator')`,
+    `SELECT section_id, status::text AS status FROM tp_content WHERE event_id=$1 AND country_id=$2 AND section_id=ANY($3::int[]) AND (status IN ('approved_by_collaborator_3','returned_by_collaborator') OR return_target_role='collaborator_3')`,
     [eventId, countryId, sectionIds]
   );
   const { rows } = await pool.query(
     `
     UPDATE tp_content
-    SET status='submitted_to_collaborator', status_comment=NULL, last_updated_at=NOW(), last_updated_by_user_id=$4
+    SET status='submitted_to_collaborator', status_comment=NULL, last_updated_at=NOW(), last_updated_by_user_id=$4, return_target_role=NULL
     WHERE event_id=$1 AND country_id=$2 AND section_id = ANY($3::int[])
-      AND status IN ('approved_by_collaborator_3','returned_by_collaborator')
+      AND (status IN ('approved_by_collaborator_3','returned_by_collaborator') OR return_target_role='collaborator_3')
     RETURNING section_id
     `,
     [eventId, countryId, sectionIds, req.user.id]
@@ -2045,15 +2090,15 @@ app.post('/api/tp/submit-approved-to-super-collaborator', requireRole('collabora
   }
 
   const beforeRowsSC = await queryAll(
-    `SELECT section_id, status::text AS status FROM tp_content WHERE event_id=$1 AND country_id=$2 AND section_id=ANY($3::int[]) AND status IN ('approved_by_collaborator','returned_by_super_collaborator')`,
+    `SELECT section_id, status::text AS status FROM tp_content WHERE event_id=$1 AND country_id=$2 AND section_id=ANY($3::int[]) AND (status IN ('approved_by_collaborator','returned_by_super_collaborator') OR return_target_role='collaborator')`,
     [eventId, countryId, sectionIds]
   );
   const { rows } = await pool.query(
     `
     UPDATE tp_content
-    SET status='submitted_to_super_collaborator', status_comment=NULL, last_updated_at=NOW(), last_updated_by_user_id=$4
+    SET status='submitted_to_super_collaborator', status_comment=NULL, last_updated_at=NOW(), last_updated_by_user_id=$4, return_target_role=NULL
     WHERE event_id=$1 AND country_id=$2 AND section_id = ANY($3::int[])
-      AND status IN ('approved_by_collaborator','returned_by_super_collaborator')
+      AND (status IN ('approved_by_collaborator','returned_by_super_collaborator') OR return_target_role='collaborator')
     RETURNING section_id
     `,
     [eventId, countryId, sectionIds, req.user.id]
@@ -2090,15 +2135,15 @@ app.post('/api/tp/submit-approved-to-supervisor', requireRole('super_collaborato
   }
 
   const beforeRowsSup = await queryAll(
-    `SELECT section_id, status::text AS status FROM tp_content WHERE event_id=$1 AND country_id=$2 AND section_id=ANY($3::int[]) AND status IN ('approved_by_super_collaborator','returned_by_supervisor')`,
+    `SELECT section_id, status::text AS status FROM tp_content WHERE event_id=$1 AND country_id=$2 AND section_id=ANY($3::int[]) AND (status IN ('approved_by_super_collaborator','returned_by_supervisor') OR return_target_role='super_collaborator')`,
     [eventId, countryId, sectionIds]
   );
   const { rows } = await pool.query(
     `
     UPDATE tp_content
-    SET status='submitted_to_supervisor', status_comment=NULL, last_updated_at=NOW(), last_updated_by_user_id=$4
+    SET status='submitted_to_supervisor', status_comment=NULL, last_updated_at=NOW(), last_updated_by_user_id=$4, return_target_role=NULL
     WHERE event_id=$1 AND country_id=$2 AND section_id = ANY($3::int[])
-      AND status IN ('approved_by_super_collaborator','returned_by_supervisor')
+      AND (status IN ('approved_by_super_collaborator','returned_by_supervisor') OR return_target_role='super_collaborator')
     RETURNING section_id
     `,
     [eventId, countryId, sectionIds, req.user.id]
@@ -2216,7 +2261,9 @@ app.get('/api/tp/status-grid', authRequired, async (req, res) => {
         COALESCE(t.status::text, 'draft') AS status,
         t.status_comment,
         t.last_updated_at,
-        u.full_name AS last_updated_by
+        u.full_name AS last_updated_by,
+        t.original_submitter_role,
+        t.return_target_role
       FROM event_required_sections ers
       JOIN sections s ON s.id = ers.section_id
       LEFT JOIN tp_content t
@@ -2297,6 +2344,8 @@ app.get('/api/tp/status-grid', authRequired, async (req, res) => {
         lastUpdatedBy: r.last_updated_by || null,
         isAssigned: assignedSet.has(Number(r.id)),
         lowerSubmitterRole,
+        originalSubmitterRole: r.original_submitter_role || null,
+        returnTargetRole: r.return_target_role || null,
         stepNames: stepNames[Number(r.id)] || { collabI: null, collabII: null, collabIII: null, collaborator: null, superCollab: null },
       }))
     });

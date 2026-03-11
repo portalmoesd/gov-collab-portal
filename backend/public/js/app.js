@@ -433,9 +433,27 @@
   };
 
   // Collab simplified step index (supports skipping Curator when lsr === 'collaborator_2')
-  window.GCP.collabSimpleStepIndex = function(status, lsr) {
+  // Maps a return_target_role to its step index in the progress bar
+  function returnTargetStepIndex(rtr, skipCurator) {
+    const r = String(rtr || '').toLowerCase();
+    if (r === 'collaborator_1') return 0;
+    if (r === 'collaborator_2') return 1;
+    if (r === 'collaborator_3') return skipCurator ? 1 : 2;
+    const base = skipCurator ? 2 : 3;
+    if (r === 'collaborator') return base;
+    if (r === 'super_collaborator') return base + 1;
+    if (r === 'supervisor') return base + 2;
+    return -1;
+  }
+
+  window.GCP.collabSimpleStepIndex = function(status, lsr, returnTargetRole) {
     const s = String(status || 'draft').toLowerCase();
     const skipCurator = String(lsr || 'collaborator_2').toLowerCase() !== 'collaborator_3';
+    // When section is returned and we know the explicit target, use it for the active step
+    if (s.startsWith('returned_by') && returnTargetRole) {
+      const rtiIdx = returnTargetStepIndex(returnTargetRole, skipCurator);
+      if (rtiIdx >= 0) return rtiIdx;
+    }
     if (skipCurator) {
       // 4-step: Collab I → Head Collab → Waiting for Approval → Approved
       if (['draft', 'returned', 'returned_by_collaborator_2'].includes(s)) return 0;
@@ -460,7 +478,7 @@
     return 0;
   };
 
-  window.GCP.renderCollabSimpleProgress = function(status, stepNames, lsr) {
+  window.GCP.renderCollabSimpleProgress = function(status, stepNames, lsr, originalSubmitterRole, returnTargetRole) {
     const skipCurator = String(lsr || 'collaborator_2').toLowerCase() !== 'collaborator_3';
     const steps = skipCurator
       ? ['Collaborator I', 'Head Collaborator', 'Waiting for Approval', 'Approved']
@@ -470,10 +488,20 @@
           ? [stepNames.collabI || null, stepNames.collabII || null, null, null]
           : [stepNames.collabI || null, stepNames.collabII || null, stepNames.collabIII || null, null, null])
       : steps.map(() => null);
-    const active = window.GCP.collabSimpleStepIndex(status, lsr);
+    // Determine the first participating step based on originalSubmitterRole
+    let startStep = 0;
+    if (originalSubmitterRole) {
+      const osr = String(originalSubmitterRole).toLowerCase();
+      if (osr === 'collaborator_2') startStep = 1;
+      else if (osr === 'collaborator_3') startStep = skipCurator ? 1 : 2;
+      else if (osr === 'collaborator') startStep = skipCurator ? 2 : 3;
+      else if (osr === 'super_collaborator') startStep = skipCurator ? 3 : 4;
+    }
+    const active = window.GCP.collabSimpleStepIndex(status, lsr, returnTargetRole);
     const fillPercent = (active / (steps.length - 1)) * 100;
     const stepHtml = steps.map((label, idx) => {
-      const state = idx < active ? 'done' : (idx === active ? 'active' : 'todo');
+      const notParticipating = idx < startStep;
+      const state = notParticipating ? 'skip' : (idx < active ? 'done' : (idx === active ? 'active' : 'todo'));
       const name = names[idx];
       // Collab I/II steps: show only the assigned name, no role title
       const displayLabel = idx < 2 ? (name ? escapeHtml(name) : '') : escapeHtml(label);
@@ -533,16 +561,21 @@
 
     const stagesHtml = stages.map((stage, idx) => {
       const events = byRole[stage.role] || [];
+      const hasEvents = events.length > 0;
       const isPast    = idx < currentLevel;
       const isCurrent = idx === currentLevel;
-      const isPending = idx > currentLevel;
+      // A stage is truly "pending" only if it's above current level AND has never had any events
+      const isPending = idx > currentLevel && !hasEvents;
+      // A stage above current level that has events was previously visited but section was returned below it
+      const isReturned = idx > currentLevel && hasEvents;
 
-      let dotClass = 'sh-stage--pending';
+      let dotClass;
       if (isPending) dotClass = 'sh-stage--pending';
-      else if (isCurrent && events.length) dotClass = 'sh-stage--active';
+      else if (isReturned) dotClass = 'sh-stage--returned';
+      else if (isCurrent && hasEvents) dotClass = 'sh-stage--active';
       else if (isCurrent) dotClass = 'sh-stage--active';
-      else if (isPast && events.length) dotClass = 'sh-stage--done';
-      else if (isPast) dotClass = 'sh-stage--warn'; // passed without recorded action
+      else if (isPast && hasEvents) dotClass = 'sh-stage--done';
+      else dotClass = 'sh-stage--warn'; // passed without recorded action
 
       let eventsHtml = '';
       if (isPending) {

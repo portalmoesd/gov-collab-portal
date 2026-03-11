@@ -182,9 +182,22 @@
 
   function appendSectionActions(target, section){
     const wrap=document.createElement('div'); wrap.className='required-actions';
+    const st=String(section.status||'').toLowerCase();
+    const rtr=String(section.returnTargetRole||'').toLowerCase();
+    // Collab I can open always; can submit when section is draft or explicitly returned to them
     wrap.appendChild(createMicroAction('Open','open',()=>{
       window.location.href=`editor.html?event_id=${currentEventId}&section_id=${section.sectionId}`;
     }));
+    const canSubmit=(st==='draft'||rtr==='collaborator_1');
+    if(canSubmit){
+      wrap.appendChild(createMicroAction('Submit','submit',async()=>{
+        if(!confirm('Submit this section to Head Collaborator?')) return;
+        try{
+          await window.GCP.apiFetch('/tp/submit',{method:'POST',body:JSON.stringify({eventId:currentEventId,sectionId:section.sectionId,htmlContent:''})});
+          await refreshStatusGrid();
+        }catch(e){setMsg(e.message||'Submit failed',true);}
+      }));
+    }
     target.appendChild(wrap);
   }
 
@@ -192,7 +205,7 @@
     const last=s.lastUpdatedAt?window.GCP.formatDateTime(s.lastUpdatedAt):'';
     const note=(s.statusComment||'').trim();
     const updatedBy=s.lastUpdatedBy||'—';
-    const progressHtml=window.GCP.renderCollabSimpleProgress(s.status, s.stepNames, s.lowerSubmitterRole);
+    const progressHtml=window.GCP.renderCollabSimpleProgress(s.status, s.stepNames, s.lowerSubmitterRole, s.originalSubmitterRole, s.returnTargetRole);
     const tr=document.createElement('tr'); tr.className='required-sections-row';
     tr.innerHTML=`
       <td>
@@ -212,7 +225,7 @@
     const last=s.lastUpdatedAt?window.GCP.formatDateTime(s.lastUpdatedAt):'';
     const note=(s.statusComment||'').trim();
     const updatedBy=s.lastUpdatedBy||'—';
-    const progressHtml=window.GCP.renderCollabSimpleProgress(s.status, s.stepNames, s.lowerSubmitterRole);
+    const progressHtml=window.GCP.renderCollabSimpleProgress(s.status, s.stepNames, s.lowerSubmitterRole, s.originalSubmitterRole, s.returnTargetRole);
     const card=document.createElement('article'); card.className='required-section-card';
     card.innerHTML=`
       <div class="required-section-card__head">
