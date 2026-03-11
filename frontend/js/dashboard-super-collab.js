@@ -194,14 +194,17 @@
   function appendSectionActions(target, section){
     const wrap=document.createElement('div'); wrap.className='required-actions';
     const s=String(section.status||'').toLowerCase();
+    const rtr=String(section.returnTargetRole||'').toLowerCase();
 
     // Open — super-collaborator can open all sections
     wrap.appendChild(createMicroAction('Open','open',()=>{
       window.location.href=`editor.html?event_id=${currentEventId}&section_id=${section.sectionId}`;
     }));
 
-    // Approve — only when section is at super-collaborator review stage
-    const canApprove=['submitted_to_super_collaborator','returned_by_super_collaborator','approved_by_collaborator'].includes(s);
+    // Approve — at super-collaborator review stage, explicitly returned to super-collab, or draft (acting as lowest)
+    const isAtMe=['submitted_to_super_collaborator','returned_by_super_collaborator','approved_by_collaborator'].includes(s)||rtr==='super_collaborator';
+    const canActAsLowest=s==='draft';
+    const canApprove=isAtMe||canActAsLowest;
     if(canApprove){
       wrap.appendChild(createMicroAction('Approve','approve',async()=>{
         if(!confirm('Approve this section?')) return;
@@ -212,8 +215,9 @@
       }));
     }
 
-    // Return — return back to Collaborator stage
-    const canReturn=['submitted_to_super_collaborator','approved_by_collaborator','approved_by_collaborator_2'].includes(s);
+    // Return — when section is at super-collab stage or any stage below supervisor
+    const canReturn=isAtMe||['submitted_to_collaborator','submitted_to_collaborator_2','submitted_to_collaborator_3',
+      'approved_by_collaborator_2','approved_by_collaborator_3'].includes(s);
     if(canReturn){
       wrap.appendChild(createMicroAction('Return','return',async()=>{
         const note=prompt('Return comment:','');
@@ -232,7 +236,7 @@
     const last=s.lastUpdatedAt?window.GCP.formatDateTime(s.lastUpdatedAt):'';
     const note=(s.statusComment||'').trim();
     const updatedBy=s.lastUpdatedBy||'—';
-    const progressHtml=window.GCP.renderLowerTierProgress(s.status, s.stepNames);
+    const progressHtml=window.GCP.renderCollabSimpleProgress(s.status, s.stepNames, s.lowerSubmitterRole, s.originalSubmitterRole, s.returnTargetRole);
     const tr=document.createElement('tr'); tr.className='required-sections-row';
     tr.innerHTML=`
       <td>
@@ -252,7 +256,7 @@
     const last=s.lastUpdatedAt?window.GCP.formatDateTime(s.lastUpdatedAt):'';
     const note=(s.statusComment||'').trim();
     const updatedBy=s.lastUpdatedBy||'—';
-    const progressHtml=window.GCP.renderLowerTierProgress(s.status, s.stepNames);
+    const progressHtml=window.GCP.renderCollabSimpleProgress(s.status, s.stepNames, s.lowerSubmitterRole, s.originalSubmitterRole, s.returnTargetRole);
     const card=document.createElement('article'); card.className='required-section-card';
     card.innerHTML=`
       <div class="required-section-card__head">

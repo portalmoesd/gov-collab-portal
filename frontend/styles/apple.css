@@ -761,6 +761,14 @@ hr, .divider{
   color:#fff;
   box-shadow:0 10px 24px rgba(10,132,255,.18);
 }
+/* Step not in pipeline for this section (original submitter is above this step) */
+.wf-step.skip .wf-step__circle{
+  background:#f1f5f9;
+  border-color:#e2e8f0;
+  color:#cbd5e1;
+  box-shadow:none;
+}
+.wf-step.skip .wf-step__label{ color:#cbd5e1; }
 .wf-step.active .wf-step__circle{
   box-shadow:0 0 0 7px rgba(10,132,255,.12), 0 10px 24px rgba(10,132,255,.18);
 }
@@ -3832,11 +3840,14 @@ body.gp-shell-ready .gp-sidebar__scrim{
   margin-top:4px; margin-left:11px; position:relative; z-index:1;
   background:#d1d5db; border:2px solid #fff; box-shadow:0 0 0 1px #d1d5db;
 }
-.sh-stage--done   .sh-dot{ background:#22c55e; box-shadow:0 0 0 1px #22c55e; }
-.sh-stage--warn   .sh-dot{ background:#f59e0b; box-shadow:0 0 0 1px #f59e0b; }
-.sh-stage--active .sh-dot{ background:#3b82f6; box-shadow:0 0 0 1px #3b82f6; }
-.sh-stage--skip   .sh-dot{ background:#e5e7eb; box-shadow:0 0 0 1px #d1d5db; }
-.sh-stage--pending .sh-dot{ background:#e5e7eb; box-shadow:0 0 0 1px #d1d5db; }
+.sh-stage--done     .sh-dot{ background:#22c55e; box-shadow:0 0 0 1px #22c55e; }
+.sh-stage--warn     .sh-dot{ background:#f59e0b; box-shadow:0 0 0 1px #f59e0b; }
+.sh-stage--active   .sh-dot{ background:#3b82f6; box-shadow:0 0 0 1px #3b82f6; }
+.sh-stage--skip     .sh-dot{ background:#e5e7eb; box-shadow:0 0 0 1px #d1d5db; }
+.sh-stage--pending  .sh-dot{ background:#e5e7eb; box-shadow:0 0 0 1px #d1d5db; }
+/* Stage was visited but section has since been returned below it */
+.sh-stage--returned .sh-dot{ background:#f97316; box-shadow:0 0 0 1px #f97316; }
+.sh-stage--returned .sh-stage-label{ color:#374151; }
 
 .sh-body{ flex:1; min-width:0; }
 .sh-stage-label{ font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.04em; color:#9ca3af; line-height:1.3; }

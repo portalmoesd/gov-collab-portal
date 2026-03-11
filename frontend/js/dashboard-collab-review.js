@@ -194,10 +194,13 @@
   function appendSectionActions(target, section){
     const wrap=document.createElement('div'); wrap.className='required-actions';
     const s=String(section.status||'').toLowerCase();
+    const rtr=String(section.returnTargetRole||'').toLowerCase();
     const isAssigned=myAssignedSectionIds.has(Number(section.sectionId));
-    // Collaborator can open: own sections, and sections that came from lower tiers
-    const cameFromLower=['submitted_to_collaborator','returned_by_collaborator','approved_by_collaborator_2'].includes(s);
-    const canOpen=isAssigned||cameFromLower;
+    // Collaborator can open: own sections, sections from lower tiers, or sections explicitly returned to them
+    const cameFromLower=['submitted_to_collaborator','returned_by_collaborator','approved_by_collaborator_2','approved_by_collaborator_3'].includes(s)||rtr==='collaborator';
+    // Can act as lowest: own assigned section at draft state
+    const canActAsLowest=isAssigned&&s==='draft';
+    const canOpen=isAssigned||cameFromLower||canActAsLowest;
 
     if(canOpen){
       wrap.appendChild(createMicroAction('Open','open',()=>{
@@ -205,7 +208,7 @@
       }));
     }
 
-    // Return only if section came from lower tiers (not if it's a directly assigned first-source section at draft)
+    // Return if section came from lower tiers
     if(cameFromLower){
       wrap.appendChild(createMicroAction('Return','return',async()=>{
         const note=prompt('Return comment:','');
@@ -214,6 +217,21 @@
           await window.GCP.apiFetch('/tp/return',{method:'POST',body:JSON.stringify({eventId:currentEventId,sectionId:section.sectionId,note})});
           setMsg('Section returned.'); await refreshStatusGrid();
         }catch(e){setMsg(e.message||'Return failed',true);}
+      }));
+    }
+
+    // Submit for own assigned sections (acting as lowest) or returned sections ready to move forward
+    if(canActAsLowest||(isAssigned&&s==='approved_by_collaborator')){
+      wrap.appendChild(createMicroAction('Submit','submit',async()=>{
+        if(!confirm('Submit this section to Super-collaborator?')) return;
+        try{
+          const endpoint=s==='draft'?'/tp/submit':'/tp/submit-approved-to-super-collaborator';
+          const body=s==='draft'
+            ?JSON.stringify({eventId:currentEventId,sectionId:section.sectionId,htmlContent:''})
+            :JSON.stringify({eventId:currentEventId});
+          await window.GCP.apiFetch(endpoint,{method:'POST',body});
+          setMsg('Section submitted to Super-collaborator.'); await refreshStatusGrid();
+        }catch(e){setMsg(e.message||'Submit failed',true);}
       }));
     }
 
@@ -227,7 +245,7 @@
     const last=s.lastUpdatedAt?window.GCP.formatDateTime(s.lastUpdatedAt):'';
     const note=(s.statusComment||'').trim();
     const updatedBy=s.lastUpdatedBy||'—';
-    const progressHtml=window.GCP.renderLowerTierProgress(s.status, s.stepNames);
+    const progressHtml=window.GCP.renderCollabSimpleProgress(s.status, s.stepNames, s.lowerSubmitterRole, s.originalSubmitterRole, s.returnTargetRole);
     const tr=document.createElement('tr'); tr.className='required-sections-row';
     tr.innerHTML=`
       <td>
@@ -247,7 +265,7 @@
     const last=s.lastUpdatedAt?window.GCP.formatDateTime(s.lastUpdatedAt):'';
     const note=(s.statusComment||'').trim();
     const updatedBy=s.lastUpdatedBy||'—';
-    const progressHtml=window.GCP.renderLowerTierProgress(s.status, s.stepNames);
+    const progressHtml=window.GCP.renderCollabSimpleProgress(s.status, s.stepNames, s.lowerSubmitterRole, s.originalSubmitterRole, s.returnTargetRole);
     const card=document.createElement('article'); card.className='required-section-card';
     card.innerHTML=`
       <div class="required-section-card__head">
@@ -291,10 +309,11 @@
       if(sectionsCards) sectionsCards.appendChild(renderCard(s));
     }
 
-    // Enable submit if any section is approved_by_collaborator or returned_by_super_collaborator
+    // Enable submit if any section is approved/returned to collaborator or returned by super-collab
     const canSubmit=currentSections.some(s=>{
       const st=String(s.status||'').toLowerCase();
-      return st==='approved_by_collaborator'||st==='returned_by_super_collaborator';
+      const rtr=String(s.returnTargetRole||'').toLowerCase();
+      return st==='approved_by_collaborator'||st==='returned_by_super_collaborator'||rtr==='collaborator';
     });
     if(submitDocBtn){ submitDocBtn.disabled=!canSubmit; submitDocBtn.style.display=''; }
   }
