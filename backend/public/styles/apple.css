@@ -289,6 +289,17 @@ hr, .divider{
   transition: 180ms ease;
 }
 .event-card:hover{ transform: translateY(-1px); box-shadow: var(--shadow-md); }
+.event-card--clickable{
+  cursor: pointer;
+}
+.event-card--clickable:hover{
+  background: rgba(235,243,255,.88);
+  border-color: rgba(10,132,255,0.22);
+}
+.event-card--clickable:active{
+  transform: translateY(0);
+  background: rgba(220,235,255,.95);
+}
 .event-card .row1{
   display:flex; align-items:flex-start; justify-content:space-between; gap: 12px;
 }
@@ -446,16 +457,6 @@ hr, .divider{
 }
 
 .event-card{ position: relative; }
-.openmini.openmini-top{
-  position: absolute;
-  top: 14px;
-  right: 14px;
-  padding: 7px 12px;
-  font-size: 13px;
-  line-height: 1;
-  letter-spacing: -0.01em;
-}
-.event-card .title{ padding-right: 84px; } /* space for the top-right button */
 
 
 
@@ -1959,17 +1960,11 @@ body.gp-shell-ready .gp-sidebar__scrim{
   }
   .event-card .title{
     font-size: 15px;
-    padding-right: 0;
   }
   .event-card .row1{
-    flex-direction: column-reverse;
+    flex-direction: column;
     align-items: stretch;
     gap: 10px;
-  }
-  .openmini.openmini-top{
-    position: static;
-    align-self: flex-start;
-    padding: 8px 14px;
   }
   .event-card .task{
     margin-top: 10px;
@@ -2059,11 +2054,6 @@ body.gp-shell-ready .gp-sidebar__scrim{
     font-size: 12px;
     line-height: 1.4;
   }
-  .openmini.openmini-top{
-    width: 100%;
-    justify-content: center;
-    text-align: center;
-  }
 }
 
 
@@ -2077,22 +2067,6 @@ body.gp-shell-ready .gp-sidebar__scrim{
   .event-card .row1 > div{
     flex: 1 1 auto;
     min-width: 0;
-  }
-  .event-card .title{
-    padding-right: 0;
-  }
-  .openmini.openmini-top{
-    position: static;
-    order: 2;
-    align-self: flex-start;
-    flex: 0 0 auto;
-    width: auto;
-    min-width: 88px;
-    padding: 9px 16px;
-    justify-content: center;
-    text-align: center;
-    background: rgba(255,255,255,0.82);
-    border-color: rgba(10,132,255,0.28);
   }
 }
 
@@ -2898,18 +2872,12 @@ body.gp-shell-ready .gp-sidebar__scrim{
     border-radius:20px;
   }
   .event-card .row1{
-    flex-direction:column-reverse;
+    flex-direction:column;
     align-items:stretch;
     gap:10px;
   }
   .event-card .title{
     font-size:15px;
-    padding-right:0;
-  }
-  .openmini.openmini-top{
-    position:static;
-    align-self:flex-start;
-    padding:8px 14px;
   }
 }
 
