@@ -19,8 +19,12 @@
   const msg                = document.getElementById('msg');
   const sectionStatusBox   = document.getElementById('sectionStatusBox');
   const openEditorSection  = document.getElementById('openEditorSection');
+  const sectionsTbody      = document.getElementById('sectionsTbody');
+  const sectionsCards      = document.getElementById('sectionsCards');
+  const sectionsEmpty      = document.getElementById('sectionsEmpty');
 
   let eventMeta = {};
+  let currentEventId = null;
 
   // ---- Minimal custom dropdown ----
   const dropdownRegistry = new Map();
@@ -168,6 +172,81 @@
     `;
   }
 
+  function createMicroAction(label, kind, onClick){
+    const btn=document.createElement('button'); btn.type='button';
+    btn.className=`micro-action required-action required-action--${kind}`;
+    btn.setAttribute('aria-label',label);
+    btn.innerHTML=`<span class="micro-action__icon"></span><span class="micro-action__label">${esc(label)}</span>`;
+    btn.addEventListener('click',onClick);
+    return btn;
+  }
+
+  function appendSectionActions(target, section){
+    const wrap=document.createElement('div'); wrap.className='required-actions';
+    wrap.appendChild(createMicroAction('Open','open',()=>{
+      window.location.href=`editor.html?event_id=${currentEventId}&section_id=${section.sectionId}`;
+    }));
+    target.appendChild(wrap);
+  }
+
+  function renderRow(s){
+    const last=s.lastUpdatedAt?window.GCP.formatDateTime(s.lastUpdatedAt):'';
+    const note=(s.statusComment||'').trim();
+    const updatedBy=s.lastUpdatedBy||'—';
+    const progressHtml=window.GCP.renderCollabSimpleProgress(s.status, s.stepNames);
+    const tr=document.createElement('tr'); tr.className='required-sections-row';
+    tr.innerHTML=`
+      <td>
+        <div class="required-section-name">${esc(s.sectionLabel)}</div>
+        <div class="required-section-meta">${esc(last||'—')} · ${esc(updatedBy)}</div>
+        ${note?`<div class="required-section-note"><b>Comment:</b> ${esc(note)}</div>`:''}
+      </td>
+      <td class="required-progress-cell"><div class="lower-progress-inline">${progressHtml}</div></td>
+      <td class="required-actions-cell"></td>
+    `;
+    appendSectionActions(tr.querySelector('.required-actions-cell'),s);
+    return tr;
+  }
+
+  function renderCard(s){
+    const last=s.lastUpdatedAt?window.GCP.formatDateTime(s.lastUpdatedAt):'';
+    const note=(s.statusComment||'').trim();
+    const updatedBy=s.lastUpdatedBy||'—';
+    const progressHtml=window.GCP.renderCollabSimpleProgress(s.status, s.stepNames);
+    const card=document.createElement('article'); card.className='required-section-card';
+    card.innerHTML=`
+      <div class="required-section-card__head">
+        <div class="required-section-name">${esc(s.sectionLabel)}</div>
+        <div class="required-section-meta">${esc(last||'—')} · ${esc(updatedBy)}</div>
+        ${note?`<div class="required-section-note"><b>Comment:</b> ${esc(note)}</div>`:''}
+      </div>
+      <div class="lower-progress-inline">${progressHtml}</div>
+      <div class="required-actions-card"></div>
+    `;
+    appendSectionActions(card.querySelector('.required-actions-card'),s);
+    return card;
+  }
+
+  async function refreshStatusGrid(){
+    if(!currentEventId) return;
+    try{
+      const data=await window.GCP.apiFetch(`/tp/status-grid?event_id=${currentEventId}`,{method:'GET'});
+      const sections=data.sections||[];
+      if(sectionsTbody) sectionsTbody.innerHTML='';
+      if(sectionsCards) sectionsCards.innerHTML='';
+      if(sectionsEmpty) sectionsEmpty.hidden=true;
+      if(!sections.length){
+        if(sectionsEmpty) sectionsEmpty.hidden=false;
+        if(sectionsTbody) sectionsTbody.innerHTML=`<tr class="required-sections-empty-row"><td colspan="3">No sections assigned to you for this event.</td></tr>`;
+        return;
+      }
+      for(const s of sections){
+        if(sectionsTbody) sectionsTbody.appendChild(renderRow(s));
+        if(sectionsCards) sectionsCards.appendChild(renderCard(s));
+      }
+    }catch(e){ /* silently ignore */ }
+  }
+
   setupCustomDropdown(eventSelect);
   setupCustomDropdown(sectionSelect);
 
@@ -208,8 +287,15 @@
   eventSelect.addEventListener('change', async()=>{
     setMsg('');
     const eventId=Number(eventSelect.value);
-    if(!Number.isFinite(eventId)){ sectionSelect.innerHTML=`<option value="">Select section...</option>`; sectionSelect.disabled=true; refreshCustomDropdown(sectionSelect); showSectionStatus(null,null); return; }
-    try{ await loadSectionsForEvent(eventId); showSectionStatus(eventId,null); }
+    currentEventId=(Number.isFinite(eventId)&&eventId>0)?eventId:null;
+    if(!currentEventId){
+      sectionSelect.innerHTML=`<option value="">Select section...</option>`; sectionSelect.disabled=true; refreshCustomDropdown(sectionSelect); showSectionStatus(null,null);
+      if(sectionsTbody) sectionsTbody.innerHTML='';
+      if(sectionsCards) sectionsCards.innerHTML='';
+      if(sectionsEmpty) sectionsEmpty.hidden=false;
+      return;
+    }
+    try{ await Promise.all([loadSectionsForEvent(currentEventId), refreshStatusGrid()]); showSectionStatus(currentEventId,null); }
     catch(e){ setMsg(e.message||'Failed to load sections',true); }
   });
 

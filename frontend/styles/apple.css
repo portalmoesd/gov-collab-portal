@@ -3731,6 +3731,12 @@ body.gp-shell-ready .gp-sidebar__scrim{
   overflow-x: auto;
 }
 
+/* Required sections: 3-column redesign (Collab I & II) */
+.required-progress-cell { vertical-align: middle; padding: 12px 14px; }
+.lower-progress-inline { max-width: 100%; overflow: hidden; }
+.required-section-card__head { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.required-section-card__head .required-section-meta { margin-top: 0; }
+
 /* Progress bar: real name as main label, role title as sublabel */
 .wf-step__sublabel {
   font-size: 10px;
