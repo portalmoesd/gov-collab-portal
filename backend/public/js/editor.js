@@ -14,7 +14,6 @@
   const taskTitleEl = document.getElementById("taskTitle");
   const lastUpdatedEl = document.getElementById("lastUpdated");
   const returnCommentBox = document.getElementById("returnCommentBox");
-  const editorFrame = document.getElementById("editorFrame");
 
   const btnSave = document.getElementById("btnSave");
   const btnSubmit = document.getElementById("btnSubmit");
@@ -55,31 +54,18 @@
     return;
   }
 
+  // Initially hide dynamic buttons; applyButtonRules() sets them correctly after load
   if (btnSubmit) btnSubmit.style.display = "none";
   if (btnApprove) btnApprove.style.display = "none";
   if (btnReturn) btnReturn.style.display = "none";
   if (isViewer) { if(btnSave) btnSave.style.display = "none"; }
 
-  // Rich editor instance
-  let richEditor = null;
-
-  function initRichEditor(html, readOnly) {
-    if (richEditor) { richEditor.destroy(); richEditor = null; }
-    if (!editorFrame) return;
-    richEditor = window.GCP.RichEditor({
-      container: editorFrame,
-      initialHtml: html || '',
-      placeholder: 'Start typing your talking points…',
-    });
-    if (readOnly && richEditor.el) {
-      richEditor.el.contentEditable = 'false';
-      richEditor.el.style.background = 'transparent';
-      richEditor.el.style.cursor = 'default';
-    }
-  }
+  let editorInstance = null;
 
   function applyButtonRules(tp){
     const s = String(tp.status || 'draft').toLowerCase();
+
+    // Reset all
     actionButtons.forEach(b => b && (b.style.display = "none"));
     if (isViewer) return;
 
@@ -94,6 +80,7 @@
     } else if (role === 'collaborator') {
       if (btnSave) btnSave.style.display = "";
       if (btnSubmit) btnSubmit.style.display = "";
+      // Return only if section came from lower tiers
       const canReturn = ['submitted_to_collaborator', 'returned_by_collaborator'].includes(s);
       if (btnReturn) btnReturn.style.display = canReturn ? "" : "none";
     } else if (role === 'super_collaborator') {
@@ -108,6 +95,7 @@
       if (btnSave) btnSave.style.display = "";
     }
 
+    // Highlight first visible button
     const firstVisible = actionButtons.find((btn) => btn && btn.style.display !== 'none');
     actionButtons.forEach((btn) => btn && btn.classList.remove('is-expanded'));
     if (firstVisible) firstVisible.classList.add('is-expanded');
@@ -123,6 +111,7 @@
       <span class="editor-meta-pill">${window.GCP.escapeHtml(tp.sectionLabel || 'Unknown section')}</span>
     `;
 
+    // Only show last-updated when a real user has made a meaningful update
     if (lastUpdatedEl){
       if (tp.lastUpdatedBy && tp.lastUpdatedAt) {
         const updatedAt = window.GCP.escapeHtml(window.GCP.formatDateTime(tp.lastUpdatedAt));
@@ -147,12 +136,22 @@
     setStatus(tp.status || "draft");
     applyButtonRules(tp);
 
+    const textarea = document.getElementById("editor");
+    textarea.value = tp.htmlContent || "";
+
     const canEdit = !isViewer && !isProtocol;
-    initRichEditor(tp.htmlContent || '', !canEdit);
+    if (window.CKEDITOR){
+      if (editorInstance) editorInstance.destroy(true);
+      editorInstance = window.CKEDITOR.replace("editor", { height: 420 });
+      if (!canEdit && editorInstance && typeof editorInstance.setReadOnly === 'function') editorInstance.setReadOnly(true);
+    } else {
+      textarea.disabled = !canEdit;
+    }
   }
 
   function getHtml(){
-    return richEditor ? richEditor.getHtml() : '';
+    if (editorInstance) return editorInstance.getData();
+    return document.getElementById("editor").value;
   }
 
   if (btnSave) btnSave.addEventListener("click", async () => {
@@ -202,6 +201,7 @@
           body: JSON.stringify({ eventId, sectionId })
         });
       } else {
+        // supervisor, super_collaborator, admin
         await window.GCP.apiFetch("/tp/approve-section", {
           method:"POST",
           body: JSON.stringify({ eventId, sectionId })
@@ -234,8 +234,61 @@
     }
   });
 
+  // ---- File upload ----
+  const btnUpload = document.getElementById('btnUpload');
+  const fileInput = document.getElementById('fileInput');
+  const filesSection = document.getElementById('filesSection');
+
+  function renderFilesList(files){
+    if(!filesSection) return;
+    if(!files||!files.length){ filesSection.style.display='none'; return; }
+    filesSection.style.display='';
+    filesSection.innerHTML = files.map(f=>{
+      const url = `/uploads/${encodeURIComponent(eventId)}/${encodeURIComponent(sectionId)}/${encodeURIComponent(f.filename)}`;
+      return `<div class="editor-file-item"><a href="${url}" target="_blank" rel="noopener">${window.GCP.escapeHtml(f.filename)}</a><span class="editor-file-size">${f.size ? (Math.ceil(f.size/1024)+'KB') : ''}</span></div>`;
+    }).join('');
+  }
+
+  async function loadFiles(){
+    try{
+      const data = await window.GCP.apiFetch(`/tp/files?event_id=${encodeURIComponent(eventId)}&section_id=${encodeURIComponent(sectionId)}`,{method:'GET'});
+      renderFilesList(data.files||[]);
+    }catch(e){ /* ignore */ }
+  }
+
+  if(btnUpload && fileInput){
+    btnUpload.addEventListener('click',()=>fileInput.click());
+    fileInput.addEventListener('change', async()=>{
+      const files = Array.from(fileInput.files||[]);
+      if(!files.length) return;
+      btnUpload.disabled = true;
+      try{
+        for(const file of files){
+          const base64 = await new Promise((resolve,reject)=>{
+            const reader = new FileReader();
+            reader.onload = ()=>resolve(reader.result.split(',')[1]);
+            reader.onerror = reject;
+            reader.readAsDataURL(file);
+          });
+          await window.GCP.apiFetch('/tp/files/upload',{
+            method:'POST',
+            body: JSON.stringify({eventId, sectionId, filename: file.name, mimeType: file.type, base64})
+          });
+        }
+        fileInput.value = '';
+        await loadFiles();
+        msg.textContent = `${files.length} file(s) uploaded.`;
+      }catch(err){
+        msg.textContent = err.message || 'Upload failed';
+      } finally {
+        btnUpload.disabled = false;
+      }
+    });
+  }
+
   try{
     await load();
+    await loadFiles();
   }catch(err){
     msg.textContent = err.message || "Failed to load editor";
   }

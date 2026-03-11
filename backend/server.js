@@ -41,7 +41,7 @@ app.use('/api', (req, res, next) => {
   next();
 });
 
-app.use(express.json({ limit: '2mb' }));
+app.use(express.json({ limit: '20mb' }));
 app.use(cors({
   origin: CORS_ORIGIN === '*' ? true : CORS_ORIGIN,
   credentials: true,
@@ -2408,6 +2408,44 @@ app.get('/api/library/document', requireRole('admin','chairman','minister','supe
   });
 });
 
+
+/** File upload endpoints **/
+const UPLOADS_DIR = path.join(__dirname, 'uploads');
+
+app.post('/api/tp/files/upload', authRequired, attachUser, async (req, res) => {
+  try {
+    const { eventId, sectionId, filename, mimeType, base64 } = req.body || {};
+    if (!eventId || !sectionId || !filename || !base64) return res.status(400).json({ error: 'Missing fields' });
+    // Sanitize filename
+    const safeName = path.basename(filename).replace(/[^a-zA-Z0-9._\-]/g, '_');
+    const dir = path.join(UPLOADS_DIR, String(eventId), String(sectionId));
+    fs.mkdirSync(dir, { recursive: true });
+    const buf = Buffer.from(base64, 'base64');
+    fs.writeFileSync(path.join(dir, safeName), buf);
+    res.json({ ok: true, filename: safeName });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'Upload failed' });
+  }
+});
+
+app.get('/api/tp/files', authRequired, attachUser, async (req, res) => {
+  try {
+    const { event_id: eventId, section_id: sectionId } = req.query;
+    if (!eventId || !sectionId) return res.status(400).json({ error: 'Missing event_id/section_id' });
+    const dir = path.join(UPLOADS_DIR, String(eventId), String(sectionId));
+    if (!fs.existsSync(dir)) return res.json({ files: [] });
+    const files = fs.readdirSync(dir).map(filename => {
+      const stat = fs.statSync(path.join(dir, filename));
+      return { filename, size: stat.size };
+    });
+    res.json({ files });
+  } catch (e) {
+    res.status(500).json({ error: 'Failed to list files' });
+  }
+});
+
+app.use('/uploads', authRequired, express.static(UPLOADS_DIR));
 
 /** Static frontend (served from backend/public for Render) **/
 const PUBLIC_DIR = path.join(__dirname, 'public');

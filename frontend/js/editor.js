@@ -234,8 +234,61 @@
     }
   });
 
+  // ---- File upload ----
+  const btnUpload = document.getElementById('btnUpload');
+  const fileInput = document.getElementById('fileInput');
+  const filesSection = document.getElementById('filesSection');
+
+  function renderFilesList(files){
+    if(!filesSection) return;
+    if(!files||!files.length){ filesSection.style.display='none'; return; }
+    filesSection.style.display='';
+    filesSection.innerHTML = files.map(f=>{
+      const url = `/uploads/${encodeURIComponent(eventId)}/${encodeURIComponent(sectionId)}/${encodeURIComponent(f.filename)}`;
+      return `<div class="editor-file-item"><a href="${url}" target="_blank" rel="noopener">${window.GCP.escapeHtml(f.filename)}</a><span class="editor-file-size">${f.size ? (Math.ceil(f.size/1024)+'KB') : ''}</span></div>`;
+    }).join('');
+  }
+
+  async function loadFiles(){
+    try{
+      const data = await window.GCP.apiFetch(`/tp/files?event_id=${encodeURIComponent(eventId)}&section_id=${encodeURIComponent(sectionId)}`,{method:'GET'});
+      renderFilesList(data.files||[]);
+    }catch(e){ /* ignore */ }
+  }
+
+  if(btnUpload && fileInput){
+    btnUpload.addEventListener('click',()=>fileInput.click());
+    fileInput.addEventListener('change', async()=>{
+      const files = Array.from(fileInput.files||[]);
+      if(!files.length) return;
+      btnUpload.disabled = true;
+      try{
+        for(const file of files){
+          const base64 = await new Promise((resolve,reject)=>{
+            const reader = new FileReader();
+            reader.onload = ()=>resolve(reader.result.split(',')[1]);
+            reader.onerror = reject;
+            reader.readAsDataURL(file);
+          });
+          await window.GCP.apiFetch('/tp/files/upload',{
+            method:'POST',
+            body: JSON.stringify({eventId, sectionId, filename: file.name, mimeType: file.type, base64})
+          });
+        }
+        fileInput.value = '';
+        await loadFiles();
+        msg.textContent = `${files.length} file(s) uploaded.`;
+      }catch(err){
+        msg.textContent = err.message || 'Upload failed';
+      } finally {
+        btnUpload.disabled = false;
+      }
+    });
+  }
+
   try{
     await load();
+    await loadFiles();
   }catch(err){
     msg.textContent = err.message || "Failed to load editor";
   }
