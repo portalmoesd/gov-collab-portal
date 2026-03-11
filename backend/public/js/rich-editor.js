@@ -4,6 +4,25 @@
  */
 (function () {
 
+  const FONT_FAMILIES = [
+    { label: 'Font',            value: '' },
+    { label: 'Arial',           value: 'Arial' },
+    { label: 'Georgia',         value: 'Georgia' },
+    { label: 'Times New Roman', value: 'Times New Roman' },
+    { label: 'Courier New',     value: 'Courier New' },
+    { label: 'Verdana',         value: 'Verdana' },
+    { label: 'Trebuchet MS',    value: 'Trebuchet MS' },
+  ];
+
+  const FONT_SIZES = [
+    { label: 'Size',    value: '' },
+    { label: 'Small',   value: '2' },
+    { label: 'Normal',  value: '3' },
+    { label: 'Large',   value: '5' },
+    { label: 'X-Large', value: '6' },
+    { label: 'Huge',    value: '7' },
+  ];
+
   const TOOLS = [
     { cmd: 'bold',          icon: '<b>B</b>',          title: 'Bold (Ctrl+B)' },
     { cmd: 'italic',        icon: '<i>I</i>',          title: 'Italic (Ctrl+I)' },
@@ -24,11 +43,19 @@
 
   const TOOLBAR_CSS = `
     .gcp-re-wrap { display:flex; flex-direction:column; border:1px solid var(--border,#e5e7eb); border-radius:14px; overflow:hidden; background:var(--card,#fff); }
-    .gcp-re-toolbar { display:flex; flex-wrap:wrap; gap:2px; padding:6px 8px; border-bottom:1px solid var(--border,#e5e7eb); background:rgba(0,0,0,.02); }
+    .gcp-re-toolbar { display:flex; flex-wrap:wrap; align-items:center; gap:2px; padding:6px 8px; border-bottom:1px solid var(--border,#e5e7eb); background:rgba(0,0,0,.02); }
     .gcp-re-btn { display:inline-flex; align-items:center; justify-content:center; min-width:30px; height:30px; padding:0 7px; border-radius:8px; border:1px solid transparent; background:transparent; cursor:pointer; font-size:13px; font-weight:700; color:var(--text,#1f2a37); transition:background .12s ease,border-color .12s ease; }
     .gcp-re-btn:hover { background:rgba(0,0,0,.06); border-color:rgba(0,0,0,.10); }
     .gcp-re-btn.active { background:rgba(10,132,255,.14); border-color:rgba(10,132,255,.30); color:#0a84ff; }
-    .gcp-re-sep { width:1px; height:22px; background:var(--border,#e5e7eb); margin:0 3px; align-self:center; }
+    .gcp-re-sep { width:1px; height:22px; background:var(--border,#e5e7eb); margin:0 3px; align-self:center; flex-shrink:0; }
+    .gcp-re-select { height:30px; padding:0 5px; border-radius:8px; border:1px solid transparent; background:transparent; cursor:pointer; font-size:12px; font-weight:600; color:var(--text,#1f2a37); outline:none; max-width:130px; transition:background .12s ease,border-color .12s ease; }
+    .gcp-re-select:hover { background:rgba(0,0,0,.06); border-color:rgba(0,0,0,.10); }
+    .gcp-re-color-wrap { position:relative; display:inline-flex; align-items:center; justify-content:center; min-width:30px; height:30px; padding:0 7px; border-radius:8px; border:1px solid transparent; background:transparent; cursor:pointer; transition:background .12s ease,border-color .12s ease; overflow:hidden; }
+    .gcp-re-color-wrap:hover { background:rgba(0,0,0,.06); border-color:rgba(0,0,0,.10); }
+    .gcp-re-color-label { display:flex; flex-direction:column; align-items:center; gap:1px; pointer-events:none; }
+    .gcp-re-color-a { font-size:13px; font-weight:900; line-height:1; color:var(--text,#1f2a37); }
+    .gcp-re-color-bar { height:3px; width:14px; border-radius:2px; background:#000; }
+    .gcp-re-color-input { position:absolute; inset:0; opacity:0; cursor:pointer; width:100%; height:100%; border:none; padding:0; }
     .gcp-re-body { flex:1; min-height:260px; padding:14px 16px; outline:none; font-size:15px; line-height:1.65; color:var(--text,#1f2a37); overflow-y:auto; }
     .gcp-re-body:empty::before { content:attr(data-placeholder); color:var(--muted,#6b7280); pointer-events:none; }
     .gcp-re-body h2 { font-size:1.3em; font-weight:800; margin:.8em 0 .3em; }
@@ -42,6 +69,9 @@
     [data-theme="dark"] .gcp-re-btn:hover { background:rgba(255,255,255,.07); }
     [data-theme="dark"] .gcp-re-btn.active { background:rgba(33,150,243,.20); color:#90caf9; }
     [data-theme="dark"] .gcp-re-body { color:#e8ecf4; }
+    [data-theme="dark"] .gcp-re-select { color:#c0cce0; }
+    [data-theme="dark"] .gcp-re-select:hover { background:rgba(255,255,255,.07); }
+    [data-theme="dark"] .gcp-re-color-a { color:#c0cce0; }
   `;
 
   let styleInjected = false;
@@ -82,6 +112,122 @@
     toolbar.className = 'gcp-re-toolbar';
     toolbar.setAttribute('aria-label', 'Editor toolbar');
 
+    // Body (created early so save/restore can reference it)
+    const body = document.createElement('div');
+    body.className = 'gcp-re-body';
+    body.contentEditable = 'true';
+    body.setAttribute('role', 'textbox');
+    body.setAttribute('aria-multiline', 'true');
+    body.setAttribute('data-placeholder', placeholder || 'Start typing…');
+    if (initialHtml) body.innerHTML = initialHtml;
+
+    // --- Selection save/restore (needed for dropdowns & color picker) ---
+    let savedRange = null;
+
+    function saveSelection() {
+      const sel = window.getSelection();
+      if (sel && sel.rangeCount > 0) savedRange = sel.getRangeAt(0).cloneRange();
+    }
+
+    function restoreSelection() {
+      if (!savedRange) return;
+      const sel = window.getSelection();
+      sel.removeAllRanges();
+      sel.addRange(savedRange);
+    }
+
+    // Save selection whenever editor loses focus (e.g. user clicks a select)
+    body.addEventListener('focusout', saveSelection);
+
+    // --- Font family select ---
+    const fontFamilySelect = document.createElement('select');
+    fontFamilySelect.className = 'gcp-re-select';
+    fontFamilySelect.title = 'Font family';
+    fontFamilySelect.setAttribute('aria-label', 'Font family');
+    FONT_FAMILIES.forEach(f => {
+      const opt = document.createElement('option');
+      opt.value = f.value;
+      opt.textContent = f.label;
+      fontFamilySelect.appendChild(opt);
+    });
+    fontFamilySelect.addEventListener('mousedown', saveSelection);
+    fontFamilySelect.addEventListener('change', () => {
+      if (fontFamilySelect.value) {
+        restoreSelection();
+        execCmd('fontName', fontFamilySelect.value);
+      }
+      fontFamilySelect.value = '';
+      body.focus();
+    });
+    toolbar.appendChild(fontFamilySelect);
+
+    // --- Font size select ---
+    const fontSizeSelect = document.createElement('select');
+    fontSizeSelect.className = 'gcp-re-select';
+    fontSizeSelect.title = 'Font size';
+    fontSizeSelect.setAttribute('aria-label', 'Font size');
+    FONT_SIZES.forEach(f => {
+      const opt = document.createElement('option');
+      opt.value = f.value;
+      opt.textContent = f.label;
+      fontSizeSelect.appendChild(opt);
+    });
+    fontSizeSelect.addEventListener('mousedown', saveSelection);
+    fontSizeSelect.addEventListener('change', () => {
+      if (fontSizeSelect.value) {
+        restoreSelection();
+        execCmd('fontSize', fontSizeSelect.value);
+      }
+      fontSizeSelect.value = '';
+      body.focus();
+    });
+    toolbar.appendChild(fontSizeSelect);
+
+    // --- Font colour picker ---
+    const colorWrap = document.createElement('span');
+    colorWrap.className = 'gcp-re-color-wrap';
+    colorWrap.title = 'Font colour';
+
+    const colorLabel = document.createElement('span');
+    colorLabel.className = 'gcp-re-color-label';
+    colorLabel.setAttribute('aria-hidden', 'true');
+
+    const colorA = document.createElement('span');
+    colorA.className = 'gcp-re-color-a';
+    colorA.textContent = 'A';
+
+    const colorBar = document.createElement('span');
+    colorBar.className = 'gcp-re-color-bar';
+
+    colorLabel.appendChild(colorA);
+    colorLabel.appendChild(colorBar);
+
+    const colorInput = document.createElement('input');
+    colorInput.type = 'color';
+    colorInput.className = 'gcp-re-color-input';
+    colorInput.value = '#000000';
+    colorInput.setAttribute('aria-label', 'Font colour');
+
+    colorWrap.appendChild(colorLabel);
+    colorWrap.appendChild(colorInput);
+
+    colorInput.addEventListener('mousedown', saveSelection);
+    colorInput.addEventListener('change', () => {
+      colorBar.style.background = colorInput.value;
+      restoreSelection();
+      execCmd('foreColor', colorInput.value);
+      body.focus();
+    });
+
+    toolbar.appendChild(colorWrap);
+
+    // Separator before existing tools
+    const firstSep = document.createElement('span');
+    firstSep.className = 'gcp-re-sep';
+    firstSep.setAttribute('aria-hidden', 'true');
+    toolbar.appendChild(firstSep);
+
+    // --- Existing format buttons ---
     TOOLS.forEach(tool => {
       if (tool.sep) {
         const sep = document.createElement('span');
@@ -110,15 +256,6 @@
       });
       toolbar.appendChild(btn);
     });
-
-    // Body
-    const body = document.createElement('div');
-    body.className = 'gcp-re-body';
-    body.contentEditable = 'true';
-    body.setAttribute('role', 'textbox');
-    body.setAttribute('aria-multiline', 'true');
-    body.setAttribute('data-placeholder', placeholder || 'Start typing…');
-    if (initialHtml) body.innerHTML = initialHtml;
 
     wrap.appendChild(toolbar);
     wrap.appendChild(body);
