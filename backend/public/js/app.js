@@ -546,7 +546,9 @@
                            ev.action === 'returned'  ? 'Returned'  : ev.action;
           const tagClass = `sh-action-tag sh-action-tag--${ev.action === 'saved' ? 'saved' : ev.action}`;
           const date = ev.acted_at ? new Date(ev.acted_at).toLocaleString('en-GB', { day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' }) : '';
-          const noteHtml = (ev.action === 'returned' && ev.note) ? `<div class="sh-note">↩ "${escapeHtml(ev.note)}"</div>` : '';
+          const noteHtml = ev.action === 'returned'
+            ? `<div class="sh-return-note">${ev.note ? `↩ ${escapeHtml(ev.note)}` : '<span class="sh-return-note__empty">No comment provided</span>'}</div>`
+            : '';
           return `<div class="sh-event"><span class="sh-actor">${actor}</span><span class="${tagClass}">${tagLabel}</span><span class="sh-date">${date}</span></div>${noteHtml}`;
         }).join('');
       }
