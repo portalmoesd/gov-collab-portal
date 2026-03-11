@@ -220,16 +220,13 @@
       }));
     }
 
-    // Submit for own assigned sections (acting as lowest) or returned sections ready to move forward
-    if(canActAsLowest||(isAssigned&&s==='approved_by_collaborator')){
+    // Submit: own draft sections, sections received from lower tiers, or own approved sections
+    const canSubmit=canActAsLowest||cameFromLower||(isAssigned&&s==='approved_by_collaborator');
+    if(canSubmit){
       wrap.appendChild(createMicroAction('Submit','submit',async()=>{
         if(!confirm('Submit this section to Super-collaborator?')) return;
         try{
-          const endpoint=s==='draft'?'/tp/submit':'/tp/submit-approved-to-super-collaborator';
-          const body=s==='draft'
-            ?JSON.stringify({eventId:currentEventId,sectionId:section.sectionId})
-            :JSON.stringify({eventId:currentEventId});
-          await window.GCP.apiFetch(endpoint,{method:'POST',body});
+          await window.GCP.apiFetch('/tp/submit',{method:'POST',body:JSON.stringify({eventId:currentEventId,sectionId:section.sectionId})});
           setMsg('Section submitted to Super-collaborator.'); await refreshStatusGrid();
         }catch(e){setMsg(e.message||'Submit failed',true);}
       }));
@@ -309,11 +306,12 @@
       if(sectionsCards) sectionsCards.appendChild(renderCard(s));
     }
 
-    // Enable submit if any section is approved/returned to collaborator or returned by super-collab
+    // Enable batch submit if any section is at the collaborator review stage
     const canSubmit=currentSections.some(s=>{
       const st=String(s.status||'').toLowerCase();
       const rtr=String(s.returnTargetRole||'').toLowerCase();
-      return st==='approved_by_collaborator'||st==='returned_by_super_collaborator'||rtr==='collaborator';
+      return ['submitted_to_collaborator','returned_by_collaborator','approved_by_collaborator',
+              'approved_by_collaborator_2','approved_by_collaborator_3','returned_by_super_collaborator'].includes(st)||rtr==='collaborator';
     });
     if(submitDocBtn){ submitDocBtn.disabled=!canSubmit; submitDocBtn.style.display=''; }
   }
