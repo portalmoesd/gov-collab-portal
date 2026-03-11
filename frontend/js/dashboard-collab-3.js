@@ -1,4 +1,4 @@
-// dashboard-collab-2.js  —  Collaborator II
+// dashboard-collab-3.js  —  Collaborator III
 (async function(){
   function esc(s){ return window.GCP.escapeHtml(s); }
 
@@ -12,7 +12,7 @@
     collaborator_2:'dashboard-collab-2.html',
     collaborator_1:'dashboard-collab.html'
   };
-  if (role !== 'collaborator_2'){ location.href = roleHome[role] || 'login.html'; return; }
+  if (role !== 'collaborator_3'){ location.href = roleHome[role] || 'login.html'; return; }
 
   const eventSelect        = document.getElementById('eventSelect');
   const sectionsTbody      = document.getElementById('sectionsTbody');
@@ -30,11 +30,6 @@
   let currentEventId = null;
   let currentSections = [];
   const eventsById = new Map();
-
-  // Update submit button label to be Collaborator II-appropriate
-  if (submitDocBtn) {
-    submitDocBtn.textContent = 'Submit to Collaborator III';
-  }
 
   // ---- Minimal custom dropdown ----
   const dropdownRegistry = new Map();
@@ -177,16 +172,6 @@
     return map[s]||(s||'');
   }
 
-  function statusBadgeClass(status){
-    const s=String(status||'').toLowerCase();
-    if(['draft','in_progress','locked'].includes(s)) return 'is-draft';
-    if(['submitted_to_collaborator_2','submitted_to_collaborator','submitted_to_super_collaborator'].includes(s)) return 'is-review';
-    if(['submitted_to_supervisor','submitted_to_chairman'].includes(s)) return 'is-submitted';
-    if(s.startsWith('approved_')) return 'is-approved';
-    if(s.startsWith('returned_')) return 'is-returned';
-    return 'is-draft';
-  }
-
   function createMicroAction(label, kind, onClick){
     const btn=document.createElement('button'); btn.type='button';
     btn.className=`micro-action required-action required-action--${kind}`;
@@ -200,7 +185,7 @@
     const wrap=document.createElement('div'); wrap.className='required-actions';
     const s=String(section.status||'').toLowerCase();
     const isAssigned=!!section.isAssigned;
-    const isAtMe=['submitted_to_collaborator_2','returned_by_collaborator_2'].includes(s);
+    const isAtMe=['submitted_to_collaborator_3','returned_by_collaborator_3'].includes(s);
     const canOpen=isAssigned||isAtMe;
 
     if(canOpen){
@@ -219,10 +204,10 @@
         }catch(e){setMsg(e.message||'Return failed',true);}
       }));
       wrap.appendChild(createMicroAction('Submit','submit',async()=>{
-        if(!confirm('Submit this section to Collaborator III?')) return;
+        if(!confirm('Submit this section to Collaborator?')) return;
         try{
           await window.GCP.apiFetch('/tp/submit',{method:'POST',body:JSON.stringify({eventId:currentEventId,sectionId:section.sectionId,htmlContent:''})});
-          setMsg('Section submitted to Collaborator III.'); await refreshStatusGrid();
+          setMsg('Section submitted to Collaborator.'); await refreshStatusGrid();
         }catch(e){setMsg(e.message||'Submit failed',true);}
       }));
     }
@@ -291,10 +276,10 @@
       if(sectionsCards) sectionsCards.appendChild(renderCard(s));
     }
 
-    // Enable submit if any assigned section is approved_by_collaborator_2 or returned_by_collaborator_3
+    // Enable submit if any assigned section is approved_by_collaborator_3 or returned_by_collaborator
     const canSubmit=currentSections.some(s=>{
       const st=String(s.status||'').toLowerCase();
-      return st==='approved_by_collaborator_2'||st==='returned_by_collaborator_3';
+      return st==='approved_by_collaborator_3'||st==='returned_by_collaborator';
     });
     if(submitDocBtn){ submitDocBtn.disabled=!canSubmit; submitDocBtn.style.display=''; }
   }
@@ -331,11 +316,11 @@
 
   if(submitDocBtn) submitDocBtn.addEventListener('click', async()=>{
     if(!currentEventId||submitDocBtn.disabled) return;
-    if(!confirm('Submit approved sections to Collaborator III?')) return;
+    if(!confirm('Submit approved sections to Collaborator?')) return;
     setMsg('');
     try{
-      const result=await window.GCP.apiFetch('/tp/submit-approved-to-collaborator-3',{method:'POST',body:JSON.stringify({eventId:currentEventId})});
-      if(result&&Number(result.submitted||0)>0) setMsg('Sections submitted to Collaborator III.');
+      const result=await window.GCP.apiFetch('/tp/submit-approved-to-collaborator',{method:'POST',body:JSON.stringify({eventId:currentEventId})});
+      if(result&&Number(result.submitted||0)>0) setMsg('Sections submitted to Collaborator.');
       else setMsg('No sections were ready to submit. Approve sections first.');
       await refreshStatusGrid();
     }catch(e){ setMsg(e.message||'Submit failed',true); }

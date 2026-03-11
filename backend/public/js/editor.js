@@ -78,6 +78,11 @@
       if (btnSubmit) btnSubmit.style.display = "";
       const canReturn = ['submitted_to_collaborator_2', 'returned_by_collaborator_2'].includes(s);
       if (btnReturn) btnReturn.style.display = canReturn ? "" : "none";
+    } else if (role === 'collaborator_3') {
+      if (btnSave) btnSave.style.display = "";
+      if (btnSubmit) btnSubmit.style.display = "";
+      const canReturn = ['submitted_to_collaborator_3', 'returned_by_collaborator_3'].includes(s);
+      if (btnReturn) btnReturn.style.display = canReturn ? "" : "none";
     } else if (role === 'collaborator') {
       if (btnSave) btnSave.style.display = "";
       if (btnSubmit) btnSubmit.style.display = "";
@@ -193,7 +198,8 @@
       await load();
       const msgMap = {
         collaborator_1: "Submitted to Collaborator II.",
-        collaborator_2: "Submitted to Collaborator.",
+        collaborator_2: "Submitted to Collaborator III.",
+        collaborator_3: "Submitted to Collaborator.",
         collaborator: "Submitted to Super-collaborator.",
         super_collaborator: "Submitted to Supervisor.",
       };

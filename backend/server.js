@@ -102,6 +102,11 @@ async function ensureSchema() {
   await pool.query(`ALTER TABLE document_status ADD COLUMN IF NOT EXISTS last_updated_by_user_id INTEGER`).catch(()=>{});
   await pool.query(`ALTER TABLE document_status ADD COLUMN IF NOT EXISTS chairman_comment TEXT`).catch(()=>{});
   await pool.query(`ALTER TABLE document_status ALTER COLUMN status TYPE TEXT USING status::text`).catch(()=>{});
+
+  // Collaborator III tier statuses
+  await pool.query(`ALTER TYPE tp_section_status ADD VALUE IF NOT EXISTS 'submitted_to_collaborator_3'`).catch(()=>{});
+  await pool.query(`ALTER TYPE tp_section_status ADD VALUE IF NOT EXISTS 'returned_by_collaborator_3'`).catch(()=>{});
+  await pool.query(`ALTER TYPE tp_section_status ADD VALUE IF NOT EXISTS 'approved_by_collaborator_3'`).catch(()=>{});
 }
 
 async function ensureRolesExist() {
@@ -113,6 +118,7 @@ async function ensureRolesExist() {
     ['protocol','Protocol'],
     ['super_collaborator','Super-collaborator'],
     ['collaborator','Collaborator'],
+    ['collaborator_3','Collaborator III'],
     ['collaborator_2','Collaborator II'],
     ['collaborator_1','Collaborator I'],
     ['viewer','Viewer'],
@@ -256,13 +262,14 @@ async function eventHasAnyRequiredSection(eventId, sectionIds){
 
 
 function isSectionPipelineRole(roleKey) {
-  return ['collaborator_1','collaborator_2','collaborator','super_collaborator'].includes(normalizeRoleKey(roleKey));
+  return ['collaborator_1','collaborator_2','collaborator_3','collaborator','super_collaborator'].includes(normalizeRoleKey(roleKey));
 }
 
 function nextSectionSubmitStatus(roleKey) {
   const rk = normalizeRoleKey(roleKey);
   if (rk === 'collaborator_1') return 'submitted_to_collaborator_2';
-  if (rk === 'collaborator_2') return 'submitted_to_collaborator';
+  if (rk === 'collaborator_2') return 'submitted_to_collaborator_3';
+  if (rk === 'collaborator_3') return 'submitted_to_collaborator';
   if (rk === 'collaborator') return 'submitted_to_super_collaborator';
   if (rk === 'super_collaborator') return 'submitted_to_supervisor';
   return null;
@@ -271,6 +278,7 @@ function nextSectionSubmitStatus(roleKey) {
 function returnSectionStatus(roleKey) {
   const rk = normalizeRoleKey(roleKey);
   if (rk === 'collaborator_2') return 'returned_by_collaborator_2';
+  if (rk === 'collaborator_3') return 'returned_by_collaborator_3';
   if (rk === 'collaborator') return 'returned_by_collaborator';
   if (rk === 'super_collaborator') return 'returned_by_super_collaborator';
   if (rk === 'supervisor') return 'returned_by_supervisor';
@@ -291,13 +299,15 @@ function approveSectionStatus(roleKey) {
 function decisionStatusesForRole(roleKey) {
   const rk = normalizeRoleKey(roleKey);
   if (rk === 'collaborator_2') return ['submitted_to_collaborator_2', 'returned_by_collaborator_2'];
-  if (rk === 'collaborator') return ['submitted_to_collaborator', 'returned_by_collaborator', 'approved_by_collaborator_2'];
+  if (rk === 'collaborator_3') return ['submitted_to_collaborator_3', 'returned_by_collaborator_3'];
+  if (rk === 'collaborator') return ['submitted_to_collaborator', 'returned_by_collaborator', 'approved_by_collaborator_2', 'approved_by_collaborator_3'];
   if (rk === 'super_collaborator') return ['submitted_to_super_collaborator', 'returned_by_super_collaborator', 'approved_by_collaborator'];
   if (rk === 'supervisor') return ['submitted_to_supervisor', 'returned_by_supervisor', 'approved_by_super_collaborator'];
   if (rk === 'chairman') return ['submitted_to_chairman', 'returned_by_chairman'];
   if (rk === 'minister') return ['submitted_to_minister', 'returned_by_minister'];
   if (rk === 'admin') return [
     'submitted_to_collaborator_2', 'returned_by_collaborator_2',
+    'submitted_to_collaborator_3', 'returned_by_collaborator_3',
     'submitted_to_collaborator', 'returned_by_collaborator',
     'submitted_to_super_collaborator', 'returned_by_super_collaborator',
     'submitted_to_supervisor', 'returned_by_supervisor',
@@ -1608,7 +1618,7 @@ app.post('/api/tp/save', authRequired, async (req, res) => {
 
   const roleKey = normalizeRoleKey(req.user.role_key);
   const isCollab = isSectionPipelineRole(roleKey);
-  const canEdit = ['collaborator_1','collaborator_2','collaborator','super_collaborator','supervisor','chairman','minister','admin'].includes(roleKey);
+  const canEdit = ['collaborator_1','collaborator_2','collaborator_3','collaborator','super_collaborator','supervisor','chairman','minister','admin'].includes(roleKey);
   if (!canEdit) return res.status(403).json({ error: 'Forbidden' });
 
   // Pipeline roles may edit assigned sections and, for collaborator/super-collaborator,
@@ -1703,7 +1713,7 @@ app.post('/api/tp/submit', authRequired, attachUser, async (req, res) => {
   return res.json({ success:true, status: targetStatus });
 });
 
-app.post('/api/tp/return', requireRole('collaborator_2','collaborator','super_collaborator','supervisor','chairman','minister','admin'), async (req, res) => {
+app.post('/api/tp/return', requireRole('collaborator_2','collaborator_3','collaborator','super_collaborator','supervisor','chairman','minister','admin'), async (req, res) => {
   const eventId = Number(req.body?.eventId);
   const sectionId = Number(req.body?.sectionId);
   const note = String((req.body?.note ?? req.body?.comment) || '');
@@ -1833,11 +1843,9 @@ app.post('/api/tp/approve-all-sections', requireRole('supervisor','chairman','mi
 
 
 
-app.post('/api/tp/submit-approved-to-collaborator', requireRole('collaborator_2','admin'), async (req, res) => {
+app.post('/api/tp/submit-approved-to-collaborator-3', requireRole('collaborator_2','admin'), async (req, res) => {
   const eventId = Number(req.body?.eventId);
-  if (!Number.isFinite(eventId)) {
-    return res.status(400).json({ error: 'eventId required' });
-  }
+  if (!Number.isFinite(eventId)) return res.status(400).json({ error: 'eventId required' });
 
   const countryId = await resolveCountryIdForEvent(eventId);
   if (!countryId) return res.status(404).json({ error: 'Event not found' });
@@ -1862,9 +1870,47 @@ app.post('/api/tp/submit-approved-to-collaborator', requireRole('collaborator_2'
   const { rows } = await pool.query(
     `
     UPDATE tp_content
+    SET status='submitted_to_collaborator_3', status_comment=NULL, last_updated_at=NOW(), last_updated_by_user_id=$4
+    WHERE event_id=$1 AND country_id=$2 AND section_id = ANY($3::int[])
+      AND status IN ('approved_by_collaborator_2','returned_by_collaborator_3')
+    RETURNING section_id
+    `,
+    [eventId, countryId, sectionIds, req.user.id]
+  );
+
+  return res.json({ success:true, submitted: rows.length, status: 'submitted_to_collaborator_3' });
+});
+
+app.post('/api/tp/submit-approved-to-collaborator', requireRole('collaborator_3','admin'), async (req, res) => {
+  const eventId = Number(req.body?.eventId);
+  if (!Number.isFinite(eventId)) return res.status(400).json({ error: 'eventId required' });
+
+  const countryId = await resolveCountryIdForEvent(eventId);
+  if (!countryId) return res.status(404).json({ error: 'Event not found' });
+
+  let sectionIds = await queryAll(
+    `SELECT section_id FROM event_required_sections WHERE event_id=$1 ORDER BY section_id ASC`,
+    [eventId]
+  );
+  sectionIds = sectionIds.map(r => Number(r.section_id)).filter(Number.isFinite);
+
+  const roleKey = normalizeRoleKey(req.user.role_key);
+  if (roleKey === 'collaborator_3') {
+    const assignedSectionIds = await getAssignedSectionIds(req.user.id);
+    sectionIds = sectionIds.filter(id => assignedSectionIds.includes(id));
+  }
+  if (!sectionIds.length) return res.json({ success:true, submitted: 0 });
+
+  for (const sid of sectionIds) {
+    await ensureTpRow(eventId, countryId, sid, req.user.id);
+  }
+
+  const { rows } = await pool.query(
+    `
+    UPDATE tp_content
     SET status='submitted_to_collaborator', status_comment=NULL, last_updated_at=NOW(), last_updated_by_user_id=$4
     WHERE event_id=$1 AND country_id=$2 AND section_id = ANY($3::int[])
-      AND status IN ('approved_by_collaborator_2','returned_by_collaborator')
+      AND status IN ('approved_by_collaborator_3','returned_by_collaborator')
     RETURNING section_id
     `,
     [eventId, countryId, sectionIds, req.user.id]
@@ -2092,7 +2138,7 @@ app.get('/api/tp/status-grid', authRequired, async (req, res) => {
          JOIN country_assignments ca ON ca.user_id = u.id AND ca.country_id = $1
          LEFT JOIN section_assignments sa ON sa.user_id = u.id
          WHERE u.is_active = true AND u.deleted_at IS NULL
-           AND r.key IN ('collaborator_1','collaborator_2','collaborator','super_collaborator')
+           AND r.key IN ('collaborator_1','collaborator_2','collaborator_3','collaborator','super_collaborator')
            AND (r.key IN ('collaborator','super_collaborator') OR sa.section_id = ANY($2::int[]))`,
         [countryId, sectionIds]
       );
@@ -2102,7 +2148,7 @@ app.get('/api/tp/status-grid', authRequired, async (req, res) => {
     // Build per-section step-name map
     const stepNames = {};
     sectionIds.forEach(id => {
-      stepNames[id] = { collabI: null, collabII: null, collaborator: null, superCollab: null };
+      stepNames[id] = { collabI: null, collabII: null, collabIII: null, collaborator: null, superCollab: null };
     });
     let sharedCollaborator = null, sharedSuperCollab = null;
     for (const u of stepNameRows) {
@@ -2112,6 +2158,7 @@ app.get('/api/tp/status-grid', authRequired, async (req, res) => {
       if (stepNames[sid]) {
         if (u.role_key === 'collaborator_1') stepNames[sid].collabI = u.full_name;
         if (u.role_key === 'collaborator_2') stepNames[sid].collabII = u.full_name;
+        if (u.role_key === 'collaborator_3') stepNames[sid].collabIII = u.full_name;
       }
     }
     sectionIds.forEach(id => {
@@ -2130,7 +2177,7 @@ app.get('/api/tp/status-grid', authRequired, async (req, res) => {
         lastUpdatedAt: r.last_updated_at,
         lastUpdatedBy: r.last_updated_by || null,
         isAssigned: assignedSet.has(Number(r.id)),
-        stepNames: stepNames[Number(r.id)] || { collabI: null, collabII: null, collaborator: null, superCollab: null },
+        stepNames: stepNames[Number(r.id)] || { collabI: null, collabII: null, collabIII: null, collaborator: null, superCollab: null },
       }))
     });
   } catch (e) {
