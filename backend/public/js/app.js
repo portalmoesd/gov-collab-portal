@@ -598,20 +598,20 @@
         }
       });
     } else {
-      // Table row layout: insert a sibling <tr> with colspan
+      // Table row layout: insert a sibling <tr> with colspan (deferred until tr is in DOM)
       const tr = container.closest('tr');
       if (!tr) return;
       const histRow = document.createElement('tr');
       histRow.className = 'section-history-row';
       histRow.hidden = true;
-      const colspan = tr.children.length || 3;
-      histRow.innerHTML = `<td colspan="${colspan}"><div class="section-history-panel"></div></td>`;
-      tr.after(histRow);
+      histRow.innerHTML = `<td colspan="3"><div class="section-history-panel"></div></td>`;
       const panel = histRow.querySelector('.section-history-panel');
 
       toggleBtn.addEventListener('click', async () => {
         open = !open;
         toggleBtn.classList.toggle('is-open', open);
+        // Lazily insert the histRow the first time it's needed (tr is in DOM by now)
+        if (!histRow.parentNode && tr.parentNode) tr.after(histRow);
         histRow.hidden = !open;
         if (open && !loaded) {
           loaded = true;
