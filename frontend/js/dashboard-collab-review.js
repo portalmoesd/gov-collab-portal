@@ -232,6 +232,16 @@
       }));
     }
 
+    if(canOpen && !cameFromLower && !canActAsLowest){
+      wrap.appendChild(createMicroAction('Ask to Return','ask-to-return',async()=>{
+        const note=prompt('Why do you need it back? (optional):','');
+        if(note===null) return;
+        try{
+          await window.GCP.apiFetch('/tp/ask-to-return',{method:'POST',body:JSON.stringify({eventId:currentEventId,sectionId:section.sectionId,note})});
+          setMsg('Return request sent.');
+        }catch(e){setMsg(e.message||'Request failed',true);}
+      }));
+    }
     if(!canOpen){
       wrap.innerHTML='<span class="required-actions-muted">Monitoring</span>';
     }
@@ -249,6 +259,7 @@
         <div class="required-section-name">${esc(s.sectionLabel)}</div>
         <div class="required-section-meta">${esc(last||'—')} · ${esc(updatedBy)}</div>
         ${note?`<div class="required-section-note"><b>Comment:</b> ${esc(note)}</div>`:''}
+        ${s.returnRequest?`<div class="section-return-request-notice"><strong>Return requested</strong> by ${esc(s.returnRequest.from)}: ${esc(s.returnRequest.note||'(no comment)')}</div>`:''}
       </td>
       <td class="required-progress-cell"><div class="lower-progress-inline">${progressHtml}</div><div class="section-history-toggle-mount"></div></td>
       <td class="required-actions-cell"></td>
