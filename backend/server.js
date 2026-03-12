@@ -1778,6 +1778,16 @@ app.post('/api/tp/ask-to-return', authRequired, async (req, res) => {
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,NOW())`,
       [eventId, countryId, sectionId, req.user.id, req.user.full_name || req.user.username, roleKey, holder, note || null]
     );
+    await recordHistory({
+      eventId, countryId, sectionId,
+      action: 'asked_to_return',
+      fromStatus: row?.status || null,
+      toStatus: row?.status || null,
+      userId: req.user.id,
+      userName: req.user.full_name || req.user.username,
+      userRole: roleKey,
+      note: note || null,
+    });
     return res.json({ success: true, directedToRole: holder });
   } catch (e) {
     console.error('ask-to-return error', e);

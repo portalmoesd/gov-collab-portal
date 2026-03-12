@@ -280,8 +280,9 @@
         }
       }));
 
-      wrap.appendChild(createMicroAction('Return', 'return', async () => {
-        const note = prompt('Return note (optional):', '') || '';
+      wrap.appendChild(createMicroAction('Return', 'return', async (e) => {
+        const note = await window.GCP.showCommentDropdown(e.currentTarget, { title: 'Return section', placeholder: 'Add a comment (optional)…', sendLabel: 'Return' }) || '';
+        if (note === null) return;
         try{
           await window.GCP.apiFetch('/tp/return', {
             method:'POST',
@@ -433,7 +434,8 @@
   returnDocBtn.addEventListener('click', async () => {
     setMsg('');
     if (!currentEventId) return;
-    const note = prompt('Return note (optional):', '') || '';
+    const note = await window.GCP.showCommentDropdown(returnDocBtn, { title: 'Return document', placeholder: 'Add a comment (optional)…', sendLabel: 'Return' });
+    if (note === null) return;
     if (!confirm('Return the full document?')) return;
     try{
       await window.GCP.apiFetch('/document/return', {
