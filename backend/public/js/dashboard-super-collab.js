@@ -156,6 +156,9 @@
       submitted_to_collaborator_2:'At Head Collaborator',
       returned_by_collaborator_2:'Returned by Head Collaborator',
       approved_by_collaborator_2:'Approved by Head Collaborator',
+      submitted_to_collaborator_3:'At Curator',
+      returned_by_collaborator_3:'Returned by Curator',
+      approved_by_collaborator_3:'Approved by Curator',
       submitted_to_collaborator:'At Collaborator',
       returned_by_collaborator:'Returned by Collaborator',
       approved_by_collaborator:'Approved by Collaborator',
@@ -175,7 +178,7 @@
   function statusBadgeClass(status){
     const s=String(status||'').toLowerCase();
     if(['draft','in_progress','locked'].includes(s)) return 'is-draft';
-    if(['submitted_to_collaborator_2','submitted_to_collaborator','submitted_to_super_collaborator'].includes(s)) return 'is-review';
+    if(['submitted_to_collaborator_2','submitted_to_collaborator_3','submitted_to_collaborator','submitted_to_super_collaborator'].includes(s)) return 'is-review';
     if(['submitted_to_supervisor','submitted_to_chairman'].includes(s)) return 'is-submitted';
     if(s.startsWith('approved_')) return 'is-approved';
     if(s.startsWith('returned_')) return 'is-returned';
@@ -201,11 +204,13 @@
       window.location.href=`editor.html?event_id=${currentEventId}&section_id=${section.sectionId}`;
     }));
 
-    // Approve — at super-collaborator review stage, explicitly returned to super-collab, or draft (acting as lowest)
-    // Super-collaborator can also skip the Collaborator stage entirely
+    // Approve — at super-collaborator review stage, or anywhere in the lower pipeline
+    // (super-collaborator can bypass Head Collaborator, Curator, and Collaborator stages)
     const isAtMe=[
       'submitted_to_super_collaborator','returned_by_super_collaborator','approved_by_collaborator',
       'submitted_to_collaborator','returned_by_collaborator','approved_by_collaborator_3',
+      'submitted_to_collaborator_2','returned_by_collaborator_2','approved_by_collaborator_2',
+      'submitted_to_collaborator_3','returned_by_collaborator_3',
     ].includes(s)||rtr==='super_collaborator';
     const canActAsLowest=s==='draft';
     const canApprove=isAtMe||canActAsLowest;
@@ -354,7 +359,12 @@
     if(!currentEventId) return;
     const eligible=currentSections.filter(s=>{
       const st=String(s.status||'').toLowerCase();
-      return ['submitted_to_super_collaborator','returned_by_super_collaborator','approved_by_collaborator'].includes(st);
+      return [
+        'submitted_to_super_collaborator','returned_by_super_collaborator','approved_by_collaborator',
+        'submitted_to_collaborator','returned_by_collaborator','approved_by_collaborator_3',
+        'submitted_to_collaborator_2','returned_by_collaborator_2','approved_by_collaborator_2',
+        'submitted_to_collaborator_3','returned_by_collaborator_3',
+      ].includes(st);
     });
     if(!eligible.length){ setMsg('No sections ready for approval.'); return; }
     if(!confirm(`Approve ${eligible.length} section(s)?`)) return;

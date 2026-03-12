@@ -36,8 +36,36 @@
   }
 
   function setStatus(status){
-    const pretty = String(status || 'draft').replaceAll('_',' ');
-    statusEl.innerHTML = `<span class="pill pill-status ${status}">${pretty}</span>`;
+    const labels = {
+      draft: 'Draft',
+      in_progress: 'Draft',
+      submitted_to_collaborator_2: 'Submitted to Head Collaborator',
+      returned_by_collaborator_2: 'Returned by Head Collaborator',
+      approved_by_collaborator_2: 'Approved by Head Collaborator',
+      submitted_to_collaborator_3: 'Submitted to Curator',
+      returned_by_collaborator_3: 'Returned by Curator',
+      approved_by_collaborator_3: 'Approved by Curator',
+      submitted_to_collaborator: 'Submitted to Collaborator',
+      returned_by_collaborator: 'Returned by Collaborator',
+      approved_by_collaborator: 'Approved by Collaborator',
+      submitted_to_super_collaborator: 'Submitted to Super-collaborator',
+      returned_by_super_collaborator: 'Returned by Super-collaborator',
+      approved_by_super_collaborator: 'Approved by Super-collaborator',
+      submitted_to_supervisor: 'Submitted to Supervisor',
+      returned_by_supervisor: 'Returned by Supervisor',
+      approved_by_supervisor: 'Approved by Supervisor',
+      submitted_to_chairman: 'Submitted to Deputy',
+      returned_by_chairman: 'Returned by Deputy',
+      approved_by_chairman: 'Approved by Deputy',
+      submitted_to_minister: 'Submitted to Minister',
+      returned_by_minister: 'Returned by Minister',
+      approved_by_minister: 'Approved by Minister',
+      approved: 'Approved',
+      locked: 'Locked',
+    };
+    const s = String(status || 'draft').toLowerCase();
+    const pretty = labels[s] || s.replaceAll('_', ' ');
+    statusEl.innerHTML = `<span class="pill pill-status ${s}">${pretty}</span>`;
   }
 
   if (!eventId || !sectionId){
