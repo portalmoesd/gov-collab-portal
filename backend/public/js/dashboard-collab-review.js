@@ -210,8 +210,8 @@
 
     // Return if section came from lower tiers
     if(cameFromLower){
-      wrap.appendChild(createMicroAction('Return','return',async()=>{
-        const note=prompt('Return comment:','');
+      wrap.appendChild(createMicroAction('Return','return',async(e)=>{
+        const note=await window.GCP.showCommentDropdown(e.currentTarget,{title:'Return section',placeholder:'Add a comment (optional)…',sendLabel:'Return'});
         if(note===null) return;
         try{
           await window.GCP.apiFetch('/tp/return',{method:'POST',body:JSON.stringify({eventId:currentEventId,sectionId:section.sectionId,note})});
@@ -233,8 +233,8 @@
     }
 
     if(canOpen && !cameFromLower && !canActAsLowest){
-      wrap.appendChild(createMicroAction('Ask to Return','ask-to-return',async()=>{
-        const note=prompt('Why do you need it back? (optional):','');
+      wrap.appendChild(createMicroAction('Ask to Return','ask-to-return',async(e)=>{
+        const note=await window.GCP.showCommentDropdown(e.currentTarget,{title:'Ask to Return',placeholder:'Why do you need it back? (optional)…',sendLabel:'Send Request'});
         if(note===null) return;
         try{
           await window.GCP.apiFetch('/tp/ask-to-return',{method:'POST',body:JSON.stringify({eventId:currentEventId,sectionId:section.sectionId,note})});

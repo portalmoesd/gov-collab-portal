@@ -294,7 +294,11 @@
   });
 
   if (btnReturn) btnReturn.addEventListener("click", async () => {
-    const comment = prompt("Return comment (required):", "");
+    const comment = await window.GCP.showCommentDropdown(btnReturn, {
+      title: 'Return section',
+      placeholder: 'Add a comment (optional)…',
+      sendLabel: 'Return',
+    });
     if (comment === null) return;
     setActionLoading(btnReturn, true);
     try{
@@ -313,11 +317,15 @@
 
   // ---- Ask to Return ----
   if (btnAskToReturn) btnAskToReturn.addEventListener("click", async () => {
-    const note = prompt("Why do you need it back? (optional):", "");
-    if (note === null) return; // cancelled
+    const note = await window.GCP.showCommentDropdown(btnAskToReturn, {
+      title: 'Ask to Return',
+      placeholder: 'Why do you need it back? (optional)…',
+      sendLabel: 'Send Request',
+    });
+    if (note === null) return;
     try {
       btnAskToReturn.disabled = true;
-      const result = await window.GCP.apiFetch("/tp/ask-to-return", {
+      await window.GCP.apiFetch("/tp/ask-to-return", {
         method: "POST",
         body: JSON.stringify({ eventId, sectionId, note })
       });

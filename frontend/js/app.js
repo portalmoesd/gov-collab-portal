@@ -688,6 +688,10 @@
             const noteInner = ev.note ? escapeHtml(ev.note) : '<span class="sh-return-note__empty">No comment provided</span>';
             return `<div class="sh-event"><span class="sh-actor">${actor}</span><details class="sh-return-details"><summary>Returned</summary><div class="sh-return-note">${noteInner}</div></details><span class="sh-date">${date}</span></div>`;
           }
+          if (ev.action === 'asked_to_return') {
+            const noteInner = ev.note ? escapeHtml(ev.note) : '<span class="sh-return-note__empty">No comment provided</span>';
+            return `<div class="sh-event"><span class="sh-actor">${actor}</span><details class="sh-return-details sh-return-details--ask"><summary>Asked to Return</summary><div class="sh-return-note">${noteInner}</div></details><span class="sh-date">${date}</span></div>`;
+          }
           const tagLabel = ev.action === 'saved' ? (ev._count > 1 ? `Edited (×${ev._count})` : 'Edited') :
                            ev.action === 'submitted' ? 'Submitted' :
                            ev.action === 'approved'  ? 'Approved'  : ev.action;
@@ -772,6 +776,92 @@
         }
       });
     }
+  };
+
+  // ---- Comment dropdown (replaces browser prompt() for Return / Ask to Return) ----
+  // showCommentDropdown(anchorEl, opts) → Promise<string|null>
+  // opts: { placeholder, sendLabel, title }
+  // Resolves with the trimmed comment string on Send, or null on Cancel/Escape/outside-click.
+  window.GCP.showCommentDropdown = function(anchorEl, opts) {
+    return new Promise(function(resolve) {
+      const { placeholder = 'Add a comment…', sendLabel = 'Send', title = '' } = opts || {};
+
+      // Remove any existing dropdown
+      const existing = document.getElementById('gcp-comment-dropdown');
+      if (existing) existing.remove();
+
+      const panel = document.createElement('div');
+      panel.id = 'gcp-comment-dropdown';
+      panel.className = 'gcp-comment-dropdown';
+      if (title) {
+        const h = document.createElement('div');
+        h.className = 'gcp-comment-dropdown__title';
+        h.textContent = title;
+        panel.appendChild(h);
+      }
+      const textarea = document.createElement('textarea');
+      textarea.className = 'gcp-comment-dropdown__textarea';
+      textarea.placeholder = placeholder;
+      textarea.rows = 3;
+      panel.appendChild(textarea);
+
+      const actions = document.createElement('div');
+      actions.className = 'gcp-comment-dropdown__actions';
+
+      const cancelBtn = document.createElement('button');
+      cancelBtn.type = 'button';
+      cancelBtn.className = 'gcp-comment-dropdown__btn gcp-comment-dropdown__btn--cancel';
+      cancelBtn.textContent = 'Cancel';
+
+      const sendBtn = document.createElement('button');
+      sendBtn.type = 'button';
+      sendBtn.className = 'gcp-comment-dropdown__btn gcp-comment-dropdown__btn--send';
+      sendBtn.textContent = sendLabel;
+
+      actions.appendChild(cancelBtn);
+      actions.appendChild(sendBtn);
+      panel.appendChild(actions);
+      document.body.appendChild(panel);
+
+      // Position panel below or above anchor
+      function positionPanel() {
+        const rect = anchorEl.getBoundingClientRect();
+        const panelH = 160;
+        const spaceBelow = window.innerHeight - rect.bottom;
+        panel.style.left = Math.min(rect.left, window.innerWidth - 280) + 'px';
+        if (spaceBelow >= panelH || spaceBelow >= rect.top) {
+          panel.style.top = (rect.bottom + window.scrollY + 4) + 'px';
+          panel.style.bottom = '';
+        } else {
+          panel.style.top = (rect.top + window.scrollY - panelH - 4) + 'px';
+          panel.style.bottom = '';
+        }
+      }
+      positionPanel();
+      textarea.focus();
+
+      function cleanup() {
+        panel.remove();
+        document.removeEventListener('keydown', onKey, true);
+        document.removeEventListener('mousedown', onOutside, true);
+      }
+      function onKey(e) {
+        if (e.key === 'Escape') { cleanup(); resolve(null); }
+        if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { doSend(); }
+      }
+      function onOutside(e) {
+        if (!panel.contains(e.target) && e.target !== anchorEl) { cleanup(); resolve(null); }
+      }
+      function doSend() {
+        const val = textarea.value.trim();
+        cleanup();
+        resolve(val);
+      }
+      cancelBtn.addEventListener('click', function() { cleanup(); resolve(null); });
+      sendBtn.addEventListener('click', doSend);
+      document.addEventListener('keydown', onKey, true);
+      setTimeout(function() { document.addEventListener('mousedown', onOutside, true); }, 50);
+    });
   };
 
 })();

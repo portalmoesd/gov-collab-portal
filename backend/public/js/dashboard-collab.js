@@ -199,8 +199,8 @@
       }));
     }
     if(!canSubmit){
-      wrap.appendChild(createMicroAction('Ask to Return','ask-to-return',async()=>{
-        const note=prompt('Why do you need it back? (optional):','');
+      wrap.appendChild(createMicroAction('Ask to Return','ask-to-return',async(e)=>{
+        const note=await window.GCP.showCommentDropdown(e.currentTarget,{title:'Ask to Return',placeholder:'Why do you need it back? (optional)…',sendLabel:'Send Request'});
         if(note===null) return;
         try{
           await window.GCP.apiFetch('/tp/ask-to-return',{method:'POST',body:JSON.stringify({eventId:currentEventId,sectionId:section.sectionId,note})});

@@ -267,13 +267,16 @@
         await refreshStatusGrid();
       }));
 
-      wrap.appendChild(createMicroAction('Return', 'return', async () => {
-        const note = prompt('Return note (optional):', '');
-        await window.GCP.apiFetch('/tp/return', {
-          method:'POST',
-          body: JSON.stringify({ eventId: currentEventId, sectionId: section.sectionId, note })
-        });
-        await refreshStatusGrid();
+      wrap.appendChild(createMicroAction('Return', 'return', async (e) => {
+        const note = await window.GCP.showCommentDropdown(e.currentTarget, { title: 'Return section', placeholder: 'Add a comment (optional)…', sendLabel: 'Return' });
+        if (note === null) return;
+        try {
+          await window.GCP.apiFetch('/tp/return', {
+            method:'POST',
+            body: JSON.stringify({ eventId: currentEventId, sectionId: section.sectionId, note })
+          });
+          await refreshStatusGrid();
+        } catch(e) { setMsg && setMsg(e.message || 'Return failed', true); }
       }));
     }
     target.appendChild(wrap);
