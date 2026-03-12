@@ -485,8 +485,8 @@
       : ['Collaborator I', 'Head Collaborator', 'Curator', 'Waiting for Approval', 'Approved'];
     const names = stepNames && typeof stepNames === 'object'
       ? (skipCurator
-          ? [stepNames.collabI || null, stepNames.collabII || null, null, null]
-          : [stepNames.collabI || null, stepNames.collabII || null, stepNames.collabIII || null, null, null])
+          ? [stepNames.collabI || null, stepNames.collabII || null, stepNames.collaborator || null, stepNames.superCollab || null]
+          : [stepNames.collabI || null, stepNames.collabII || null, stepNames.collabIII || null, stepNames.collaborator || null, stepNames.superCollab || null])
       : steps.map(() => null);
     // Determine the first participating step based on originalSubmitterRole
     let startStep = 0;
@@ -503,8 +503,8 @@
       const notParticipating = idx < startStep;
       const state = notParticipating ? 'skip' : (idx < active ? 'done' : (idx === active ? 'active' : 'todo'));
       const name = names[idx];
-      // Collab I/II steps: show only the assigned name, no role title
-      const displayLabel = idx < 2 ? (name ? escapeHtml(name) : '') : escapeHtml(label);
+      // Show the actor's name once they've acted; otherwise show the role label
+      const displayLabel = name ? escapeHtml(name) : escapeHtml(label);
       return `<div class="wf-step ${state}" role="listitem" aria-current="${idx === active ? 'step' : 'false'}">
         <div class="wf-step__circle" aria-hidden="true">${idx + 1}</div>
         <div class="wf-step__label">${displayLabel}</div>
@@ -609,10 +609,15 @@
         }).join('');
       }
 
+      // Show the first actor's name in the stage header once they've acted; otherwise show the role label
+      const firstActorName = hasEvents ? (events[0].user_name || null) : null;
+      const stageLabelHtml = firstActorName
+        ? `<span class="sh-stage-actor">${escapeHtml(firstActorName)}</span><span class="sh-stage-role">${escapeHtml(stage.label)}</span>`
+        : escapeHtml(stage.label);
       return `<div class="sh-stage ${dotClass}">
         <div class="sh-dot"></div>
         <div class="sh-body">
-          <div class="sh-stage-label">${escapeHtml(stage.label)}</div>
+          <div class="sh-stage-label">${stageLabelHtml}</div>
           <div class="sh-events">${eventsHtml}</div>
         </div>
       </div>`;

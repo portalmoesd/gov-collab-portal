@@ -3822,6 +3822,8 @@ body.gp-shell-ready .gp-sidebar__scrim{
 .sh-stage--done .sh-stage-label,
 .sh-stage--warn .sh-stage-label,
 .sh-stage--active .sh-stage-label{ color:#374151; }
+.sh-stage-actor{ font-weight:700; }
+.sh-stage-role{ font-weight:400; color:inherit; margin-left:4px; opacity:.6; }
 .sh-events{ display:flex; flex-direction:column; gap:2px; margin-top:1px; }
 .sh-event{ display:flex; align-items:baseline; gap:6px; flex-wrap:wrap; font-size:12px; color:#6b7280; }
 .sh-actor{ font-weight:700; color:#1f2937; }
@@ -3866,5 +3868,6 @@ body.gp-shell-ready .gp-sidebar__scrim{
 [data-theme="dark"] .sh-stage-label{ color:#6b7280; }
 [data-theme="dark"] .sh-stage--done .sh-stage-label,
 [data-theme="dark"] .sh-stage--active .sh-stage-label{ color:#c0cce0; }
+[data-theme="dark"] .sh-stage-role{ opacity:.5; }
 [data-theme="dark"] .sh-actor{ color:#e0eaf6; }
 [data-theme="dark"] .sh-date{ color:#6b7280; }

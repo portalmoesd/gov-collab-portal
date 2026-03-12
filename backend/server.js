@@ -2320,46 +2320,37 @@ app.get('/api/tp/status-grid', authRequired, async (req, res) => {
     const { rows } = await pool.query(q, params);
     const assignedSet = new Set((assignedSectionIds || []).map(Number));
 
-    // Fetch assigned pipeline-role user names for the progress bar step labels.
-    // collaborator_1 / collaborator_2 are section+country scoped;
-    // collaborator / super_collaborator are country-scoped only.
+    // Fetch names from history: a user's name appears on a step only after they've acted.
     const sectionIds = rows.map(r => Number(r.id));
     let stepNameRows = [];
     if (sectionIds.length) {
       const snRes = await pool.query(
-        `SELECT u.full_name, r.key AS role_key, sa.section_id
-         FROM users u
-         JOIN roles r ON r.id = u.role_id
-         JOIN country_assignments ca ON ca.user_id = u.id AND ca.country_id = $1
-         LEFT JOIN section_assignments sa ON sa.user_id = u.id
-         WHERE u.is_active = true AND u.deleted_at IS NULL
-           AND r.key IN ('collaborator_1','collaborator_2','collaborator_3','collaborator','super_collaborator')
-           AND (r.key IN ('collaborator','super_collaborator') OR sa.section_id = ANY($2::int[]))`,
-        [countryId, sectionIds]
+        `SELECT DISTINCT ON (section_id, user_role)
+           section_id, user_name AS full_name, user_role AS role_key
+         FROM tp_section_history
+         WHERE event_id = $1 AND section_id = ANY($2::int[])
+           AND user_role IN ('collaborator_1','collaborator_2','collaborator_3','collaborator','super_collaborator')
+         ORDER BY section_id, user_role, acted_at ASC`,
+        [eventId, sectionIds]
       );
       stepNameRows = snRes.rows;
     }
 
-    // Build per-section step-name map
+    // Build per-section step-name map (null = not acted yet → show role label)
     const stepNames = {};
     sectionIds.forEach(id => {
       stepNames[id] = { collabI: null, collabII: null, collabIII: null, collaborator: null, superCollab: null };
     });
-    let sharedCollaborator = null, sharedSuperCollab = null;
     for (const u of stepNameRows) {
-      if (u.role_key === 'collaborator') sharedCollaborator = u.full_name;
-      if (u.role_key === 'super_collaborator') sharedSuperCollab = u.full_name;
       const sid = Number(u.section_id);
       if (stepNames[sid]) {
-        if (u.role_key === 'collaborator_1') stepNames[sid].collabI = u.full_name;
-        if (u.role_key === 'collaborator_2') stepNames[sid].collabII = u.full_name;
-        if (u.role_key === 'collaborator_3') stepNames[sid].collabIII = u.full_name;
+        if (u.role_key === 'collaborator_1')    stepNames[sid].collabI      = u.full_name;
+        if (u.role_key === 'collaborator_2')    stepNames[sid].collabII     = u.full_name;
+        if (u.role_key === 'collaborator_3')    stepNames[sid].collabIII    = u.full_name;
+        if (u.role_key === 'collaborator')      stepNames[sid].collaborator = u.full_name;
+        if (u.role_key === 'super_collaborator')stepNames[sid].superCollab  = u.full_name;
       }
     }
-    sectionIds.forEach(id => {
-      stepNames[id].collaborator = sharedCollaborator;
-      stepNames[id].superCollab = sharedSuperCollab;
-    });
 
     res.json({
       event_id: eventId,
