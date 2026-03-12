@@ -565,8 +565,16 @@
       else if (osr === 'super_collaborator') startStep = skipCurator ? 3 : 4;
     }
     const visibleSteps = allSteps.slice(startStep);
-    // Absolute active index from status, then offset to visible-relative
-    const activeAbs = window.GCP.collabSimpleStepIndex(status, lsr, returnTargetRole);
+    // Absolute active index from status, then offset to visible-relative.
+    // collabSimpleStepIndex deliberately keeps submitted_to_super_collaborator and
+    // approved_by_collaborator at the Collaborator step so the lower-tier bar can
+    // label that region "Waiting for Approval". For the upper-tier bar we have an
+    // explicit Super-Collaborator step, so advance past Collaborator for those statuses.
+    const _s = String(status || '').toLowerCase();
+    const _superIdx = skipCurator ? 3 : 4;
+    const activeAbs = (['submitted_to_super_collaborator', 'approved_by_collaborator'].includes(_s))
+      ? _superIdx
+      : window.GCP.collabSimpleStepIndex(status, lsr, returnTargetRole);
     const active = Math.max(0, activeAbs - startStep);
     const fillPercent = visibleSteps.length > 1 ? (active / (visibleSteps.length - 1)) * 100 : 100;
     const stepHtml = visibleSteps.map((step, idx) => {
