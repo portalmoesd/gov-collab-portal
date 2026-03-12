@@ -1357,7 +1357,7 @@ body.gp-shell-ready .gp-sidebar__scrim{
   --hover-bg:#fdecec;
 }
 .micro-action--ask-to-return{
-  --icon-url:url('../assets/ask_to_return_icon.svg');
+  --icon-url:url('../assets/return-icon.svg');
   --icon-color:#d97706;
   --hover-color:#92400e;
   --hover-bg:#fef3c7;
