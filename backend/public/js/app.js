@@ -622,10 +622,22 @@
     return 0; // draft / in_progress / returned_by_collaborator_1
   }
 
-  function renderHistoryTimeline(history, currentStatus, lsr) {
+  function renderHistoryTimeline(history, currentStatus, lsr, originalSubmitterRole) {
     const skipCurator = String(lsr || 'collaborator_2').toLowerCase() !== 'collaborator_3';
-    const stages = skipCurator ? HISTORY_STAGES.filter(s => s.role !== 'collaborator_3') : HISTORY_STAGES;
     const currentLevel = historyStageLevel(currentStatus, skipCurator);
+
+    // Build the ordered stage list, tagging each with its index in the skipCurator-aware
+    // full array so comparisons with currentLevel remain correct after further filtering.
+    const lowerRoleOrder = ['collaborator_1','collaborator_2','collaborator_3','collaborator','super_collaborator'];
+    const osr = String(originalSubmitterRole || 'collaborator_1').toLowerCase();
+    const startRoleIdx = Math.max(0, lowerRoleOrder.indexOf(osr));
+
+    const stages = (skipCurator ? HISTORY_STAGES.filter(s => s.role !== 'collaborator_3') : HISTORY_STAGES)
+      .map((s, i) => ({ ...s, _idx: i }))
+      // Drop Supervisor / Deputy / Minister — section history never contains their actions
+      .filter(s => !['supervisor','chairman','minister'].includes(s.role))
+      // Drop lower-tier roles that did not participate for this specific section
+      .filter(s => lowerRoleOrder.indexOf(s.role) < 0 || lowerRoleOrder.indexOf(s.role) >= startRoleIdx);
     // Group history events by role
     const byRole = {};
     for (const ev of (history || [])) {
@@ -634,15 +646,15 @@
       byRole[r].push(ev);
     }
 
-    const stagesHtml = stages.map((stage, idx) => {
+    const stagesHtml = stages.map((stage) => {
       const events = byRole[stage.role] || [];
       const hasEvents = events.length > 0;
-      const isPast    = idx < currentLevel;
-      const isCurrent = idx === currentLevel;
+      const isPast    = stage._idx < currentLevel;
+      const isCurrent = stage._idx === currentLevel;
       // A stage is truly "pending" only if it's above current level AND has never had any events
-      const isPending = idx > currentLevel && !hasEvents;
+      const isPending = stage._idx > currentLevel && !hasEvents;
       // A stage above current level that has events was previously visited but section was returned below it
-      const isReturned = idx > currentLevel && hasEvents;
+      const isReturned = stage._idx > currentLevel && hasEvents;
 
       let dotClass;
       if (isPending) dotClass = 'sh-stage--pending';
@@ -684,11 +696,8 @@
         }).join('');
       }
 
-      // Show the first actor's name in the stage header once they've acted; otherwise show the role label
-      const firstActorName = hasEvents ? (events[0].user_name || null) : null;
-      const stageLabelHtml = firstActorName
-        ? `<span class="sh-stage-actor">${escapeHtml(firstActorName)}</span><span class="sh-stage-role">${escapeHtml(stage.label)}</span>`
-        : escapeHtml(stage.label);
+      // Stage header shows only the role title; actor names appear in the event rows below
+      const stageLabelHtml = escapeHtml(stage.label);
       return `<div class="sh-stage ${dotClass}">
         <div class="sh-dot"></div>
         <div class="sh-body">
@@ -729,7 +738,7 @@
           panel.innerHTML = '<div class="sh-no-action">Loading…</div>';
           try {
             const data = await window.GCP.apiFetch(`/tp/section-history?event_id=${encodeURIComponent(eventId)}&section_id=${encodeURIComponent(section.sectionId)}`, { method:'GET' });
-            panel.innerHTML = renderHistoryTimeline(data.history || [], section.status, section.lowerSubmitterRole);
+            panel.innerHTML = renderHistoryTimeline(data.history || [], section.status, section.lowerSubmitterRole, section.originalSubmitterRole);
           } catch (e) {
             panel.innerHTML = `<div class="sh-no-action">Could not load history: ${escapeHtml(e.message||'error')}</div>`;
           }
@@ -756,7 +765,7 @@
           panel.innerHTML = '<div class="sh-no-action">Loading…</div>';
           try {
             const data = await window.GCP.apiFetch(`/tp/section-history?event_id=${encodeURIComponent(eventId)}&section_id=${encodeURIComponent(section.sectionId)}`, { method:'GET' });
-            panel.innerHTML = renderHistoryTimeline(data.history || [], section.status, section.lowerSubmitterRole);
+            panel.innerHTML = renderHistoryTimeline(data.history || [], section.status, section.lowerSubmitterRole, section.originalSubmitterRole);
           } catch (e) {
             panel.innerHTML = `<div class="sh-no-action">Could not load history: ${escapeHtml(e.message||'error')}</div>`;
           }

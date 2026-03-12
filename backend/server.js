@@ -362,10 +362,13 @@ async function getCurrentSectionStatus(eventId, countryId, sectionId) {
 
 async function userCanSeeEvent(user, event){
   const roleKey = normalizeRoleKey(user.role_key);
-  // Submitter visibility rules
+  // Upper-pipeline visibility: Deputy and Minister only see events that need them
   const submitterRole = String(event.submitter_role || 'chairman').toLowerCase();
   if (roleKey === 'chairman' && submitterRole === 'supervisor') return false;
   if (roleKey === 'minister' && submitterRole !== 'minister') return false;
+  // Lower-pipeline visibility: Curator only sees events where Curator is in the pipeline
+  const lowerSubmitterRole = String(event.lower_submitter_role || 'collaborator_2').toLowerCase();
+  if (roleKey === 'collaborator_3' && lowerSubmitterRole !== 'collaborator_3') return false;
 
   if (!isSectionPipelineRole(roleKey)) return true;
 
@@ -1166,33 +1169,16 @@ app.get('/api/events', authRequired, attachUser, async (req, res) => {
     where.push(`EXISTS (SELECT 1 FROM event_required_sections ers WHERE ers.event_id=e.id AND ers.section_id = ANY($${idx++}::int[]))`); vals.push(sections);
   }
 
-  // Document submitter visibility rules
-  // - If submitter is Supervisor, Deputy and Minister should not see the event.
-  // - If submitter is Deputy, Minister should not see the event.
-  // - If submitter is Minister, only Minister sees it at final stage.
+  // Upper-pipeline visibility: Deputy and Minister only see events that need them
   if (roleKey === 'chairman') {
     where.push(`COALESCE(e.submitter_role,'chairman') <> 'supervisor'`);
   }
   if (roleKey === 'minister') {
     where.push(`COALESCE(e.submitter_role,'chairman') = 'minister'`);
   }
-
-  if (roleKey === 'chairman') {
-    where.push(`COALESCE(e.submitter_role,'chairman') <> 'supervisor'`);
-  }
-  if (roleKey === 'minister') {
-    where.push(`COALESCE(e.submitter_role,'chairman') = 'minister'`);
-  }
-
-  // Document submitter visibility rules:
-  // - If submitter is Supervisor, Deputy and Minister should not see the event.
-  // - If submitter is Deputy, Minister should not see the event.
-  // - If submitter is Minister, everyone can see (normal workflow).
-  if (roleKey === 'chairman') {
-    where.push(`COALESCE(e.submitter_role,'chairman') <> 'supervisor'`);
-  }
-  if (roleKey === 'minister') {
-    where.push(`COALESCE(e.submitter_role,'chairman') = 'minister'`);
+  // Lower-pipeline visibility: Curator only sees events where Curator is in the pipeline
+  if (roleKey === 'collaborator_3') {
+    where.push(`COALESCE(e.lower_submitter_role,'collaborator_2') = 'collaborator_3'`);
   }
 
   const rows = await queryAll(
@@ -1228,15 +1214,16 @@ app.get('/api/events/upcoming', authRequired, attachUser, async (req, res) => {
     where.push(`EXISTS (SELECT 1 FROM event_required_sections ers WHERE ers.event_id=e.id AND ers.section_id = ANY($${idx++}::int[]))`); vals.push(sections);
   }
 
-  // Document submitter visibility rules (keep consistent with /api/events and userCanSeeEvent)
-  // - If submitter is Supervisor, Deputy and Minister should not see the event.
-  // - If submitter is Deputy, Minister should not see the event.
-  // - If submitter is Minister, Minister should see it (Deputy still participates).
+  // Upper-pipeline visibility: Deputy and Minister only see events that need them
   if (roleKey === 'chairman') {
     where.push(`COALESCE(e.submitter_role,'chairman') <> 'supervisor'`);
   }
   if (roleKey === 'minister') {
     where.push(`COALESCE(e.submitter_role,'chairman') = 'minister'`);
+  }
+  // Lower-pipeline visibility: Curator only sees events where Curator is in the pipeline
+  if (roleKey === 'collaborator_3') {
+    where.push(`COALESCE(e.lower_submitter_role,'collaborator_2') = 'collaborator_3'`);
   }
 
   const rows = await queryAll(
@@ -2282,6 +2269,11 @@ app.get('/api/tp/status-grid', authRequired, async (req, res) => {
 
     const evMetaGrid = await queryOne(`SELECT lower_submitter_role FROM events WHERE id=$1`, [eventId]);
     const lowerSubmitterRole = String(evMetaGrid?.lower_submitter_role || 'collaborator_2').toLowerCase();
+
+    // Curator only participates when the event pipeline includes Curator
+    if (roleKey === 'collaborator_3' && lowerSubmitterRole !== 'collaborator_3') {
+      return res.json({ event_id: eventId, country_id: countryId, lowerSubmitterRole, sections: [] });
+    }
 
     let q = `
       SELECT
