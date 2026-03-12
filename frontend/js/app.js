@@ -518,6 +518,57 @@
     </div>`;
   };
 
+  // Progress bar for Collaborator and Super-Collaborator dashboards.
+  // Shows the full pipeline with explicit role names.
+  // Steps before originalSubmitterRole are completely omitted (not greyed-out) so
+  // the bar starts exactly where this section entered the pipeline.
+  window.GCP.renderUpperTierProgress = function(status, stepNames, lsr, originalSubmitterRole, returnTargetRole) {
+    const skipCurator = String(lsr || 'collaborator_2').toLowerCase() !== 'collaborator_3';
+    const sn = stepNames && typeof stepNames === 'object' ? stepNames : {};
+    const allSteps = skipCurator
+      ? [
+          { label: 'Collaborator I',     name: sn.collabI      || null },
+          { label: 'Head Collaborator',  name: sn.collabII     || null },
+          { label: 'Collaborator',       name: sn.collaborator || null },
+          { label: 'Super-Collaborator', name: sn.superCollab  || null },
+        ]
+      : [
+          { label: 'Collaborator I',     name: sn.collabI      || null },
+          { label: 'Head Collaborator',  name: sn.collabII     || null },
+          { label: 'Curator',            name: sn.collabIII    || null },
+          { label: 'Collaborator',       name: sn.collaborator || null },
+          { label: 'Super-Collaborator', name: sn.superCollab  || null },
+        ];
+    // Determine first visible step from originalSubmitterRole
+    let startStep = 0;
+    if (originalSubmitterRole) {
+      const osr = String(originalSubmitterRole).toLowerCase();
+      if (osr === 'collaborator_2')      startStep = 1;
+      else if (osr === 'collaborator_3') startStep = skipCurator ? 1 : 2;
+      else if (osr === 'collaborator')   startStep = skipCurator ? 2 : 3;
+      else if (osr === 'super_collaborator') startStep = skipCurator ? 3 : 4;
+    }
+    const visibleSteps = allSteps.slice(startStep);
+    // Absolute active index from status, then offset to visible-relative
+    const activeAbs = window.GCP.collabSimpleStepIndex(status, lsr, returnTargetRole);
+    const active = Math.max(0, activeAbs - startStep);
+    const fillPercent = visibleSteps.length > 1 ? (active / (visibleSteps.length - 1)) * 100 : 100;
+    const stepHtml = visibleSteps.map((step, idx) => {
+      const state = idx < active ? 'done' : (idx === active ? 'active' : 'todo');
+      const displayLabel = step.name ? escapeHtml(step.name) : escapeHtml(step.label);
+      return `<div class="wf-step ${state}" role="listitem" aria-current="${idx === active ? 'step' : 'false'}">
+        <div class="wf-step__circle" aria-hidden="true">${idx + 1}</div>
+        <div class="wf-step__label">${displayLabel}</div>
+      </div>`;
+    }).join('');
+    return `<div class="wf-progress upper-tier-progress" style="--wf-count:${visibleSteps.length};" role="group" aria-label="Section workflow progress">
+      <div class="wf-progress__steps" role="list">${stepHtml}</div>
+      <div class="wf-progress__track" aria-hidden="true">
+        <div class="wf-progress__fill" style="width:${fillPercent}%;"></div>
+      </div>
+    </div>`;
+  };
+
   // ---- Section history panel ----
 
   // Ordered pipeline stages for the history timeline
