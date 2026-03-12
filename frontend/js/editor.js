@@ -19,6 +19,8 @@
   const btnSubmit = document.getElementById("btnSubmit");
   const btnApprove = document.getElementById("btnApprove");
   const btnReturn = document.getElementById("btnReturn");
+  const btnUpload = document.getElementById("btnUpload");
+  const btnAskToReturn = document.getElementById("btnAskToReturn");
 
   const actionButtons = [btnSave, btnSubmit, btnApprove, btnReturn];
 
@@ -82,49 +84,77 @@
     return;
   }
 
-  // Initially hide dynamic buttons; applyButtonRules() sets them correctly after load
-  if (btnSubmit) btnSubmit.style.display = "none";
-  if (btnApprove) btnApprove.style.display = "none";
-  if (btnReturn) btnReturn.style.display = "none";
-  if (isViewer) { if(btnSave) btnSave.style.display = "none"; }
+  // Initially hide all action buttons; applyButtonRules() sets them correctly after load
+  actionButtons.forEach(b => b && (b.style.display = "none"));
+  if (btnUpload)      btnUpload.style.display      = "none";
+  if (btnAskToReturn) btnAskToReturn.style.display = "none";
 
   let editorInstance = null;
   let richEditorInstance = null;
 
+  // Returns true when it is the current user's active turn to act on the section.
+  function isMyTurn(tp) {
+    const s   = String(tp.status || 'draft').toLowerCase();
+    const rtr = String(tp.returnTargetRole || '').toLowerCase();
+    if (role === 'collaborator_1')     return s === 'draft' || rtr === 'collaborator_1';
+    if (role === 'collaborator_2')     return ['submitted_to_collaborator_2','returned_by_collaborator_2'].includes(s) || rtr === 'collaborator_2';
+    if (role === 'collaborator_3')     return ['submitted_to_collaborator_3','returned_by_collaborator_3'].includes(s) || rtr === 'collaborator_3';
+    if (role === 'collaborator')       return ['submitted_to_collaborator','returned_by_collaborator','approved_by_collaborator_2','approved_by_collaborator_3'].includes(s) || rtr === 'collaborator';
+    if (role === 'super_collaborator') return [
+      'submitted_to_super_collaborator','returned_by_super_collaborator','approved_by_collaborator',
+      'submitted_to_collaborator','returned_by_collaborator','approved_by_collaborator_3',
+      'submitted_to_collaborator_2','returned_by_collaborator_2','approved_by_collaborator_2',
+      'submitted_to_collaborator_3','returned_by_collaborator_3',
+    ].includes(s) || rtr === 'super_collaborator' || s === 'draft';
+    return true; // supervisor / chairman / minister / admin always active
+  }
+
   function applyButtonRules(tp){
     const s = String(tp.status || 'draft').toLowerCase();
 
-    // Reset all
+    // Reset all action buttons + Ask to Return
     actionButtons.forEach(b => b && (b.style.display = "none"));
+    if (btnUpload)       btnUpload.style.display       = "none";
+    if (btnAskToReturn)  btnAskToReturn.style.display  = "none";
     if (isViewer) return;
 
+    if (!isMyTurn(tp)) {
+      // Not this user's turn — editor is read-only; only Ask to Return is available
+      if (btnAskToReturn) btnAskToReturn.style.display = "";
+      return;
+    }
+
+    // It IS this user's turn — show the normal role-specific buttons
     if (role === 'collaborator_1') {
-      if (btnSave) btnSave.style.display = "";
+      if (btnSave)   btnSave.style.display   = "";
       if (btnSubmit) btnSubmit.style.display = "";
+      if (btnUpload) btnUpload.style.display = "";
     } else if (role === 'collaborator_2') {
-      if (btnSave) btnSave.style.display = "";
+      if (btnSave)   btnSave.style.display   = "";
       if (btnSubmit) btnSubmit.style.display = "";
+      if (btnUpload) btnUpload.style.display = "";
       const canReturn = ['submitted_to_collaborator_2', 'returned_by_collaborator_2'].includes(s);
       if (btnReturn) btnReturn.style.display = canReturn ? "" : "none";
     } else if (role === 'collaborator_3') {
-      if (btnSave) btnSave.style.display = "";
+      if (btnSave)   btnSave.style.display   = "";
       if (btnSubmit) btnSubmit.style.display = "";
+      if (btnUpload) btnUpload.style.display = "";
       const canReturn = ['submitted_to_collaborator_3', 'returned_by_collaborator_3'].includes(s);
       if (btnReturn) btnReturn.style.display = canReturn ? "" : "none";
     } else if (role === 'collaborator') {
-      if (btnSave) btnSave.style.display = "";
+      if (btnSave)   btnSave.style.display   = "";
       if (btnSubmit) btnSubmit.style.display = "";
-      // Return only if section came from lower tiers
+      if (btnUpload) btnUpload.style.display = "";
       const canReturn = ['submitted_to_collaborator', 'returned_by_collaborator'].includes(s);
       if (btnReturn) btnReturn.style.display = canReturn ? "" : "none";
     } else if (role === 'super_collaborator') {
-      if (btnSave) btnSave.style.display = "";
+      if (btnSave)    btnSave.style.display    = "";
       if (btnApprove) btnApprove.style.display = "";
-      if (btnReturn) btnReturn.style.display = "";
+      if (btnReturn)  btnReturn.style.display  = "";
     } else if (['supervisor','chairman','minister','admin'].includes(role)) {
-      if (btnSave) btnSave.style.display = "";
+      if (btnSave)    btnSave.style.display    = "";
       if (btnApprove) btnApprove.style.display = "";
-      if (btnReturn) btnReturn.style.display = "";
+      if (btnReturn)  btnReturn.style.display  = "";
     } else {
       if (btnSave) btnSave.style.display = "";
     }
@@ -281,8 +311,27 @@
     }
   });
 
+  // ---- Ask to Return ----
+  if (btnAskToReturn) btnAskToReturn.addEventListener("click", async () => {
+    const note = prompt("Why do you need it back? (optional):", "");
+    if (note === null) return; // cancelled
+    try {
+      btnAskToReturn.disabled = true;
+      const result = await window.GCP.apiFetch("/tp/ask-to-return", {
+        method: "POST",
+        body: JSON.stringify({ eventId, sectionId, note })
+      });
+      msg.textContent = "Return request sent.";
+      msg.style.color = "#16a34a";
+    } catch(err) {
+      msg.textContent = err.message || "Failed to send return request.";
+      msg.style.color = "crimson";
+    } finally {
+      btnAskToReturn.disabled = false;
+    }
+  });
+
   // ---- File upload ----
-  const btnUpload = document.getElementById('btnUpload');
   const fileInput = document.getElementById('fileInput');
   const filesSection = document.getElementById('filesSection');
 

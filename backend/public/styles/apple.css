@@ -1356,6 +1356,12 @@ body.gp-shell-ready .gp-sidebar__scrim{
   --hover-color:#dc2626;
   --hover-bg:#fdecec;
 }
+.micro-action--ask-to-return{
+  --icon-url:url('../assets/return-icon.svg');
+  --icon-color:#d97706;
+  --hover-color:#92400e;
+  --hover-bg:#fef3c7;
+}
 
 @media (max-width: 900px){
   .tp-actionbar{
@@ -2705,6 +2711,8 @@ body.gp-shell-ready .gp-sidebar__scrim{
 .required-status-badge.is-approved{ background:#e8f7ee; color:#17854b; border-color:rgba(22,163,74,.18); }
 .required-status-badge.is-returned{ background:#fef0f0; color:#c53f3f; border-color:rgba(220,38,38,.16); }
 .required-section-note{margin-top:8px; padding:8px 10px; border-radius:12px; border:1px solid rgba(220,38,38,.14); background:rgba(254,240,240,.72); font-size:12px; color:#8f3a3a; line-height:1.45;}
+.section-return-request-notice{margin-top:6px; padding:6px 10px; border-radius:10px; border-left:3px solid #d97706; background:#fef9ec; font-size:12px; color:#92400e; line-height:1.45;}
+.section-return-request-notice strong{font-weight:700;}
 .required-actions{display:flex; align-items:center; justify-content:flex-end; gap:8px; flex-wrap:wrap;}
 .required-actions .micro-action{width:46px; min-width:46px; height:46px; padding:0 14px 0 0; box-shadow: inset 0 0 0 1px rgba(24,37,61,.04);}
 .required-actions .micro-action .micro-action__icon{flex:0 0 46px; width:46px; height:46px;}

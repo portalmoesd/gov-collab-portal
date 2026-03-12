@@ -81,6 +81,18 @@ async function ensureSchema() {
   await pool.query(`ALTER TABLE events ADD COLUMN IF NOT EXISTS lower_submitter_role TEXT DEFAULT 'collaborator_2'`).catch(()=>{});
   await pool.query(`ALTER TABLE tp_content ADD COLUMN IF NOT EXISTS original_submitter_role TEXT DEFAULT NULL`).catch(()=>{});
   await pool.query(`ALTER TABLE tp_content ADD COLUMN IF NOT EXISTS return_target_role TEXT DEFAULT NULL`).catch(()=>{});
+  await pool.query(`CREATE TABLE IF NOT EXISTS section_return_requests (
+    id SERIAL PRIMARY KEY,
+    event_id INTEGER NOT NULL,
+    country_id INTEGER NOT NULL,
+    section_id INTEGER NOT NULL,
+    requested_by_user_id INTEGER REFERENCES users(id),
+    requested_by_name TEXT NOT NULL,
+    requested_by_role TEXT NOT NULL,
+    directed_to_role TEXT NOT NULL,
+    note TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+  )`).catch(()=>{});
 
   // Ensure enum value exists for minister approvals (legacy DBs)
   await pool.query(`ALTER TYPE tp_section_status ADD VALUE IF NOT EXISTS 'approved_by_minister'`).catch(async ()=>{
@@ -352,6 +364,31 @@ function decisionStatusesForRole(roleKey) {
     'submitted_to_minister', 'returned_by_minister'
   ];
   return [];
+}
+
+// Determines which role currently holds the section (i.e. whose turn it is to act).
+function currentHolderRole(status, returnTargetRole, originalSubmitterRole, lowerSubmitterRole) {
+  const s = String(status || 'draft').toLowerCase();
+  const skipCurator = String(lowerSubmitterRole || 'collaborator_2').toLowerCase() !== 'collaborator_3';
+  if (s === 'draft' || s === 'in_progress') return normalizeRoleKey(originalSubmitterRole || 'collaborator_1');
+  if (s.startsWith('returned_')) return normalizeRoleKey(returnTargetRole || originalSubmitterRole || 'collaborator_1');
+  const directMap = {
+    submitted_to_collaborator_2: 'collaborator_2',
+    submitted_to_collaborator_3: 'collaborator_3',
+    submitted_to_collaborator:   'collaborator',
+    submitted_to_super_collaborator: 'super_collaborator',
+    submitted_to_supervisor: 'supervisor',
+    submitted_to_chairman:   'chairman',
+    submitted_to_minister:   'minister',
+  };
+  if (directMap[s]) return directMap[s];
+  if (s === 'approved_by_collaborator_2') return skipCurator ? 'collaborator' : 'collaborator_3';
+  if (s === 'approved_by_collaborator_3') return 'collaborator';
+  if (s === 'approved_by_collaborator')   return 'super_collaborator';
+  if (s === 'approved_by_super_collaborator') return 'supervisor';
+  if (s === 'approved_by_supervisor') return 'chairman';
+  if (s === 'approved_by_chairman')   return 'minister';
+  return normalizeRoleKey(originalSubmitterRole || 'collaborator_1');
 }
 
 async function getCurrentSectionStatus(eventId, countryId, sectionId) {
@@ -1591,6 +1628,8 @@ app.get('/api/tp', authRequired, async (req, res) => {
     t.html_content,
     t.status,
     t.status_comment,
+    t.return_target_role,
+    t.original_submitter_role,
     t.last_updated_at,
     u.full_name AS last_updated_by
   FROM tp_content t
@@ -1612,6 +1651,8 @@ return res.json({
   htmlContent: row.html_content || '',
   status: row.status || 'draft',
   statusComment: row.status_comment || null,
+  returnTargetRole: row.return_target_role || null,
+  originalSubmitterRole: row.original_submitter_role || null,
   lastUpdatedAt: row.last_updated_at,
   lastUpdatedBy: row.last_updated_by || null,
   stepNames: await (async () => {
@@ -1704,6 +1745,44 @@ app.post('/api/tp/save', authRequired, async (req, res) => {
     userId: req.user.id, userName: req.user.full_name || req.user.username, userRole: roleKey });
 
   return res.json({ success:true });
+});
+
+// Ask to Return — any user can request the current holder to return a section
+app.post('/api/tp/ask-to-return', authRequired, async (req, res) => {
+  try {
+    const eventId  = Number(req.body?.eventId);
+    const sectionId = Number(req.body?.sectionId);
+    const note = String(req.body?.note || '').trim();
+    if (!Number.isFinite(eventId) || !Number.isFinite(sectionId)) {
+      return res.status(400).json({ error: 'eventId and sectionId required' });
+    }
+    const countryId = await resolveCountryIdForEvent(eventId);
+    if (!countryId) return res.status(404).json({ error: 'Event not found' });
+
+    const row = await queryOne(
+      `SELECT status::text, return_target_role, original_submitter_role FROM tp_content WHERE event_id=$1 AND country_id=$2 AND section_id=$3`,
+      [eventId, countryId, sectionId]
+    );
+    const evMeta = await queryOne(`SELECT lower_submitter_role FROM events WHERE id=$1`, [eventId]);
+    const lsr = String(evMeta?.lower_submitter_role || 'collaborator_2').toLowerCase();
+
+    const holder = currentHolderRole(row?.status, row?.return_target_role, row?.original_submitter_role, lsr);
+    const roleKey = normalizeRoleKey(req.user.role_key);
+    if (holder === roleKey) {
+      return res.status(400).json({ error: 'Section is already at your stage — use Return directly.' });
+    }
+
+    await pool.query(
+      `INSERT INTO section_return_requests
+         (event_id, country_id, section_id, requested_by_user_id, requested_by_name, requested_by_role, directed_to_role, note, created_at)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,NOW())`,
+      [eventId, countryId, sectionId, req.user.id, req.user.full_name || req.user.username, roleKey, holder, note || null]
+    );
+    return res.json({ success: true, directedToRole: holder });
+  } catch (e) {
+    console.error('ask-to-return error', e);
+    return res.status(500).json({ error: 'Server error' });
+  }
 });
 
 app.post('/api/tp/submit', authRequired, attachUser, async (req, res) => {
@@ -2347,6 +2426,27 @@ app.get('/api/tp/status-grid', authRequired, async (req, res) => {
       }
     }
 
+    // Fetch the latest pending "Ask to Return" request directed at the current user's role
+    const returnRequestsBySection = {};
+    if (sectionIds.length) {
+      const rrRes = await pool.query(
+        `SELECT DISTINCT ON (section_id)
+           section_id, requested_by_name, requested_by_role, note, created_at
+         FROM section_return_requests
+         WHERE event_id=$1 AND section_id=ANY($2::int[]) AND directed_to_role=$3
+         ORDER BY section_id, created_at DESC`,
+        [eventId, sectionIds, roleKey]
+      );
+      for (const r of rrRes.rows) {
+        returnRequestsBySection[Number(r.section_id)] = {
+          from: r.requested_by_name,
+          fromRole: r.requested_by_role,
+          note: r.note || '',
+          at: r.created_at,
+        };
+      }
+    }
+
     res.json({
       event_id: eventId,
       country_id: countryId,
@@ -2362,6 +2462,7 @@ app.get('/api/tp/status-grid', authRequired, async (req, res) => {
         lowerSubmitterRole,
         originalSubmitterRole: r.original_submitter_role || null,
         returnTargetRole: r.return_target_role || null,
+        returnRequest: returnRequestsBySection[Number(r.id)] || null,
         stepNames: stepNames[Number(r.id)] || { collabI: null, collabII: null, collabIII: null, collaborator: null, superCollab: null },
       }))
     });

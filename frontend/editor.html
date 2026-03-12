@@ -6,10 +6,6 @@
   <title>GOV COLLAB PORTAL • Editor</title>
   <link rel="stylesheet" href="styles.css?v=20260307ed3" />
   <link rel="stylesheet" href="styles/apple.css?v=20260307ed3" />
-  <style>
-    /* Hide CKEditor security warning notification banner */
-    .cke_notification, .cke_notifications_area { display:none !important; }
-  </style>
 </head>
 <body>
 
@@ -54,19 +50,21 @@
           <span class="micro-action__icon" aria-hidden="true"></span>
           <span class="micro-action__label">Upload</span>
         </button>
+        <button class="micro-action micro-action--ask-to-return" id="btnAskToReturn" type="button" aria-label="Ask to Return" style="display:none;">
+          <span class="micro-action__icon" aria-hidden="true"></span>
+          <span class="micro-action__label">Ask to Return</span>
+        </button>
         <input type="file" id="fileInput" multiple style="display:none;" />
         </div>
       </div>
     </div>
   </div>
 
-  <div class="editor-frame"><textarea id="editor"></textarea></div>
-
+  <div class="editor-frame" id="editorFrame"></div>
   <div id="filesSection" class="editor-files-list" style="display:none;"></div>
 
   <div class="editor-foot">
     <div id="msg" class="small editor-msg"></div>
-    <div class="small muted editor-note">CKEditor loads from CDN. If blocked, the editor falls back to a plain textarea.</div>
   </div>
 </section>
 
@@ -75,7 +73,7 @@
   <script src="js/config.js"></script>
   <script src="js/api.js"></script>
   <script src="js/app.js"></script>
-  <script src="https://cdn.ckeditor.com/4.22.1/standard/ckeditor.js"></script>
+  <script src="js/rich-editor.js"></script>
   <script src="js/editor.js"></script>
 </body>
 </html>
