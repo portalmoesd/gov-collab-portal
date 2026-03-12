@@ -809,6 +809,19 @@ hr, .divider{
   background:linear-gradient(90deg, var(--wf-blue), var(--wf-blue-dark));
   box-shadow:0 4px 14px rgba(10,132,255,.18);
 }
+/* Awaiting-action placeholder — shown before anyone has acted on a section */
+.wf-progress--awaiting{
+  display:flex;
+  align-items:center;
+  min-height:52px;
+}
+.wf-progress__awaiting-label{
+  font-size:13px;
+  font-weight:600;
+  letter-spacing:.06em;
+  text-transform:uppercase;
+  color:#94a3b8;
+}
 @media (max-width: 900px){
   .wf-step__circle{ width:29px; height:29px; font-size:16px; }
   .wf-step__label{ font-size:13px; }

@@ -478,7 +478,22 @@
     return 0;
   };
 
+  // Returns true when a section has never been acted on:
+  // status is still 'draft' AND no actor names have been recorded yet.
+  function isAwaitingFirstAction(status, stepNames) {
+    if (String(status || '').toLowerCase() !== 'draft') return false;
+    if (!stepNames || typeof stepNames !== 'object') return true;
+    return !Object.values(stepNames).some(Boolean);
+  }
+
+  function awaitingProgressHtml() {
+    return `<div class="wf-progress wf-progress--awaiting" role="group" aria-label="Section workflow progress">
+      <span class="wf-progress__awaiting-label">Awaiting action</span>
+    </div>`;
+  }
+
   window.GCP.renderCollabSimpleProgress = function(status, stepNames, lsr, originalSubmitterRole, returnTargetRole) {
+    if (isAwaitingFirstAction(status, stepNames)) return awaitingProgressHtml();
     const skipCurator = String(lsr || 'collaborator_2').toLowerCase() !== 'collaborator_3';
     const steps = skipCurator
       ? ['Collaborator I', 'Head Collaborator', 'Waiting for Approval', 'Approved']
@@ -523,6 +538,7 @@
   // Steps before originalSubmitterRole are completely omitted (not greyed-out) so
   // the bar starts exactly where this section entered the pipeline.
   window.GCP.renderUpperTierProgress = function(status, stepNames, lsr, originalSubmitterRole, returnTargetRole) {
+    if (isAwaitingFirstAction(status, stepNames)) return awaitingProgressHtml();
     const skipCurator = String(lsr || 'collaborator_2').toLowerCase() !== 'collaborator_3';
     const sn = stepNames && typeof stepNames === 'object' ? stepNames : {};
     const allSteps = skipCurator
@@ -543,9 +559,9 @@
     let startStep = 0;
     if (originalSubmitterRole) {
       const osr = String(originalSubmitterRole).toLowerCase();
-      if (osr === 'collaborator_2')      startStep = 1;
-      else if (osr === 'collaborator_3') startStep = skipCurator ? 1 : 2;
-      else if (osr === 'collaborator')   startStep = skipCurator ? 2 : 3;
+      if (osr === 'collaborator_2')          startStep = 1;
+      else if (osr === 'collaborator_3')     startStep = skipCurator ? 1 : 2;
+      else if (osr === 'collaborator')       startStep = skipCurator ? 2 : 3;
       else if (osr === 'super_collaborator') startStep = skipCurator ? 3 : 4;
     }
     const visibleSteps = allSteps.slice(startStep);
