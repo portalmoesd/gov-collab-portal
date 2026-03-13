@@ -119,8 +119,10 @@
     if (isViewer) return;
 
     if (!isMyTurn(tp)) {
-      // Not this user's turn — editor is read-only; only Ask to Return is available
-      if (btnAskToReturn) btnAskToReturn.style.display = "";
+      // Not this user's turn — editor is read-only.
+      // Only show Ask to Return when someone else holds the section (non-draft).
+      // In draft state there is no current holder, so Ask to Return is meaningless.
+      if (s !== 'draft' && btnAskToReturn) btnAskToReturn.style.display = "";
       return;
     }
 
