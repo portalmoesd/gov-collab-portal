@@ -2896,17 +2896,21 @@ app.use((err, req, res, next) => {
   res.status(500).json({ error: 'Server error' });
 });
 
-(async () => {
-  try {
-    await ensureSchema();
-    await ensureRolesExist();
-    await ensureBaseData();
-    await ensureInitialAdmin();
-  } catch (err) {
-    console.error('Startup ensureSchema/ensureRoles failed:', err);
-  }
+if (require.main === module) {
+  (async () => {
+    try {
+      await ensureSchema();
+      await ensureRolesExist();
+      await ensureBaseData();
+      await ensureInitialAdmin();
+    } catch (err) {
+      console.error('Startup ensureSchema/ensureRoles failed:', err);
+    }
 
-  app.listen(PORT, () => {
-    console.log(`GOV COLLAB PORTAL API listening on port ${PORT}`);
-  });
-})();
+    app.listen(PORT, () => {
+      console.log(`GOV COLLAB PORTAL API listening on port ${PORT}`);
+    });
+  })();
+}
+
+module.exports = app;
