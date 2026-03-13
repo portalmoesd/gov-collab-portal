@@ -257,45 +257,94 @@
   function appendSectionActions(target, section){
     if (!target) return;
     target.innerHTML = '';
-
-    const wrap = document.createElement('div');
-    wrap.className = 'required-actions';
-
-    wrap.appendChild(createMicroAction('Open', 'open', () => {
-      window.open(`editor.html?event_id=${currentEventId}&section_id=${section.sectionId}`, '_blank');
+    const wrap=document.createElement('div'); wrap.className='required-actions';
+    const s=String(section.status||'').toLowerCase();
+    const rtr=String(section.returnTargetRole||'').toLowerCase();
+    wrap.appendChild(createMicroAction('Open','open',()=>{
+      window.location.href=`editor.html?event_id=${currentEventId}&section_id=${section.sectionId}`;
     }));
-
-    const sectionStatus = String(section.status || '').toLowerCase();
-    const canDecision = !['approved_by_chairman', 'approved_by_minister', 'locked'].includes(sectionStatus);
-    if (canDecision) {
-      wrap.appendChild(createMicroAction('Approve', 'approve', async () => {
+    const isAtMe=[
+      'submitted_to_chairman','returned_by_chairman',
+      'approved_by_supervisor',
+      'submitted_to_supervisor','returned_by_supervisor',
+      'approved_by_super_collaborator',
+      'submitted_to_super_collaborator','returned_by_super_collaborator',
+      'approved_by_collaborator','submitted_to_collaborator','returned_by_collaborator',
+      'approved_by_collaborator_3','submitted_to_collaborator_3','returned_by_collaborator_3',
+      'approved_by_collaborator_2','submitted_to_collaborator_2','returned_by_collaborator_2',
+    ].includes(s)||rtr==='chairman';
+    const canApprove=isAtMe||(s==='draft');
+    if(canApprove){
+      wrap.appendChild(createMicroAction('Approve','approve',async()=>{
+        if(!confirm('Approve this section?')) return;
         try{
-          await window.GCP.apiFetch('/tp/approve-section-chairman', {
-            method:'POST',
-            body: JSON.stringify({ eventId: currentEventId, sectionId: section.sectionId })
-          });
-          await refresh();
-        }catch(e){
-          setMsg(e.message || 'Failed to approve section', true);
-        }
+          await window.GCP.apiFetch('/tp/approve-section-chairman',{method:'POST',body:JSON.stringify({eventId:currentEventId,sectionId:section.sectionId})});
+          setMsg('Section approved.'); await refresh();
+        }catch(e){setMsg(e.message||'Approve failed',true);}
       }));
-
-      wrap.appendChild(createMicroAction('Return', 'return', async (e) => {
-        const note = await window.GCP.showCommentDropdown(e.currentTarget, { title: 'Return section', placeholder: 'Add a comment (optional)…', sendLabel: 'Return' }) || '';
-        if (note === null) return;
+      wrap.appendChild(createMicroAction('Return','return',async(e)=>{
+        const note=await window.GCP.showCommentDropdown(e.currentTarget,{title:'Return section',placeholder:'Add a comment (optional)…',sendLabel:'Return'});
+        if(note===null) return;
         try{
-          await window.GCP.apiFetch('/tp/return', {
-            method:'POST',
-            body: JSON.stringify({ eventId: currentEventId, sectionId: section.sectionId, note })
-          });
-          await refresh();
-        }catch(e){
-          setMsg(e.message || 'Failed to return section', true);
-        }
+          await window.GCP.apiFetch('/tp/return',{method:'POST',body:JSON.stringify({eventId:currentEventId,sectionId:section.sectionId,note})});
+          setMsg('Section returned.'); await refresh();
+        }catch(e){setMsg(e.message||'Return failed',true);}
       }));
     }
-
+    if(!canApprove){
+      wrap.appendChild(createMicroAction('Ask to Return','ask-to-return',async(e)=>{
+        const note=await window.GCP.showCommentDropdown(e.currentTarget,{title:'Ask to Return',placeholder:'Why do you need it back? (optional)…',sendLabel:'Send Request'});
+        if(note===null) return;
+        try{
+          await window.GCP.apiFetch('/tp/ask-to-return',{method:'POST',body:JSON.stringify({eventId:currentEventId,sectionId:section.sectionId,note})});
+          setMsg('Return request sent.');
+        }catch(e){setMsg(e.message||'Request failed',true);}
+      }));
+    }
     target.appendChild(wrap);
+  }
+
+  function renderRow(s){
+    const last=s.lastUpdatedAt?window.GCP.formatDateTime(s.lastUpdatedAt):'';
+    const note=(s.statusComment||'').trim();
+    const updatedBy=s.lastUpdatedBy||'—';
+    const progressHtml=window.GCP.renderUpperTierProgress(s.status, s.stepNames, s.lowerSubmitterRole, s.originalSubmitterRole, s.returnTargetRole);
+    const tr=document.createElement('tr'); tr.className='required-sections-row';
+    tr.innerHTML=`
+      <td>
+        <div class="required-section-name">${escape(s.sectionLabel||'')}</div>
+        <div class="required-section-meta">${escape(last||'—')} · ${escape(updatedBy)}</div>
+        ${note?`<div class="required-section-note"><b>Comment:</b> ${escape(note)}</div>`:''}
+        ${s.returnRequest?`<div class="section-return-request-notice"><strong>Return requested</strong> by ${escape(s.returnRequest.from||'')}: ${escape(s.returnRequest.note||'(no comment)')}</div>`:''}
+      </td>
+      <td class="required-progress-cell"><div class="lower-progress-inline">${progressHtml}</div><div class="section-history-toggle-mount"></div></td>
+      <td class="required-actions-cell"></td>
+    `;
+    appendSectionActions(tr.querySelector('.required-actions-cell'),s);
+    window.GCP.attachSectionHistoryToggle(tr.querySelector('.section-history-toggle-mount'), s, currentEventId, false);
+    return tr;
+  }
+
+  function renderCard(s){
+    const last=s.lastUpdatedAt?window.GCP.formatDateTime(s.lastUpdatedAt):'';
+    const note=(s.statusComment||'').trim();
+    const updatedBy=s.lastUpdatedBy||'—';
+    const progressHtml=window.GCP.renderUpperTierProgress(s.status, s.stepNames, s.lowerSubmitterRole, s.originalSubmitterRole, s.returnTargetRole);
+    const card=document.createElement('article'); card.className='required-section-card';
+    card.innerHTML=`
+      <div class="required-section-card__head">
+        <div class="required-section-name">${escape(s.sectionLabel||'')}</div>
+        <div class="required-section-meta">${escape(last||'—')} · ${escape(updatedBy)}</div>
+        ${note?`<div class="required-section-note"><b>Comment:</b> ${escape(note)}</div>`:''}
+        ${s.returnRequest?`<div class="section-return-request-notice"><strong>Return requested</strong> by ${escape(s.returnRequest.from||'')}: ${escape(s.returnRequest.note||'(no comment)')}</div>`:''}
+      </div>
+      <div class="lower-progress-inline">${progressHtml}</div>
+      <div class="section-history-toggle-mount"></div>
+      <div class="required-actions-card"></div>
+    `;
+    appendSectionActions(card.querySelector('.required-actions-card'),s);
+    window.GCP.attachSectionHistoryToggle(card.querySelector('.section-history-toggle-mount'), s, currentEventId, true);
+    return card;
   }
 
   async function loadEvents(){
@@ -330,7 +379,7 @@
       previewBtn.disabled = true;
       if (approveAllSectionsBtn) approveAllSectionsBtn.disabled = true;
       if (sectionsEmpty) sectionsEmpty.hidden = false;
-      sectionsTbody.innerHTML = `<tr class="required-sections-empty-row"><td colspan="5">Choose an event to review required sections.</td></tr>`;
+      sectionsTbody.innerHTML = `<tr class="required-sections-empty-row"><td colspan="3">Choose an event to review required sections.</td></tr>`;
       endEventBtn.style.display = 'none';
       return;
     }
@@ -358,48 +407,13 @@
 
     if (!currentSections.length){
       if (sectionsEmpty) sectionsEmpty.hidden = false;
-      sectionsTbody.innerHTML = `<tr class="required-sections-empty-row"><td colspan="5">No required sections yet.</td></tr>`;
+      sectionsTbody.innerHTML = `<tr class="required-sections-empty-row"><td colspan="3">No required sections yet.</td></tr>`;
       if (approveAllSectionsBtn) approveAllSectionsBtn.disabled = true;
     } else {
       if (approveAllSectionsBtn) approveAllSectionsBtn.disabled = false;
-      for (const s of currentSections){
-        const tr = document.createElement('tr');
-        tr.className = 'required-sections-row';
-        const lastUpdate = s.lastUpdatedAt ? window.GCP.formatDateTime(s.lastUpdatedAt) : '';
-        const note = (s.statusComment || '').trim();
-        const updatedBy = s.lastUpdatedBy || '—';
-        const badgeClass = statusBadgeClass(s.status);
-        tr.innerHTML = `
-          <td>
-            <div class="required-section-name">${escape(s.sectionLabel || '')}</div>
-            ${note ? `<div class="required-section-note"><b>Comment:</b> ${escape(note)}</div>` : ''}
-          </td>
-          <td><span class="required-status-badge ${badgeClass}">${escape(humanStatus(s.status))}</span></td>
-          <td><span class="required-updated-at">${escape(lastUpdate || '—')}</span></td>
-          <td><span class="required-updated-by">${escape(updatedBy)}</span></td>
-          <td class="required-actions-cell"></td>
-        `;
-        appendSectionActions(tr.querySelector('.required-actions-cell'), s);
-        sectionsTbody.appendChild(tr);
-
-        if (sectionsCards){
-          const card = document.createElement('article');
-          card.className = 'required-section-card';
-          card.innerHTML = `
-            <div class="required-section-card__top">
-              <div class="required-section-card__meta">
-                <div class="required-section-name">${escape(s.sectionLabel || '')}</div>
-                <div class="required-section-meta">Last update · ${escape(lastUpdate || '—')}</div>
-              </div>
-              <span class="required-status-badge ${badgeClass}">${escape(humanStatus(s.status))}</span>
-            </div>
-            <div class="required-section-card__line"><span>Updated by</span><strong>${escape(updatedBy)}</strong></div>
-            ${note ? `<div class="required-section-note"><b>Comment:</b> ${escape(note)}</div>` : ''}
-            <div class="required-actions-card"></div>
-          `;
-          appendSectionActions(card.querySelector('.required-actions-card'), s);
-          sectionsCards.appendChild(card);
-        }
+      for(const s of currentSections){
+        if(sectionsTbody) sectionsTbody.appendChild(renderRow(s));
+        if(sectionsCards) sectionsCards.appendChild(renderCard(s));
       }
     }
 

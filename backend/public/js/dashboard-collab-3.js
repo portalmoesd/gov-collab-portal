@@ -185,8 +185,11 @@
     const s=String(section.status||'').toLowerCase();
     const rtr=String(section.returnTargetRole||'').toLowerCase();
     const isAssigned=!!section.isAssigned;
-    // At me: section submitted/returned to Curator, OR explicitly returned to Curator
-    const isAtMe=['submitted_to_collaborator_3','returned_by_collaborator_3'].includes(s)||rtr==='collaborator_3';
+    // At me: section at Curator's stage, OR at/below Head Collaborator stage (Curator can bypass)
+    const isAtMe=[
+      'submitted_to_collaborator_3','returned_by_collaborator_3',
+      'approved_by_collaborator_2','submitted_to_collaborator_2','returned_by_collaborator_2',
+    ].includes(s)||rtr==='collaborator_3';
     // Can act as lowest: assigned section at draft state (skip Collab I and Head Collab)
     const canActAsLowest=isAssigned&&s==='draft';
     const canOpen=isAssigned||isAtMe||canActAsLowest;
