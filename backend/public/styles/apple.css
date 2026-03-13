@@ -1362,11 +1362,6 @@ body.gp-shell-ready .gp-sidebar__scrim{
   --hover-color:#92400e;
   --hover-bg:#fef3c7;
 }
-.micro-action--ask-to-return:hover,
-.micro-action--ask-to-return:focus-visible,
-.micro-action--ask-to-return.is-expanded{
-  width:220px;
-}
 
 @media (max-width: 900px){
   .tp-actionbar{
@@ -3937,3 +3932,10 @@ body.gp-shell-ready .gp-sidebar__scrim{
 [data-theme="dark"] .sh-stage-role{ opacity:.5; }
 [data-theme="dark"] .sh-actor{ color:#e0eaf6; }
 [data-theme="dark"] .sh-date{ color:#6b7280; }
+
+/* Ask to Return button on Editor page: wider expanded width to fit label */
+.tp-actionbar .micro-action--ask-to-return:hover,
+.tp-actionbar .micro-action--ask-to-return:focus-visible,
+.tp-actionbar .micro-action--ask-to-return.is-expanded{
+  width:210px;
+}

@@ -1362,11 +1362,6 @@ body.gp-shell-ready .gp-sidebar__scrim{
   --hover-color:#92400e;
   --hover-bg:#fef3c7;
 }
-.micro-action--ask-to-return:hover,
-.micro-action--ask-to-return:focus-visible,
-.micro-action--ask-to-return.is-expanded{
-  width:220px;
-}
 
 @media (max-width: 900px){
   .tp-actionbar{
@@ -3966,4 +3961,11 @@ body.gp-shell-ready .gp-sidebar__scrim{
     opacity:1;
     transform:translateX(0);
   }
+}
+
+/* Ask to Return button on Editor page: wider expanded width to fit label */
+.tp-actionbar .micro-action--ask-to-return:hover,
+.tp-actionbar .micro-action--ask-to-return:focus-visible,
+.tp-actionbar .micro-action--ask-to-return.is-expanded{
+  width:210px;
 }
