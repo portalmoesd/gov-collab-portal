@@ -294,11 +294,6 @@
       if(sectionsCards) sectionsCards.appendChild(renderCard(s));
     }
 
-    // Enable submit if any assigned section is approved_by_collaborator_3 or returned_by_collaborator
-    const canSubmit=currentSections.some(s=>{
-      const st=String(s.status||'').toLowerCase();
-      return st==='approved_by_collaborator_3'||st==='returned_by_collaborator';
-    });
   }
 
   async function loadUpcoming(){
@@ -323,7 +318,6 @@
       if(sectionsTbody) sectionsTbody.innerHTML='';
       if(sectionsCards) sectionsCards.innerHTML='';
       if(sectionsEmpty) sectionsEmpty.hidden=false;
-      if(submitDocBtn) submitDocBtn.disabled=true;
       if(docStatusBox) docStatusBox.innerHTML='';
       return;
     }
