@@ -647,8 +647,18 @@
       .map((s, i) => ({ ...s, _idx: i }))
       // Drop Supervisor / Deputy / Minister — section history never contains their actions
       .filter(s => !['supervisor','chairman','minister'].includes(s.role))
-      // Drop lower-tier roles that did not participate for this specific section
-      .filter(s => lowerRoleOrder.indexOf(s.role) < 0 || lowerRoleOrder.indexOf(s.role) >= startRoleIdx);
+      // Drop lower-tier roles that did not participate for this specific section.
+      // Exception: always keep collaborator_1 when the same person who acted as collaborator_1
+      // later became collaborator_2 (original editor promoted to Head Collaborator).
+      .filter(s => {
+        if (lowerRoleOrder.indexOf(s.role) < 0 || lowerRoleOrder.indexOf(s.role) >= startRoleIdx) return true;
+        if (s.role === 'collaborator_1' && startRoleIdx > 0) {
+          const col1Names = new Set((byRole['collaborator_1'] || []).map(ev => ev.user_name).filter(Boolean));
+          const col2Names = new Set((byRole['collaborator_2'] || []).map(ev => ev.user_name).filter(Boolean));
+          return [...col1Names].some(n => col2Names.has(n));
+        }
+        return false;
+      });
     // Group history events by role
     const byRole = {};
     for (const ev of historyArr) {
