@@ -97,8 +97,8 @@
     const s   = String(tp.status || 'draft').toLowerCase();
     const rtr = String(tp.returnTargetRole || '').toLowerCase();
     if (role === 'collaborator_1')     return s === 'draft' || rtr === 'collaborator_1';
-    if (role === 'collaborator_2')     return ['submitted_to_collaborator_2','returned_by_collaborator_2'].includes(s) || rtr === 'collaborator_2';
-    if (role === 'collaborator_3')     return ['submitted_to_collaborator_3','returned_by_collaborator_3'].includes(s) || rtr === 'collaborator_3';
+    if (role === 'collaborator_2')     return ['submitted_to_collaborator_2','returned_by_collaborator_2'].includes(s) || rtr === 'collaborator_2' || s === 'draft';
+    if (role === 'collaborator_3')     return ['submitted_to_collaborator_3','returned_by_collaborator_3'].includes(s) || rtr === 'collaborator_3' || s === 'draft';
     if (role === 'collaborator')       return ['submitted_to_collaborator','returned_by_collaborator','approved_by_collaborator_2','approved_by_collaborator_3'].includes(s) || rtr === 'collaborator' || s === 'draft';
     if (role === 'super_collaborator') return [
       'submitted_to_super_collaborator','returned_by_super_collaborator','approved_by_collaborator',
@@ -119,8 +119,10 @@
     if (isViewer) return;
 
     if (!isMyTurn(tp)) {
-      // Not this user's turn — editor is read-only; only Ask to Return is available
-      if (btnAskToReturn) btnAskToReturn.style.display = "";
+      // Not this user's turn — editor is read-only.
+      // Only show Ask to Return when someone else holds the section (non-draft).
+      // In draft state there is no current holder, so Ask to Return is meaningless.
+      if (s !== 'draft' && btnAskToReturn) btnAskToReturn.style.display = "";
       return;
     }
 

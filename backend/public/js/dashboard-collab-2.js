@@ -18,7 +18,6 @@
   const sectionsTbody      = document.getElementById('sectionsTbody');
   const sectionsCards      = document.getElementById('sectionsCards');
   const sectionsEmpty      = document.getElementById('sectionsEmpty');
-  const submitDocBtn       = document.getElementById('submitDocBtn');
   const previewFullBtn     = document.getElementById('previewFullBtn');
   const modalBackdrop      = document.getElementById('modalBackdrop');
   const modalContent       = document.getElementById('modalContent');
@@ -295,9 +294,6 @@
     currentSections=data.sections||[];
     currentLowerSubmitterRole=String(data.lowerSubmitterRole||'collaborator_2').toLowerCase();
     const skipCurator=currentLowerSubmitterRole!=='collaborator_3';
-    if(submitDocBtn){
-      submitDocBtn.textContent=skipCurator?'Submit approved sections to Collaborator':'Submit approved sections to Curator';
-    }
     if(sectionsTbody) sectionsTbody.innerHTML='';
     if(sectionsCards) sectionsCards.innerHTML='';
     if(sectionsEmpty) sectionsEmpty.hidden=true;
@@ -305,7 +301,6 @@
     if(!currentSections.length){
       if(sectionsEmpty) sectionsEmpty.hidden=false;
       if(sectionsTbody) sectionsTbody.innerHTML=`<tr class="required-sections-empty-row"><td colspan="3">No sections assigned to you for this event.</td></tr>`;
-      if(submitDocBtn) submitDocBtn.disabled=true;
       return;
     }
 
@@ -314,13 +309,6 @@
       if(sectionsCards) sectionsCards.appendChild(renderCard(s));
     }
 
-    // Enable submit based on pipeline: if skipping Curator, ready when approved_by_collaborator_2 or returned_by_collaborator
-    const canSubmit=currentSections.some(s=>{
-      const st=String(s.status||'').toLowerCase();
-      if(skipCurator) return st==='approved_by_collaborator_2'||st==='returned_by_collaborator';
-      return st==='approved_by_collaborator_2'||st==='returned_by_collaborator_3';
-    });
-    if(submitDocBtn){ submitDocBtn.disabled=!canSubmit; submitDocBtn.style.display=''; }
   }
 
   async function loadUpcoming(){
@@ -345,25 +333,11 @@
       if(sectionsTbody) sectionsTbody.innerHTML='';
       if(sectionsCards) sectionsCards.innerHTML='';
       if(sectionsEmpty) sectionsEmpty.hidden=false;
-      if(submitDocBtn) submitDocBtn.disabled=true;
       if(docStatusBox) docStatusBox.innerHTML='';
       return;
     }
     try{ await refreshStatusGrid(); }
     catch(e){ setMsg(e.message||'Failed to load sections',true); }
-  });
-
-  if(submitDocBtn) submitDocBtn.addEventListener('click', async()=>{
-    if(!currentEventId||submitDocBtn.disabled) return;
-    const dest=currentLowerSubmitterRole!=='collaborator_3'?'Collaborator':'Curator';
-    if(!confirm(`Submit approved sections to ${dest}?`)) return;
-    setMsg('');
-    try{
-      const result=await window.GCP.apiFetch('/tp/submit-approved-to-collaborator-3',{method:'POST',body:JSON.stringify({eventId:currentEventId})});
-      if(result&&Number(result.submitted||0)>0) setMsg(`Sections submitted to ${dest}.`);
-      else setMsg('No sections were ready to submit. Approve sections first.');
-      await refreshStatusGrid();
-    }catch(e){ setMsg(e.message||'Submit failed',true); }
   });
 
   if(previewFullBtn) previewFullBtn.addEventListener('click', async()=>{
