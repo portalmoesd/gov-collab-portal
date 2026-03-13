@@ -500,8 +500,8 @@
       : ['Collaborator I', 'Head Collaborator', 'Curator', 'Waiting for Approval', 'Approved'];
     const names = stepNames && typeof stepNames === 'object'
       ? (skipCurator
-          ? [stepNames.collabI || null, stepNames.collabII || null, stepNames.collaborator || null, stepNames.superCollab || null]
-          : [stepNames.collabI || null, stepNames.collabII || null, stepNames.collabIII || null, stepNames.collaborator || null, stepNames.superCollab || null])
+          ? [stepNames.collabI || null, stepNames.collabII || null, null, null]
+          : [stepNames.collabI || null, stepNames.collabII || null, stepNames.collabIII || null, null, null])
       : steps.map(() => null);
     // Determine the first participating step based on originalSubmitterRole
     let startStep = 0;
