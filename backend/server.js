@@ -1985,6 +1985,11 @@ app.post('/api/tp/return', requireRole('collaborator_2','collaborator_3','collab
     [eventId, countryId, sectionId, returnStatus, note, req.user.id, returnTarget]
   );
 
+  await pool.query(
+    `DELETE FROM section_return_requests WHERE event_id=$1 AND country_id=$2 AND section_id=$3`,
+    [eventId, countryId, sectionId]
+  );
+
   await recordHistory({ eventId, countryId, sectionId, action: 'returned', fromStatus: currentStatus, toStatus: returnStatus,
     userId: req.user.id, userName: req.user.full_name || req.user.username, userRole: roleKey, note });
 
@@ -2041,6 +2046,11 @@ app.post('/api/tp/approve-section', requireRole('super_collaborator','supervisor
       [eventId, countryId, sectionId, targetStatus, req.user.id]
     );
   }
+
+  await pool.query(
+    `DELETE FROM section_return_requests WHERE event_id=$1 AND country_id=$2 AND section_id=$3`,
+    [eventId, countryId, sectionId]
+  );
 
   await recordHistory({ eventId, countryId, sectionId, action: 'approved', fromStatus: currentStatus, toStatus: targetStatus,
     userId: req.user.id, userName: req.user.full_name || req.user.username, userRole: roleKey });

@@ -190,8 +190,9 @@
       'submitted_to_collaborator_3','returned_by_collaborator_3',
       'approved_by_collaborator_2','submitted_to_collaborator_2','returned_by_collaborator_2',
     ].includes(s)||rtr==='collaborator_3';
-    // Can act as lowest: assigned section at draft state (skip Collab I and Head Collab)
-    const canActAsLowest=isAssigned&&s==='draft';
+    // Can act as lowest: assigned section at draft state (skip Collab I and Head Collab),
+    // OR section returned to a lower tier but Curator is assigned and can step in
+    const canActAsLowest=isAssigned&&(s==='draft'||rtr==='collaborator_1'||rtr==='collaborator_2');
     const canOpen=isAssigned||isAtMe||canActAsLowest;
 
     if(canOpen){

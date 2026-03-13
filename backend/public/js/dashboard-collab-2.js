@@ -198,8 +198,9 @@
     const isAssigned=!!section.isAssigned;
     // At me: section is submitted/returned to Head Collab, OR explicitly returned to me
     const isAtMe=['submitted_to_collaborator_2','returned_by_collaborator_2'].includes(s)||rtr==='collaborator_2';
-    // Can act as lowest: assigned section at draft state (no Collab I first)
-    const canActAsLowest=isAssigned&&s==='draft';
+    // Can act as lowest: assigned section at draft state (no Collab I first),
+    // OR section returned to Collab I but Head Collab is assigned and can step in
+    const canActAsLowest=isAssigned&&(s==='draft'||rtr==='collaborator_1');
     const canOpen=isAssigned||isAtMe||canActAsLowest;
 
     if(canOpen){
