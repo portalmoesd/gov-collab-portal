@@ -3819,6 +3819,7 @@ body.gp-shell-ready .gp-sidebar__scrim{
 }
 
 .sh-timeline{ display:flex; flex-direction:column; gap:0; position:relative; }
+.sh-timeline--awaiting{ flex-direction:row; align-items:center; min-height:40px; }
 .sh-timeline::before{
   content:''; position:absolute; left:15px; top:8px; bottom:8px;
   width:2px; background:rgba(0,0,0,.08); border-radius:2px;
