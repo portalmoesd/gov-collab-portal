@@ -623,13 +623,24 @@
   }
 
   function renderHistoryTimeline(history, currentStatus, lsr, originalSubmitterRole) {
+    const historyArr = history || [];
+    const s = String(currentStatus || 'draft').toLowerCase();
+
+    // No actions recorded yet: show placeholder (mirrors progress bar behaviour)
+    if (historyArr.length === 0 && s === 'draft') {
+      return `<div class="sh-timeline sh-timeline--awaiting"><span class="wf-progress__awaiting-label">Awaiting action</span></div>`;
+    }
+
     const skipCurator = String(lsr || 'collaborator_2').toLowerCase() !== 'collaborator_3';
     const currentLevel = historyStageLevel(currentStatus, skipCurator);
 
     // Build the ordered stage list, tagging each with its index in the skipCurator-aware
     // full array so comparisons with currentLevel remain correct after further filtering.
     const lowerRoleOrder = ['collaborator_1','collaborator_2','collaborator_3','collaborator','super_collaborator'];
-    const osr = String(originalSubmitterRole || 'collaborator_1').toLowerCase();
+    // Use originalSubmitterRole when available; otherwise derive from the first recorded history entry
+    const firstEntryRole = historyArr.length > 0 ? (historyArr[0].user_role || '') : '';
+    const effectiveOsr = originalSubmitterRole || firstEntryRole || 'collaborator_1';
+    const osr = String(effectiveOsr).toLowerCase();
     const startRoleIdx = Math.max(0, lowerRoleOrder.indexOf(osr));
 
     const stages = (skipCurator ? HISTORY_STAGES.filter(s => s.role !== 'collaborator_3') : HISTORY_STAGES)
@@ -640,7 +651,7 @@
       .filter(s => lowerRoleOrder.indexOf(s.role) < 0 || lowerRoleOrder.indexOf(s.role) >= startRoleIdx);
     // Group history events by role
     const byRole = {};
-    for (const ev of (history || [])) {
+    for (const ev of historyArr) {
       const r = ev.user_role || '';
       if (!byRole[r]) byRole[r] = [];
       byRole[r].push(ev);
