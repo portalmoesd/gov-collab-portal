@@ -250,6 +250,7 @@
     try{
       const me = await window.GCP.apiFetch("/auth/me", { method:"GET" });
       localStorage.setItem("gcp_user", JSON.stringify(me));
+      window.GCP.me = me;
       buildSidebar(me);
       return me;
     }catch(err){
@@ -643,10 +644,28 @@
     const osr = String(effectiveOsr).toLowerCase();
     const startRoleIdx = Math.max(0, lowerRoleOrder.indexOf(osr));
 
+    // Group history events by role early — needed for stage-filtering decisions below
+    const byRole = {};
+    for (const ev of historyArr) {
+      const r = ev.user_role || '';
+      if (!byRole[r]) byRole[r] = [];
+      byRole[r].push(ev);
+    }
+
+    // Viewer role controls how much of the pipeline is exposed
+    const viewerRole = String(window.GCP.me?.role || '').toLowerCase();
+    const isLowerPipeline = ['collaborator_1','collaborator_2','collaborator_3'].includes(viewerRole);
+    // Highest stage index (in the skipCurator-aware _idx space) that lower-pipeline users see in full
+    const lowerCeilingIdx = skipCurator ? 1 : 2; // collaborator_2 or collaborator_3
+
     const stages = (skipCurator ? HISTORY_STAGES.filter(s => s.role !== 'collaborator_3') : HISTORY_STAGES)
       .map((s, i) => ({ ...s, _idx: i }))
-      // Drop Supervisor / Deputy / Minister — section history never contains their actions
-      .filter(s => !['supervisor','chairman','minister'].includes(s.role))
+      // Supervisor / Deputy / Minister: always hidden for lower-pipeline viewers;
+      // for everyone else shown only when they actually participated (have history entries).
+      .filter(s => {
+        if (!['supervisor','chairman','minister'].includes(s.role)) return true;
+        return !isLowerPipeline && (byRole[s.role] || []).length > 0;
+      })
       // Drop lower-tier roles that did not participate for this specific section.
       // Exception: always keep collaborator_1 when the same person who acted as collaborator_1
       // later became collaborator_2 (original editor promoted to Head Collaborator).
@@ -658,14 +677,9 @@
           return [...col1Names].some(n => col2Names.has(n));
         }
         return false;
-      });
-    // Group history events by role
-    const byRole = {};
-    for (const ev of historyArr) {
-      const r = ev.user_role || '';
-      if (!byRole[r]) byRole[r] = [];
-      byRole[r].push(ev);
-    }
+      })
+      // Lower-pipeline viewers (col1/col2/col3) only see detail up to their ceiling stage
+      .filter(s => !isLowerPipeline || s._idx <= lowerCeilingIdx);
 
     const stagesHtml = stages.map((stage) => {
       const events = byRole[stage.role] || [];
@@ -732,7 +746,19 @@
       </div>`;
     }).join('');
 
-    return `<div class="sh-timeline">${stagesHtml}</div>`;
+    // Lower-pipeline viewers: when the section has progressed past their ceiling, append one
+    // consolidated "In progress" stage instead of exposing upper-pipeline detail
+    const inProgressHtml = isLowerPipeline && currentLevel > lowerCeilingIdx
+      ? `<div class="sh-stage sh-stage--active">
+          <div class="sh-dot"></div>
+          <div class="sh-body">
+            <div class="sh-stage-label">In progress</div>
+            <div class="sh-events"><div class="sh-no-action">Under review by higher levels</div></div>
+          </div>
+        </div>`
+      : '';
+
+    return `<div class="sh-timeline">${stagesHtml}${inProgressHtml}</div>`;
   }
 
   // Attaches a history toggle button + lazy-loaded history row to a table row (tr) or card element.
