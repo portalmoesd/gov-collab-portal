@@ -99,7 +99,7 @@
     if (role === 'collaborator_1')     return s === 'draft' || rtr === 'collaborator_1';
     if (role === 'collaborator_2')     return ['submitted_to_collaborator_2','returned_by_collaborator_2'].includes(s) || rtr === 'collaborator_2';
     if (role === 'collaborator_3')     return ['submitted_to_collaborator_3','returned_by_collaborator_3'].includes(s) || rtr === 'collaborator_3';
-    if (role === 'collaborator')       return ['submitted_to_collaborator','returned_by_collaborator','approved_by_collaborator_2','approved_by_collaborator_3'].includes(s) || rtr === 'collaborator';
+    if (role === 'collaborator')       return ['submitted_to_collaborator','returned_by_collaborator','approved_by_collaborator_2','approved_by_collaborator_3'].includes(s) || rtr === 'collaborator' || s === 'draft';
     if (role === 'super_collaborator') return [
       'submitted_to_super_collaborator','returned_by_super_collaborator','approved_by_collaborator',
       'submitted_to_collaborator','returned_by_collaborator','approved_by_collaborator_3',

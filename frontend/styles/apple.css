@@ -3932,3 +3932,33 @@ body.gp-shell-ready .gp-sidebar__scrim{
 [data-theme="dark"] .sh-stage-role{ opacity:.5; }
 [data-theme="dark"] .sh-actor{ color:#e0eaf6; }
 [data-theme="dark"] .sh-date{ color:#6b7280; }
+
+/* Save button: always expanded, no folding */
+.tp-actionbar .micro-action--save,
+.tp-actionbar .micro-action--save:hover,
+.tp-actionbar .micro-action--save:focus-visible{
+  width:176px;
+}
+.tp-actionbar .micro-action--save .micro-action__label{
+  opacity:1;
+  transform:translateX(0);
+  display:block;
+}
+.tp-actionbar .micro-action--save[disabled]:hover,
+.tp-actionbar .micro-action--save[disabled]:focus-visible{
+  width:176px;
+}
+@media (max-width: 900px){
+  .tp-actionbar .micro-action--save,
+  .tp-actionbar .micro-action--save:hover,
+  .tp-actionbar .micro-action--save:focus-visible{
+    width:176px;
+    min-width:176px;
+    padding:0 22px 0 0;
+  }
+  .tp-actionbar .micro-action--save .micro-action__label{
+    display:block;
+    opacity:1;
+    transform:translateX(0);
+  }
+}
