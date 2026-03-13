@@ -1362,6 +1362,11 @@ body.gp-shell-ready .gp-sidebar__scrim{
   --hover-color:#92400e;
   --hover-bg:#fef3c7;
 }
+.micro-action--ask-to-return:hover,
+.micro-action--ask-to-return:focus-visible,
+.micro-action--ask-to-return.is-expanded{
+  width:220px;
+}
 
 @media (max-width: 900px){
   .tp-actionbar{
