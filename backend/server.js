@@ -1876,6 +1876,12 @@ app.post('/api/tp/submit', authRequired, attachUser, async (req, res) => {
     }
   }
 
+  // Clear any pending return requests for this section now that it has been re-submitted
+  await pool.query(
+    `DELETE FROM section_return_requests WHERE event_id=$1 AND country_id=$2 AND section_id=$3`,
+    [eventId, countryId, sectionId]
+  );
+
   await recordHistory({ eventId, countryId, sectionId, action: 'submitted', fromStatus, toStatus: targetStatus,
     userId: req.user.id, userName: req.user.full_name || req.user.username, userRole: roleKey });
 
