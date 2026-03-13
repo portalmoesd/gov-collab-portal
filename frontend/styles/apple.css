@@ -1338,6 +1338,19 @@ body.gp-shell-ready .gp-sidebar__scrim{
   --hover-color:#111827;
   --hover-bg:#f1f5f9;
 }
+/* Save button is always fully expanded — never folds */
+#btnSave,
+#btnSave:hover,
+#btnSave:focus-visible,
+#btnSave[disabled],
+#btnSave[disabled]:hover,
+#btnSave[disabled]:focus-visible{
+  width:176px;
+}
+#btnSave .micro-action__label{
+  opacity:1;
+  transform:translateX(0);
+}
 .micro-action--submit{
   --icon-url:url('../assets/submit-icon.svg');
   --icon-color:#1d4ed8;
@@ -1383,6 +1396,13 @@ body.gp-shell-ready .gp-sidebar__scrim{
   .micro-action__icon{ flex-basis:52px; width:52px; height:52px; }
   .micro-action__icon::before{ width:24px; height:24px; }
   .micro-action__label{ display:none; }
+  /* Restore compact size for Save on mobile */
+  #btnSave,
+  #btnSave:hover,
+  #btnSave:focus-visible,
+  #btnSave[disabled],
+  #btnSave[disabled]:hover,
+  #btnSave[disabled]:focus-visible{ width:52px; min-width:52px; }
 }
 
 
