@@ -2449,9 +2449,9 @@ app.get('/api/tp/status-grid', authRequired, async (req, res) => {
         `SELECT DISTINCT ON (section_id)
            section_id, requested_by_name, requested_by_role, note, created_at
          FROM section_return_requests
-         WHERE event_id=$1 AND section_id=ANY($2::int[]) AND directed_to_role=$3
+         WHERE event_id=$1 AND section_id=ANY($2::int[])
          ORDER BY section_id, created_at DESC`,
-        [eventId, sectionIds, roleKey]
+        [eventId, sectionIds]
       );
       for (const r of rrRes.rows) {
         returnRequestsBySection[Number(r.section_id)] = {
