@@ -23,6 +23,7 @@
     else if (r === "collaborator") location.href = "dashboard-collab-review.html";
     else if (r === "collaborator_2") location.href = "dashboard-collab-2.html";
     else if (r === "collaborator_1") location.href = "dashboard-collab.html";
+    else if (r === "collaborator_3") location.href = "dashboard-collab-3.html";
     else if (r === "protocol") location.href = "calendar.html";
     else if (r === "minister") location.href = "calendar.html";
     else location.href = "statistics.html";

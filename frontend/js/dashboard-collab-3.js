@@ -18,7 +18,6 @@
   const sectionsTbody      = document.getElementById('sectionsTbody');
   const sectionsCards      = document.getElementById('sectionsCards');
   const sectionsEmpty      = document.getElementById('sectionsEmpty');
-  const submitDocBtn       = document.getElementById('submitDocBtn');
   const previewFullBtn     = document.getElementById('previewFullBtn');
   const modalBackdrop      = document.getElementById('modalBackdrop');
   const modalContent       = document.getElementById('modalContent');
@@ -287,7 +286,6 @@
     if(!currentSections.length){
       if(sectionsEmpty) sectionsEmpty.hidden=false;
       if(sectionsTbody) sectionsTbody.innerHTML=`<tr class="required-sections-empty-row"><td colspan="3">No sections assigned to you for this event.</td></tr>`;
-      if(submitDocBtn) submitDocBtn.disabled=true;
       return;
     }
 
@@ -301,7 +299,6 @@
       const st=String(s.status||'').toLowerCase();
       return st==='approved_by_collaborator_3'||st==='returned_by_collaborator';
     });
-    if(submitDocBtn){ submitDocBtn.disabled=!canSubmit; submitDocBtn.style.display=''; }
   }
 
   async function loadUpcoming(){
@@ -332,18 +329,6 @@
     }
     try{ await refreshStatusGrid(); }
     catch(e){ setMsg(e.message||'Failed to load sections',true); }
-  });
-
-  if(submitDocBtn) submitDocBtn.addEventListener('click', async()=>{
-    if(!currentEventId||submitDocBtn.disabled) return;
-    if(!confirm('Submit approved sections to Collaborator?')) return;
-    setMsg('');
-    try{
-      const result=await window.GCP.apiFetch('/tp/submit-approved-to-collaborator',{method:'POST',body:JSON.stringify({eventId:currentEventId})});
-      if(result&&Number(result.submitted||0)>0) setMsg('Sections submitted to Collaborator.');
-      else setMsg('No sections were ready to submit. Approve sections first.');
-      await refreshStatusGrid();
-    }catch(e){ setMsg(e.message||'Submit failed',true); }
   });
 
   if(previewFullBtn) previewFullBtn.addEventListener('click', async()=>{

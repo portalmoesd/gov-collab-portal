@@ -1607,6 +1607,21 @@ app.get('/api/tp', authRequired, async (req, res) => {
         ok = decisionStatusesForRole(roleKey).includes(currentStatus);
       }
     }
+    // collaborator_2 / collaborator_3 may be section-assigned without country assignment;
+    // allow access when section is assigned to them and status is draft or their decision status.
+    if (!ok && ['collaborator_2','collaborator_3'].includes(roleKey)) {
+      const countryIdForAccess = await resolveCountryIdForEvent(eventId);
+      if (countryIdForAccess) {
+        const currentStatus = await getCurrentSectionStatus(eventId, countryIdForAccess, sectionId);
+        const assignedSections = await getAssignedSectionIds(req.user.id);
+        const required = await queryOne(
+          `SELECT 1 AS ok FROM event_required_sections WHERE event_id=$1 AND section_id=$2`,
+          [eventId, sectionId]
+        );
+        ok = !!required && assignedSections.includes(Number(sectionId)) &&
+             (currentStatus === 'draft' || decisionStatusesForRole(roleKey).includes(currentStatus));
+      }
+    }
     if (!ok) return res.status(403).json({ error: 'Forbidden' });
   }
 
@@ -1703,6 +1718,19 @@ app.post('/api/tp/save', authRequired, async (req, res) => {
       if (countryIdForAccess) {
         const currentStatus = await getCurrentSectionStatus(eventId, countryIdForAccess, sectionId);
         ok = decisionStatusesForRole(roleKey).includes(currentStatus);
+      }
+    }
+    if (!ok && ['collaborator_2','collaborator_3'].includes(roleKey)) {
+      const countryIdForAccess = await resolveCountryIdForEvent(eventId);
+      if (countryIdForAccess) {
+        const currentStatus = await getCurrentSectionStatus(eventId, countryIdForAccess, sectionId);
+        const assignedSections = await getAssignedSectionIds(req.user.id);
+        const required = await queryOne(
+          `SELECT 1 AS ok FROM event_required_sections WHERE event_id=$1 AND section_id=$2`,
+          [eventId, sectionId]
+        );
+        ok = !!required && assignedSections.includes(Number(sectionId)) &&
+             (currentStatus === 'draft' || decisionStatusesForRole(roleKey).includes(currentStatus));
       }
     }
     if (!ok) return res.status(403).json({ error: 'Forbidden' });
@@ -1817,6 +1845,19 @@ app.post('/api/tp/submit', authRequired, attachUser, async (req, res) => {
     if (countryIdForAccess) {
       const currentStatus = await getCurrentSectionStatus(eventId, countryIdForAccess, sectionId);
       ok = decisionStatusesForRole(roleKey).includes(currentStatus);
+    }
+  }
+  if (!ok && ['collaborator_2','collaborator_3'].includes(roleKey)) {
+    const countryIdForAccess = await resolveCountryIdForEvent(eventId);
+    if (countryIdForAccess) {
+      const currentStatus = await getCurrentSectionStatus(eventId, countryIdForAccess, sectionId);
+      const assignedSections = await getAssignedSectionIds(req.user.id);
+      const required = await queryOne(
+        `SELECT 1 AS ok FROM event_required_sections WHERE event_id=$1 AND section_id=$2`,
+        [eventId, sectionId]
+      );
+      ok = !!required && assignedSections.includes(Number(sectionId)) &&
+           (currentStatus === 'draft' || decisionStatusesForRole(roleKey).includes(currentStatus));
     }
   }
   if (!ok) return res.status(403).json({ error: 'Forbidden' });

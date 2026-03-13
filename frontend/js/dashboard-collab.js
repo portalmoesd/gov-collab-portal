@@ -15,11 +15,7 @@
   if (role !== 'collaborator_1'){ location.href = roleHome[role] || 'login.html'; return; }
 
   const eventSelect        = document.getElementById('eventSelect');
-  const sectionSelect      = document.getElementById('sectionSelect');
-  const openBtn            = document.getElementById('openEditorBtn');
   const msg                = document.getElementById('msg');
-  const sectionStatusBox   = document.getElementById('sectionStatusBox');
-  const openEditorSection  = document.getElementById('openEditorSection');
   const sectionsTbody      = document.getElementById('sectionsTbody');
   const sectionsCards      = document.getElementById('sectionsCards');
   const sectionsEmpty      = document.getElementById('sectionsEmpty');
@@ -159,18 +155,6 @@
     return map[s]||(s||'Draft');
   }
 
-  async function showSectionStatus(eventId, tp){
-    if(!sectionStatusBox) return;
-    if(!tp){ sectionStatusBox.style.display='none'; return; }
-    const note=(tp.statusComment||'').trim();
-    if(note){
-      sectionStatusBox.style.display='block';
-      sectionStatusBox.innerHTML=`<div style="padding:8px 10px;border-radius:10px;border:1px solid rgba(220,38,38,.25);background:rgba(254,226,226,.55);"><b>Return comment:</b> ${esc(note)}</div>`;
-    } else {
-      sectionStatusBox.style.display='none';
-    }
-  }
-
   function createMicroAction(label, kind, onClick){
     const btn=document.createElement('button'); btn.type='button';
     btn.className=`micro-action required-action required-action--${kind}`;
@@ -275,14 +259,11 @@
   }
 
   setupCustomDropdown(eventSelect);
-  setupCustomDropdown(sectionSelect);
 
   async function loadUpcoming(){
     const events = await window.GCP.apiFetch('/events/upcoming',{method:'GET'});
     eventMeta={};
     eventSelect.innerHTML=`<option value="">Select event...</option>`;
-    sectionSelect.innerHTML=`<option value="">Select section...</option>`;
-    sectionSelect.disabled=true;
     for(const ev of (events||[])){
       eventMeta[ev.id]={ occasion:ev.task||ev.occasion||'', country:ev.country_name_en||'' };
       const opt=document.createElement('option');
@@ -291,24 +272,6 @@
       eventSelect.appendChild(opt);
     }
     refreshCustomDropdown(eventSelect);
-    refreshCustomDropdown(sectionSelect);
-  }
-
-  async function loadSectionsForEvent(eventId){
-    sectionSelect.innerHTML=`<option value="">Loading...</option>`;
-    sectionSelect.disabled=true;
-    refreshCustomDropdown(sectionSelect);
-    const r=await window.GCP.apiFetch(`/my/sections?event_id=${encodeURIComponent(eventId)}`,{method:'GET'});
-    const sections=(r.sections||[]).slice().sort((a,b)=>((a.order_index||0)-(b.order_index||0)));
-    sectionSelect.innerHTML=`<option value="">Select section...</option>`;
-    for(const s of sections){
-      const opt=document.createElement('option');
-      opt.value=(s.id!=null?s.id:s.section_id);
-      opt.textContent=s.label;
-      sectionSelect.appendChild(opt);
-    }
-    sectionSelect.disabled=false;
-    refreshCustomDropdown(sectionSelect);
   }
 
   eventSelect.addEventListener('change', async()=>{
@@ -316,33 +279,13 @@
     const eventId=Number(eventSelect.value);
     currentEventId=(Number.isFinite(eventId)&&eventId>0)?eventId:null;
     if(!currentEventId){
-      sectionSelect.innerHTML=`<option value="">Select section...</option>`; sectionSelect.disabled=true; refreshCustomDropdown(sectionSelect); showSectionStatus(null,null);
       if(sectionsTbody) sectionsTbody.innerHTML='';
       if(sectionsCards) sectionsCards.innerHTML='';
       if(sectionsEmpty) sectionsEmpty.hidden=false;
       return;
     }
-    try{ await Promise.all([loadSectionsForEvent(currentEventId), refreshStatusGrid()]); showSectionStatus(currentEventId,null); }
+    try{ await refreshStatusGrid(); }
     catch(e){ setMsg(e.message||'Failed to load sections',true); }
-  });
-
-  sectionSelect.addEventListener('change', async()=>{
-    setMsg('');
-    const eventId=Number(eventSelect.value);
-    const sectionId=Number(sectionSelect.value);
-    if(!Number.isFinite(eventId)||!Number.isFinite(sectionId)){ showSectionStatus(eventId,null); return; }
-    try{
-      const tp=await window.GCP.apiFetch(`/tp?event_id=${encodeURIComponent(eventId)}&section_id=${encodeURIComponent(sectionId)}`,{method:'GET'});
-      showSectionStatus(eventId,tp);
-    }catch(e){ showSectionStatus(eventId,null); }
-  });
-
-  if(openBtn) openBtn.addEventListener('click',()=>{
-    setMsg('');
-    const eventId=Number(eventSelect.value);
-    const sectionId=Number(sectionSelect.value);
-    if(!Number.isFinite(eventId)||!Number.isFinite(sectionId)){ setMsg('Please select an event and a section.',true); return; }
-    window.location.href=`editor.html?event_id=${eventId}&section_id=${sectionId}`;
   });
 
   // Refresh on back-navigation
