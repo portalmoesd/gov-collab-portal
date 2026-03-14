@@ -241,7 +241,7 @@
   function createMicroAction(label, kind, onClick){
     const btn = document.createElement('button');
     btn.type = 'button';
-    btn.className = `micro-action required-action required-action--${kind}`;
+    btn.className = `micro-action micro-action--${kind} required-action required-action--${kind}`;
     btn.setAttribute('aria-label', label);
     btn.innerHTML = `<span class="micro-action__icon"></span><span class="micro-action__label">${escape(label)}</span>`;
     btn.addEventListener('click', onClick);
