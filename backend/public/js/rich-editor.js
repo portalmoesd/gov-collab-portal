@@ -1,6 +1,14 @@
 /**
  * GCP Rich Editor — lightweight contenteditable editor (no external deps)
- * Exposes: window.GCP.RichEditor({ container, initialHtml, authorName }) → { getHtml, getCleanHtml, setHtml, destroy, focus, acceptAllChanges, rejectAllChanges, hasTrackedChanges }
+ * Exposes: window.GCP.RichEditor({ container, initialHtml, authorName })
+ *
+ * Track Changes behaviour:
+ *  - Changes are ALWAYS recorded as <ins>/<del> markup in the DOM.
+ *  - The TC button is a "Show / Hide Changes" toggle, NOT a tracking toggle.
+ *  - By default markup is invisible (ins looks like normal text, del is hidden).
+ *  - Clicking TC reveals the markup with colour coding.
+ *  - Self-corrections: deleting text that you yourself just inserted removes
+ *    the <ins> silently — nothing shows in track changes.
  */
 (function () {
 
@@ -73,22 +81,39 @@
     [data-theme="dark"] .gcp-re-select:hover { background:rgba(255,255,255,.07); }
     [data-theme="dark"] .gcp-re-color-a { color:#c0cce0; }
 
-    /* Track Changes */
-    .gcp-re-btn.tc-on { background:rgba(245,158,11,.18); border-color:rgba(217,119,6,.45); color:#92400e; }
+    /* Track Changes — TC button */
+    .gcp-re-tc-badge { display:inline-flex; align-items:center; justify-content:center; min-width:15px; height:15px; padding:0 3px; border-radius:999px; background:rgba(220,38,38,.16); color:#b91c1c; font-size:10px; font-weight:800; line-height:1; margin-left:3px; vertical-align:middle; }
+    .gcp-re-btn.tc-active { background:rgba(245,158,11,.16); border-color:rgba(217,119,6,.40); color:#92400e; }
+    .gcp-re-btn.tc-active .gcp-re-tc-badge { background:rgba(59,130,246,.15); color:#1d4ed8; }
+    [data-theme="dark"] .gcp-re-btn.tc-active { background:rgba(245,158,11,.22); color:#fcd34d; }
+
+    /* TC bar (shown only when changes are visible) */
     .gcp-re-tc-bar { display:flex; align-items:center; gap:8px; padding:5px 10px; border-bottom:1px solid var(--border,#e5e7eb); background:rgba(245,158,11,.07); font-size:12px; font-weight:600; color:#78350f; flex-wrap:wrap; }
     .gcp-re-tc-status { flex:1; min-width:0; }
+    .gcp-re-tc-authors { font-size:11px; font-weight:500; color:#92400e; margin-top:2px; }
     .gcp-re-tc-actions { display:flex; gap:5px; flex-shrink:0; }
     .gcp-re-tc-action { padding:2px 9px; border-radius:6px; border:1px solid; cursor:pointer; font-size:11px; font-weight:700; background:transparent; line-height:1.6; }
     .gcp-re-tc-action.accept { border-color:rgba(22,163,74,.35); color:#15803d; }
     .gcp-re-tc-action.accept:hover { background:rgba(22,163,74,.1); }
     .gcp-re-tc-action.reject { border-color:rgba(220,38,38,.35); color:#b91c1c; }
     .gcp-re-tc-action.reject:hover { background:rgba(220,38,38,.1); }
-    .gcp-re-body ins[data-tc-id] { text-decoration:underline; text-decoration-color:rgba(22,163,74,.8); background:rgba(22,163,74,.12); border-radius:2px; padding:0 1px; cursor:default; font-style:normal; }
-    .gcp-re-body del[data-tc-id] { text-decoration:line-through; text-decoration-color:rgba(220,38,38,.8); background:rgba(220,38,38,.12); border-radius:2px; padding:0 1px; cursor:default; }
-    [data-theme="dark"] .gcp-re-btn.tc-on { background:rgba(245,158,11,.22); color:#fcd34d; }
     [data-theme="dark"] .gcp-re-tc-bar { background:rgba(120,80,10,.18); color:#fcd34d; }
-    [data-theme="dark"] .gcp-re-body ins[data-tc-id] { background:rgba(22,163,74,.22); }
-    [data-theme="dark"] .gcp-re-body del[data-tc-id] { background:rgba(220,38,38,.22); }
+
+    /* Track Changes markup — HIDDEN by default */
+    .gcp-re-body ins[data-tc-id] { text-decoration:none; background:none; padding:0; font-style:normal; }
+    .gcp-re-body del[data-tc-id] { display:none; }
+
+    /* Track Changes markup — VISIBLE when .tc-visible is on the wrap */
+    .gcp-re-wrap.tc-visible .gcp-re-body ins[data-tc-id] {
+      text-decoration:underline; text-decoration-color:rgba(22,163,74,.8);
+      background:rgba(22,163,74,.12); border-radius:2px; padding:0 1px; cursor:default; font-style:normal;
+    }
+    .gcp-re-wrap.tc-visible .gcp-re-body del[data-tc-id] {
+      display:inline; text-decoration:line-through; text-decoration-color:rgba(220,38,38,.8);
+      background:rgba(220,38,38,.12); border-radius:2px; padding:0 1px; cursor:default;
+    }
+    [data-theme="dark"] .gcp-re-wrap.tc-visible .gcp-re-body ins[data-tc-id] { background:rgba(22,163,74,.22); }
+    [data-theme="dark"] .gcp-re-wrap.tc-visible .gcp-re-body del[data-tc-id] { background:rgba(220,38,38,.22); }
   `;
 
   let styleInjected = false;
@@ -110,7 +135,6 @@
     const range = sel.getRangeAt(0);
     let block = range.commonAncestorContainer;
     while (block && block.nodeType !== Node.ELEMENT_NODE) block = block.parentNode;
-    // If already that heading, convert to paragraph
     if (block && block.tagName && block.tagName.toLowerCase() === tag) {
       document.execCommand('formatBlock', false, 'p');
     } else {
@@ -124,12 +148,10 @@
     const wrap = document.createElement('div');
     wrap.className = 'gcp-re-wrap';
 
-    // Toolbar
     const toolbar = document.createElement('div');
     toolbar.className = 'gcp-re-toolbar';
     toolbar.setAttribute('aria-label', 'Editor toolbar');
 
-    // Body (created early so save/restore can reference it)
     const body = document.createElement('div');
     body.className = 'gcp-re-body';
     body.contentEditable = 'true';
@@ -138,17 +160,31 @@
     body.setAttribute('data-placeholder', placeholder || 'Start typing…');
     if (initialHtml) body.innerHTML = initialHtml;
 
-    // --- Track Changes state ---
-    const tc = { enabled: false, authorName: authorName || 'Unknown', counter: 0 };
+    // ── Track Changes state ──────────────────────────────────────────────────
+    // Tracking is ALWAYS on. tc.visible controls the Show/Hide toggle only.
+    const tc = {
+      visible:    false,
+      authorName: authorName || 'Unknown',
+      counter:    0,
+    };
     function newTcId() { return `tc${Date.now()}${++tc.counter}`; }
 
-    // TC bar (sits between toolbar and body)
+    // ── TC bar (between toolbar and body) ────────────────────────────────────
     const tcBar = document.createElement('div');
     tcBar.className = 'gcp-re-tc-bar';
     tcBar.style.display = 'none';
 
-    const tcStatus = document.createElement('span');
+    const tcStatusWrap = document.createElement('div');
+    tcStatusWrap.style.flex = '1';
+
+    const tcStatus = document.createElement('div');
     tcStatus.className = 'gcp-re-tc-status';
+
+    const tcAuthors = document.createElement('div');
+    tcAuthors.className = 'gcp-re-tc-authors';
+
+    tcStatusWrap.appendChild(tcStatus);
+    tcStatusWrap.appendChild(tcAuthors);
 
     const tcActionsEl = document.createElement('div');
     tcActionsEl.className = 'gcp-re-tc-actions';
@@ -165,168 +201,133 @@
 
     tcActionsEl.appendChild(tcAcceptAll);
     tcActionsEl.appendChild(tcRejectAll);
-    tcBar.appendChild(tcStatus);
+    tcBar.appendChild(tcStatusWrap);
     tcBar.appendChild(tcActionsEl);
 
-    // --- Selection save/restore (needed for dropdowns & color picker) ---
+    // ── Selection save/restore ───────────────────────────────────────────────
     let savedRange = null;
-
     function saveSelection() {
       const sel = window.getSelection();
       if (sel && sel.rangeCount > 0) savedRange = sel.getRangeAt(0).cloneRange();
     }
-
     function restoreSelection() {
       if (!savedRange) return;
       const sel = window.getSelection();
       sel.removeAllRanges();
       sel.addRange(savedRange);
     }
-
-    // Save selection whenever editor loses focus (e.g. user clicks a select)
     body.addEventListener('focusout', saveSelection);
 
-    // --- Font family select ---
+    // ── Font family ──────────────────────────────────────────────────────────
     const fontFamilySelect = document.createElement('select');
     fontFamilySelect.className = 'gcp-re-select';
     fontFamilySelect.title = 'Font family';
     fontFamilySelect.setAttribute('aria-label', 'Font family');
     FONT_FAMILIES.forEach(f => {
       const opt = document.createElement('option');
-      opt.value = f.value;
-      opt.textContent = f.label;
+      opt.value = f.value; opt.textContent = f.label;
       fontFamilySelect.appendChild(opt);
     });
     fontFamilySelect.addEventListener('mousedown', saveSelection);
     fontFamilySelect.addEventListener('change', () => {
-      if (fontFamilySelect.value) {
-        restoreSelection();
-        execCmd('fontName', fontFamilySelect.value);
-      }
-      fontFamilySelect.value = '';
-      body.focus();
+      if (fontFamilySelect.value) { restoreSelection(); execCmd('fontName', fontFamilySelect.value); }
+      fontFamilySelect.value = ''; body.focus();
     });
     toolbar.appendChild(fontFamilySelect);
 
-    // --- Font size select ---
+    // ── Font size ────────────────────────────────────────────────────────────
     const fontSizeSelect = document.createElement('select');
     fontSizeSelect.className = 'gcp-re-select';
     fontSizeSelect.title = 'Font size';
     fontSizeSelect.setAttribute('aria-label', 'Font size');
     FONT_SIZES.forEach(f => {
       const opt = document.createElement('option');
-      opt.value = f.value;
-      opt.textContent = f.label;
+      opt.value = f.value; opt.textContent = f.label;
       fontSizeSelect.appendChild(opt);
     });
     fontSizeSelect.addEventListener('mousedown', saveSelection);
     fontSizeSelect.addEventListener('change', () => {
-      if (fontSizeSelect.value) {
-        restoreSelection();
-        execCmd('fontSize', fontSizeSelect.value);
-      }
-      fontSizeSelect.value = '';
-      body.focus();
+      if (fontSizeSelect.value) { restoreSelection(); execCmd('fontSize', fontSizeSelect.value); }
+      fontSizeSelect.value = ''; body.focus();
     });
     toolbar.appendChild(fontSizeSelect);
 
-    // --- Font colour picker ---
+    // ── Color picker ─────────────────────────────────────────────────────────
     const colorWrap = document.createElement('span');
     colorWrap.className = 'gcp-re-color-wrap';
     colorWrap.title = 'Font colour';
-
     const colorLabel = document.createElement('span');
     colorLabel.className = 'gcp-re-color-label';
     colorLabel.setAttribute('aria-hidden', 'true');
-
     const colorA = document.createElement('span');
-    colorA.className = 'gcp-re-color-a';
-    colorA.textContent = 'A';
-
+    colorA.className = 'gcp-re-color-a'; colorA.textContent = 'A';
     const colorBar = document.createElement('span');
     colorBar.className = 'gcp-re-color-bar';
-
-    colorLabel.appendChild(colorA);
-    colorLabel.appendChild(colorBar);
-
+    colorLabel.appendChild(colorA); colorLabel.appendChild(colorBar);
     const colorInput = document.createElement('input');
-    colorInput.type = 'color';
-    colorInput.className = 'gcp-re-color-input';
-    colorInput.value = '#000000';
-    colorInput.setAttribute('aria-label', 'Font colour');
-
-    colorWrap.appendChild(colorLabel);
-    colorWrap.appendChild(colorInput);
-
+    colorInput.type = 'color'; colorInput.className = 'gcp-re-color-input';
+    colorInput.value = '#000000'; colorInput.setAttribute('aria-label', 'Font colour');
+    colorWrap.appendChild(colorLabel); colorWrap.appendChild(colorInput);
     colorInput.addEventListener('mousedown', saveSelection);
     colorInput.addEventListener('change', () => {
       colorBar.style.background = colorInput.value;
-      restoreSelection();
-      execCmd('foreColor', colorInput.value);
-      body.focus();
+      restoreSelection(); execCmd('foreColor', colorInput.value); body.focus();
     });
-
     toolbar.appendChild(colorWrap);
 
-    // Separator before existing tools
+    // Separator
     const firstSep = document.createElement('span');
-    firstSep.className = 'gcp-re-sep';
-    firstSep.setAttribute('aria-hidden', 'true');
+    firstSep.className = 'gcp-re-sep'; firstSep.setAttribute('aria-hidden', 'true');
     toolbar.appendChild(firstSep);
 
-    // --- Existing format buttons ---
+    // ── Format buttons ───────────────────────────────────────────────────────
     TOOLS.forEach(tool => {
       if (tool.sep) {
         const sep = document.createElement('span');
-        sep.className = 'gcp-re-sep';
-        sep.setAttribute('aria-hidden', 'true');
-        toolbar.appendChild(sep);
-        return;
+        sep.className = 'gcp-re-sep'; sep.setAttribute('aria-hidden', 'true');
+        toolbar.appendChild(sep); return;
       }
       const btn = document.createElement('button');
-      btn.type = 'button';
-      btn.className = 'gcp-re-btn';
-      btn.innerHTML = tool.icon;
-      btn.title = tool.title;
-      btn.setAttribute('aria-label', tool.title);
-      btn.dataset.cmd = tool.cmd;
-
+      btn.type = 'button'; btn.className = 'gcp-re-btn';
+      btn.innerHTML = tool.icon; btn.title = tool.title;
+      btn.setAttribute('aria-label', tool.title); btn.dataset.cmd = tool.cmd;
       btn.addEventListener('mousedown', e => {
-        e.preventDefault(); // keep editor focus
-        if (tool.cmd === 'h2' || tool.cmd === 'h3') {
-          handleHeading(tool.cmd);
-        } else {
-          execCmd(tool.cmd);
-        }
-        body.focus();
-        updateActive();
+        e.preventDefault();
+        if (tool.cmd === 'h2' || tool.cmd === 'h3') { handleHeading(tool.cmd); }
+        else { execCmd(tool.cmd); }
+        body.focus(); updateActive();
       });
       toolbar.appendChild(btn);
     });
 
-    // --- Track Changes toggle button ---
+    // ── Track Changes toggle button ──────────────────────────────────────────
     const tcSep = document.createElement('span');
-    tcSep.className = 'gcp-re-sep';
-    tcSep.setAttribute('aria-hidden', 'true');
+    tcSep.className = 'gcp-re-sep'; tcSep.setAttribute('aria-hidden', 'true');
     toolbar.appendChild(tcSep);
 
     const tcBtn = document.createElement('button');
-    tcBtn.type = 'button';
-    tcBtn.className = 'gcp-re-btn';
-    tcBtn.textContent = 'TC';
-    tcBtn.title = 'Track Changes';
-    tcBtn.setAttribute('aria-label', 'Toggle track changes');
+    tcBtn.type = 'button'; tcBtn.className = 'gcp-re-btn';
+    tcBtn.setAttribute('aria-label', 'Show or hide tracked changes');
     tcBtn.setAttribute('aria-pressed', 'false');
+    tcBtn.title = 'Show / Hide Changes';
+
+    const tcBtnLabel = document.createElement('span');
+    tcBtnLabel.textContent = 'Changes';
+    const tcBadge = document.createElement('span');
+    tcBadge.className = 'gcp-re-tc-badge';
+    tcBadge.style.display = 'none';
+    tcBtn.appendChild(tcBtnLabel);
+    tcBtn.appendChild(tcBadge);
     toolbar.appendChild(tcBtn);
 
-    // --- Assemble DOM ---
+    // ── Assemble DOM ─────────────────────────────────────────────────────────
     wrap.appendChild(toolbar);
     wrap.appendChild(tcBar);
     wrap.appendChild(body);
     container.innerHTML = '';
     container.appendChild(wrap);
 
-    // --- Track Changes helpers ---
+    // ── Track Changes helpers ────────────────────────────────────────────────
 
     function countChanges() {
       const ids = new Set();
@@ -334,20 +335,36 @@
       return ids.size;
     }
 
+    // Returns {name, count} for each distinct author with pending changes
+    function getAuthors() {
+      const map = new Map();
+      body.querySelectorAll('[data-tc-id]').forEach(el => {
+        const a = el.getAttribute('data-tc-author') || 'Unknown';
+        map.set(a, (map.get(a) || 0) + 1);
+      });
+      return [...map.entries()].map(([name, count]) => ({ name, count }));
+    }
+
     function updateTcBar() {
       const n = countChanges();
-      const show = tc.enabled || n > 0;
-      tcBar.style.display = show ? '' : 'none';
-      if (!show) return;
-      const parts = [];
-      if (tc.enabled) parts.push('Track Changes On');
-      if (n > 0) parts.push(`${n} change${n === 1 ? '' : 's'}`);
-      else if (tc.enabled) parts.push('No changes yet');
-      tcStatus.textContent = parts.join(' · ');
-      tcAcceptAll.style.display = n > 0 ? '' : 'none';
-      tcRejectAll.style.display = n > 0 ? '' : 'none';
-      tcBtn.classList.toggle('tc-on', tc.enabled);
-      tcBtn.setAttribute('aria-pressed', String(tc.enabled));
+      // Badge on button
+      if (n > 0) { tcBadge.textContent = String(n); tcBadge.style.display = ''; }
+      else { tcBadge.style.display = 'none'; }
+
+      // Wrap class controls CSS visibility
+      wrap.classList.toggle('tc-visible', tc.visible);
+      tcBtn.classList.toggle('tc-active', tc.visible);
+      tcBtn.setAttribute('aria-pressed', String(tc.visible));
+
+      // Bar is only shown when changes are visible
+      tcBar.style.display = (tc.visible && n > 0) ? '' : 'none';
+      if (tc.visible && n > 0) {
+        tcStatus.textContent = `${n} tracked change${n === 1 ? '' : 's'}`;
+        const authors = getAuthors();
+        tcAuthors.textContent = authors.map(a => a.name).join(', ');
+        tcAcceptAll.style.display = '';
+        tcRejectAll.style.display = '';
+      }
     }
 
     function acceptAllChanges() {
@@ -384,7 +401,16 @@
       return clone.innerHTML.replace(/(<br\s*\/?>|\s|&nbsp;)*$/, '').trim();
     }
 
-    // Convert a StaticRange (from getTargetRanges) to a live Range
+    // Find the nearest <ins> ancestor by the same author, if any
+    function getSelfIns(node) {
+      let el = node.nodeType === Node.ELEMENT_NODE ? node : node.parentElement;
+      while (el && el !== body) {
+        if (el.tagName === 'INS' && el.getAttribute('data-tc-author') === tc.authorName) return el;
+        el = el.parentElement;
+      }
+      return null;
+    }
+
     function staticToRange(sr) {
       const r = document.createRange();
       r.setStart(sr.startContainer, sr.startOffset);
@@ -392,10 +418,26 @@
       return r;
     }
 
-    // Wrap a range's content in a <del data-tc-id> element.
-    // placeCursorAfter: true = cursor after del, false = cursor before del.
+    // Wrap range in <del>. If range is entirely within own <ins>, just delete (self-correction).
     function wrapRangeAsDeletion(range, placeCursorAfter) {
       if (range.collapsed) return null;
+
+      // Self-correction: deleting own inserted text → remove the <ins> content, don't track
+      const selfIns = getSelfIns(range.startContainer);
+      if (selfIns && selfIns.contains(range.endContainer)) {
+        try {
+          range.deleteContents();
+          if (selfIns.isConnected && !selfIns.textContent) selfIns.remove();
+          // Cursor is already in place (deleteContents collapses the range)
+          const sel = window.getSelection();
+          sel.removeAllRanges();
+          sel.addRange(range);
+        } catch (_) {}
+        updateTcBar();
+        return null;
+      }
+
+      // Normal tracked deletion
       try {
         const id = newTcId();
         const frag = range.cloneContents();
@@ -407,7 +449,6 @@
         del.appendChild(frag);
         range.deleteContents();
         range.insertNode(del);
-        // Reposition cursor
         const sel = window.getSelection();
         sel.removeAllRanges();
         const r = document.createRange();
@@ -421,15 +462,14 @@
       }
     }
 
-    // Insert text as a tracked <ins> element at the current cursor.
-    // Extends an adjacent <ins> by the same author if possible.
+    // Insert text as tracked <ins>. Extends adjacent own <ins> when possible.
     function insertTracked(text) {
       if (!text) return;
       const sel = window.getSelection();
       if (!sel.rangeCount) return;
       const range = sel.getRangeAt(0);
 
-      // Extend an existing adjacent <ins> by the same author
+      // Extend an adjacent <ins> by the same author
       const { startContainer, startOffset } = range;
       if (startContainer.nodeType === Node.TEXT_NODE) {
         const parent = startContainer.parentElement;
@@ -440,13 +480,11 @@
           const r = document.createRange();
           r.setStart(startContainer, startContainer.length);
           r.collapse(true);
-          sel.removeAllRanges();
-          sel.addRange(r);
+          sel.removeAllRanges(); sel.addRange(r);
           return;
         }
       }
 
-      // Create a new <ins>
       const id = newTcId();
       const ins = document.createElement('ins');
       ins.setAttribute('data-tc-id', id);
@@ -456,18 +494,14 @@
       ins.textContent = text;
       range.insertNode(ins);
       const r = document.createRange();
-      r.setStartAfter(ins);
-      r.collapse(true);
-      sel.removeAllRanges();
-      sel.addRange(r);
+      r.setStartAfter(ins); r.collapse(true);
+      sel.removeAllRanges(); sel.addRange(r);
     }
 
-    // --- TC button and bar events ---
-
+    // ── TC button events ─────────────────────────────────────────────────────
     tcBtn.addEventListener('mousedown', e => e.preventDefault());
     tcBtn.addEventListener('click', () => {
-      if (!body.isContentEditable) return;
-      tc.enabled = !tc.enabled;
+      tc.visible = !tc.visible;
       updateTcBar();
     });
 
@@ -477,8 +511,7 @@
     tcRejectAll.addEventListener('mousedown', e => e.preventDefault());
     tcRejectAll.addEventListener('click', () => { rejectAllChanges(); body.focus(); });
 
-    // --- beforeinput: intercept when track changes is ON ---
-
+    // ── beforeinput: intercept all text mutations for tracking ───────────────
     const TC_INPUT_TYPES = new Set([
       'insertText', 'insertReplacementText',
       'deleteContentBackward', 'deleteContentForward',
@@ -489,7 +522,10 @@
     ]);
 
     body.addEventListener('beforeinput', e => {
-      if (!tc.enabled || !TC_INPUT_TYPES.has(e.inputType)) return;
+      if (!TC_INPUT_TYPES.has(e.inputType)) return;
+      // Only intercept when editor is actually editable
+      if (!body.isContentEditable) return;
+
       e.preventDefault();
 
       const staticRanges = e.getTargetRanges ? e.getTargetRanges() : [];
@@ -501,31 +537,27 @@
       const type = e.inputType;
 
       if (type === 'insertText' || type === 'insertReplacementText') {
-        // Replace selection (if any) with deletion, then insert tracked text
         if (!targetRange.collapsed) wrapRangeAsDeletion(targetRange, true);
         insertTracked(e.data);
       } else if (type === 'insertFromPaste' || type === 'insertFromDrop') {
         if (!targetRange.collapsed) wrapRangeAsDeletion(targetRange, true);
-        const text = (e.dataTransfer || e.clipboardData || null)?.getData('text/plain') || '';
+        const text = (e.dataTransfer || null)?.getData('text/plain') || '';
         if (text) insertTracked(text);
       } else if (type === 'deleteByCut') {
         if (!targetRange.collapsed) wrapRangeAsDeletion(targetRange, false);
       } else if (type.startsWith('delete')) {
-        // For all other deletes, wrap in <del> — cursor stays before the deletion
         wrapRangeAsDeletion(targetRange, false);
       }
 
       updateTcBar();
     });
 
-    // --- Active state update ---
-
+    // ── Active state update ──────────────────────────────────────────────────
     function updateActive() {
       toolbar.querySelectorAll('.gcp-re-btn').forEach(btn => {
         const cmd = btn.dataset.cmd;
         if (!cmd || cmd === 'h2' || cmd === 'h3' || cmd === 'removeFormat') {
-          btn.classList.remove('active');
-          return;
+          btn.classList.remove('active'); return;
         }
         try { btn.classList.toggle('active', document.queryCommandState(cmd)); } catch (_) {}
       });
@@ -535,7 +567,6 @@
     body.addEventListener('mouseup', updateActive);
     body.addEventListener('selectionchange', updateActive);
 
-    // Keyboard shortcuts
     body.addEventListener('keydown', e => {
       if ((e.ctrlKey || e.metaKey) && !e.shiftKey) {
         if (e.key === 'b') { e.preventDefault(); execCmd('bold'); updateActive(); }
@@ -544,27 +575,20 @@
       }
     });
 
-    // --- Public API ---
-
+    // ── Public API ───────────────────────────────────────────────────────────
     function getHtml() {
-      // Returns HTML as-is (may contain <ins>/<del> tracked-change markup)
       return body.innerHTML.replace(/(<br\s*\/?>|\s|&nbsp;)*$/, '').trim();
     }
 
     function setHtml(html) {
       body.innerHTML = html || '';
-      updateTcBar(); // refresh count in case loaded HTML has tracked changes
+      updateTcBar();
     }
 
-    function destroy() {
-      container.innerHTML = '';
-    }
+    function destroy() { container.innerHTML = ''; }
+    function focus()   { body.focus(); }
 
-    function focus() {
-      body.focus();
-    }
-
-    // Show TC bar on load if the initial HTML already contains tracked changes
+    // Initialise badge/bar after loading any pre-existing markup
     updateTcBar();
 
     return { getHtml, getCleanHtml, setHtml, destroy, focus, el: body,

@@ -21,6 +21,12 @@
   const btnReturn = document.getElementById("btnReturn");
   const btnUpload = document.getElementById("btnUpload");
   const btnAskToReturn = document.getElementById("btnAskToReturn");
+  const btnComments = document.getElementById("btnComments");
+  const commentsPanel = document.getElementById("commentsPanel");
+  const commentsList = document.getElementById("commentsList");
+  const commentInput = document.getElementById("commentInput");
+  const addCommentBtn = document.getElementById("addCommentBtn");
+  const closePanelBtn = document.getElementById("closePanelBtn");
 
   const actionButtons = [btnSave, btnSubmit, btnApprove, btnReturn];
 
@@ -417,9 +423,106 @@
     });
   }
 
+  // ---- Comments panel ----
+
+  function formatCommentTime(iso) {
+    try {
+      const d = new Date(iso);
+      return d.toLocaleString(undefined, { month:'short', day:'numeric', year:'numeric', hour:'2-digit', minute:'2-digit' });
+    } catch(_) { return iso || ''; }
+  }
+
+  function renderComments(comments) {
+    if (!commentsList) return;
+    if (!comments || !comments.length) {
+      commentsList.innerHTML = '<div class="ecp-empty">No comments yet.</div>';
+      if (btnComments) btnComments.classList.remove('has-comments');
+      return;
+    }
+    if (btnComments) btnComments.classList.add('has-comments');
+    commentsList.innerHTML = comments.map(c => {
+      const author = window.GCP.escapeHtml(c.author_name || 'Unknown');
+      const text   = window.GCP.escapeHtml(c.comment_text || '');
+      const time   = window.GCP.escapeHtml(formatCommentTime(c.created_at));
+      const delBtn = c.is_own
+        ? `<button class="ecp-comment-del" data-id="${c.id}" type="button">Delete</button>`
+        : '';
+      return `<div class="ecp-comment" data-comment-id="${c.id}">
+        <div class="ecp-comment-meta">
+          <span class="ecp-comment-author">${author}</span>
+          <span class="ecp-comment-time">${time}</span>
+        </div>
+        <div class="ecp-comment-text">${text}</div>
+        ${delBtn}
+      </div>`;
+    }).join('');
+    // Wire delete buttons
+    commentsList.querySelectorAll('.ecp-comment-del').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const id = btn.dataset.id;
+        try {
+          await window.GCP.apiFetch(`/tp/comments/${id}`, { method: 'DELETE' });
+          await loadComments();
+        } catch(e) {
+          msg.textContent = e.message || 'Delete failed';
+        }
+      });
+    });
+  }
+
+  async function loadComments() {
+    if (!commentsList || !eventId || !sectionId) return;
+    try {
+      const data = await window.GCP.apiFetch(
+        `/tp/comments?event_id=${encodeURIComponent(eventId)}&section_id=${encodeURIComponent(sectionId)}`,
+        { method: 'GET' }
+      );
+      renderComments(data.comments || []);
+    } catch(e) {
+      if (commentsList) commentsList.innerHTML = `<div class="ecp-empty" style="color:#dc2626">Could not load comments.</div>`;
+    }
+  }
+
+  if (btnComments && commentsPanel) {
+    btnComments.addEventListener('click', () => {
+      const open = commentsPanel.style.display !== 'none';
+      commentsPanel.style.display = open ? 'none' : '';
+      if (!open) loadComments();
+    });
+  }
+
+  if (closePanelBtn && commentsPanel) {
+    closePanelBtn.addEventListener('click', () => { commentsPanel.style.display = 'none'; });
+  }
+
+  if (addCommentBtn && commentInput) {
+    addCommentBtn.addEventListener('click', async () => {
+      const text = (commentInput.value || '').trim();
+      if (!text) return;
+      addCommentBtn.disabled = true;
+      try {
+        await window.GCP.apiFetch('/tp/comments', {
+          method: 'POST',
+          body: JSON.stringify({ eventId, sectionId, commentText: text })
+        });
+        commentInput.value = '';
+        await loadComments();
+      } catch(e) {
+        msg.textContent = e.message || 'Could not post comment';
+      } finally {
+        addCommentBtn.disabled = false;
+      }
+    });
+    // Post on Ctrl+Enter
+    commentInput.addEventListener('keydown', e => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') { e.preventDefault(); addCommentBtn.click(); }
+    });
+  }
+
   try{
     await load();
     await loadFiles();
+    await loadComments();
   }catch(err){
     msg.textContent = err.message || "Failed to load editor";
   }

@@ -143,6 +143,21 @@ async function ensureSchema() {
     )
   `).catch(()=>{});
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_tsh_lookup ON tp_section_history(event_id, section_id, acted_at)`).catch(()=>{});
+
+  // Section-level comments
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS tp_section_comments (
+      id          SERIAL PRIMARY KEY,
+      event_id    INTEGER NOT NULL REFERENCES events(id) ON DELETE CASCADE,
+      country_id  INTEGER NOT NULL REFERENCES countries(id) ON DELETE CASCADE,
+      section_id  INTEGER NOT NULL REFERENCES sections(id) ON DELETE CASCADE,
+      user_id     INTEGER NOT NULL REFERENCES users(id),
+      author_name TEXT NOT NULL,
+      comment_text TEXT NOT NULL,
+      created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `).catch(()=>{});
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_tsc_lookup ON tp_section_comments(event_id, country_id, section_id)`).catch(()=>{});
 }
 
 async function ensureRolesExist() {
@@ -2878,6 +2893,53 @@ app.get('/api/tp/files', authRequired, attachUser, async (req, res) => {
     res.status(500).json({ error: 'Failed to list files' });
   }
 });
+
+// ── Section Comments ──────────────────────────────────────────────────────────
+
+app.get('/api/tp/comments', authRequired, attachUser, asyncRoute(async (req, res) => {
+  const { event_id, section_id } = req.query;
+  if (!event_id || !section_id) return res.status(400).json({ error: 'Missing event_id or section_id' });
+  const countryId = await resolveCountryIdForEvent(event_id);
+  if (!countryId) return res.status(404).json({ error: 'Country not found for event' });
+  const rows = await pool.query(
+    `SELECT id, author_name, comment_text, created_at,
+            (user_id = $4) AS is_own
+     FROM tp_section_comments
+     WHERE event_id=$1 AND country_id=$2 AND section_id=$3
+     ORDER BY created_at ASC`,
+    [event_id, countryId, section_id, req.user.id]
+  );
+  res.json({ comments: rows.rows });
+}));
+
+app.post('/api/tp/comments', authRequired, attachUser, asyncRoute(async (req, res) => {
+  const { eventId, sectionId, commentText } = req.body || {};
+  if (!eventId || !sectionId || !commentText?.trim())
+    return res.status(400).json({ error: 'Missing required fields' });
+  const countryId = await resolveCountryIdForEvent(eventId);
+  if (!countryId) return res.status(404).json({ error: 'Country not found for event' });
+  const authorName = req.user.full_name || req.user.username || 'Unknown';
+  const row = await pool.query(
+    `INSERT INTO tp_section_comments (event_id, country_id, section_id, user_id, author_name, comment_text)
+     VALUES ($1,$2,$3,$4,$5,$6) RETURNING id, author_name, comment_text, created_at`,
+    [eventId, countryId, sectionId, req.user.id, authorName, commentText.trim()]
+  );
+  res.json({ comment: { ...row.rows[0], is_own: true } });
+}));
+
+app.delete('/api/tp/comments/:id', authRequired, attachUser, asyncRoute(async (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  if (!id) return res.status(400).json({ error: 'Invalid id' });
+  const roleKey = normalizeRoleKey(req.user.role_key);
+  // Admins can delete any comment; others can only delete their own
+  const condition = roleKey === 'admin'
+    ? 'id=$1'
+    : 'id=$1 AND user_id=$2';
+  const params = roleKey === 'admin' ? [id] : [id, req.user.id];
+  const result = await pool.query(`DELETE FROM tp_section_comments WHERE ${condition}`, params);
+  if (result.rowCount === 0) return res.status(404).json({ error: 'Comment not found or not yours' });
+  res.json({ ok: true });
+}));
 
 /** Static frontend (served from backend/public for Render) **/
 const PUBLIC_DIR = path.join(__dirname, 'public');
