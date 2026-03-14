@@ -177,11 +177,11 @@
       <span class="editor-meta-pill">${window.GCP.escapeHtml(tp.sectionLabel || 'Unknown section')}</span>
     `;
 
-    // Only show last-updated when a real user has made a meaningful update
+    // Show last content edit (actual text change), not workflow actions
     if (lastUpdatedEl){
-      if (tp.lastUpdatedBy && tp.lastUpdatedAt) {
-        const updatedAt = window.GCP.escapeHtml(window.GCP.formatDateTime(tp.lastUpdatedAt));
-        const updatedBy = window.GCP.escapeHtml(tp.lastUpdatedBy);
+      if (tp.lastContentEditedBy && tp.lastContentEditedAt) {
+        const updatedAt = window.GCP.escapeHtml(window.GCP.formatDateTime(tp.lastContentEditedAt));
+        const updatedBy = window.GCP.escapeHtml(tp.lastContentEditedBy);
         lastUpdatedEl.innerHTML = `<span>Last updated · ${updatedAt}</span><span>· ${updatedBy}</span>`;
       } else {
         lastUpdatedEl.innerHTML = `<span class="muted">No updates yet</span>`;
@@ -215,7 +215,7 @@
       if (richEditorInstance){
         richEditorInstance.setHtml(tp.htmlContent || '');
       } else {
-        richEditorInstance = window.GCP.RichEditor({ container: editorFrame, initialHtml: tp.htmlContent || '' });
+        richEditorInstance = window.GCP.RichEditor({ container: editorFrame, initialHtml: tp.htmlContent || '', authorName: me.full_name || me.username || 'Unknown' });
       }
       if (richEditorInstance && richEditorInstance.el){
         richEditorInstance.el.contentEditable = canEdit ? 'true' : 'false';
@@ -272,6 +272,10 @@
   });
 
   if (btnApprove) btnApprove.addEventListener("click", async () => {
+    if (richEditorInstance && richEditorInstance.hasTrackedChanges()) {
+      msg.textContent = "Accept or reject all tracked changes before approving.";
+      return;
+    }
     setActionLoading(btnApprove, true);
     try{
       if (role === "chairman" || role === "minister"){

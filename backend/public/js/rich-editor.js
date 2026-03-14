@@ -1,6 +1,6 @@
 /**
  * GCP Rich Editor — lightweight contenteditable editor (no external deps)
- * Exposes: window.GCP.RichEditor({ container, initialHtml }) → { getHtml, setHtml, destroy }
+ * Exposes: window.GCP.RichEditor({ container, initialHtml, authorName }) → { getHtml, getCleanHtml, setHtml, destroy, focus, acceptAllChanges, rejectAllChanges, hasTrackedChanges }
  */
 (function () {
 
@@ -72,6 +72,23 @@
     [data-theme="dark"] .gcp-re-select { color:#c0cce0; }
     [data-theme="dark"] .gcp-re-select:hover { background:rgba(255,255,255,.07); }
     [data-theme="dark"] .gcp-re-color-a { color:#c0cce0; }
+
+    /* Track Changes */
+    .gcp-re-btn.tc-on { background:rgba(245,158,11,.18); border-color:rgba(217,119,6,.45); color:#92400e; }
+    .gcp-re-tc-bar { display:flex; align-items:center; gap:8px; padding:5px 10px; border-bottom:1px solid var(--border,#e5e7eb); background:rgba(245,158,11,.07); font-size:12px; font-weight:600; color:#78350f; flex-wrap:wrap; }
+    .gcp-re-tc-status { flex:1; min-width:0; }
+    .gcp-re-tc-actions { display:flex; gap:5px; flex-shrink:0; }
+    .gcp-re-tc-action { padding:2px 9px; border-radius:6px; border:1px solid; cursor:pointer; font-size:11px; font-weight:700; background:transparent; line-height:1.6; }
+    .gcp-re-tc-action.accept { border-color:rgba(22,163,74,.35); color:#15803d; }
+    .gcp-re-tc-action.accept:hover { background:rgba(22,163,74,.1); }
+    .gcp-re-tc-action.reject { border-color:rgba(220,38,38,.35); color:#b91c1c; }
+    .gcp-re-tc-action.reject:hover { background:rgba(220,38,38,.1); }
+    .gcp-re-body ins[data-tc-id] { text-decoration:underline; text-decoration-color:rgba(22,163,74,.8); background:rgba(22,163,74,.12); border-radius:2px; padding:0 1px; cursor:default; font-style:normal; }
+    .gcp-re-body del[data-tc-id] { text-decoration:line-through; text-decoration-color:rgba(220,38,38,.8); background:rgba(220,38,38,.12); border-radius:2px; padding:0 1px; cursor:default; }
+    [data-theme="dark"] .gcp-re-btn.tc-on { background:rgba(245,158,11,.22); color:#fcd34d; }
+    [data-theme="dark"] .gcp-re-tc-bar { background:rgba(120,80,10,.18); color:#fcd34d; }
+    [data-theme="dark"] .gcp-re-body ins[data-tc-id] { background:rgba(22,163,74,.22); }
+    [data-theme="dark"] .gcp-re-body del[data-tc-id] { background:rgba(220,38,38,.22); }
   `;
 
   let styleInjected = false;
@@ -101,7 +118,7 @@
     }
   }
 
-  function RichEditor({ container, initialHtml, placeholder }) {
+  function RichEditor({ container, initialHtml, placeholder, authorName }) {
     injectStyle();
 
     const wrap = document.createElement('div');
@@ -120,6 +137,36 @@
     body.setAttribute('aria-multiline', 'true');
     body.setAttribute('data-placeholder', placeholder || 'Start typing…');
     if (initialHtml) body.innerHTML = initialHtml;
+
+    // --- Track Changes state ---
+    const tc = { enabled: false, authorName: authorName || 'Unknown', counter: 0 };
+    function newTcId() { return `tc${Date.now()}${++tc.counter}`; }
+
+    // TC bar (sits between toolbar and body)
+    const tcBar = document.createElement('div');
+    tcBar.className = 'gcp-re-tc-bar';
+    tcBar.style.display = 'none';
+
+    const tcStatus = document.createElement('span');
+    tcStatus.className = 'gcp-re-tc-status';
+
+    const tcActionsEl = document.createElement('div');
+    tcActionsEl.className = 'gcp-re-tc-actions';
+
+    const tcAcceptAll = document.createElement('button');
+    tcAcceptAll.type = 'button';
+    tcAcceptAll.className = 'gcp-re-tc-action accept';
+    tcAcceptAll.textContent = 'Accept All';
+
+    const tcRejectAll = document.createElement('button');
+    tcRejectAll.type = 'button';
+    tcRejectAll.className = 'gcp-re-tc-action reject';
+    tcRejectAll.textContent = 'Reject All';
+
+    tcActionsEl.appendChild(tcAcceptAll);
+    tcActionsEl.appendChild(tcRejectAll);
+    tcBar.appendChild(tcStatus);
+    tcBar.appendChild(tcActionsEl);
 
     // --- Selection save/restore (needed for dropdowns & color picker) ---
     let savedRange = null;
@@ -257,10 +304,221 @@
       toolbar.appendChild(btn);
     });
 
+    // --- Track Changes toggle button ---
+    const tcSep = document.createElement('span');
+    tcSep.className = 'gcp-re-sep';
+    tcSep.setAttribute('aria-hidden', 'true');
+    toolbar.appendChild(tcSep);
+
+    const tcBtn = document.createElement('button');
+    tcBtn.type = 'button';
+    tcBtn.className = 'gcp-re-btn';
+    tcBtn.textContent = 'TC';
+    tcBtn.title = 'Track Changes';
+    tcBtn.setAttribute('aria-label', 'Toggle track changes');
+    tcBtn.setAttribute('aria-pressed', 'false');
+    toolbar.appendChild(tcBtn);
+
+    // --- Assemble DOM ---
     wrap.appendChild(toolbar);
+    wrap.appendChild(tcBar);
     wrap.appendChild(body);
     container.innerHTML = '';
     container.appendChild(wrap);
+
+    // --- Track Changes helpers ---
+
+    function countChanges() {
+      const ids = new Set();
+      body.querySelectorAll('[data-tc-id]').forEach(el => ids.add(el.getAttribute('data-tc-id')));
+      return ids.size;
+    }
+
+    function updateTcBar() {
+      const n = countChanges();
+      const show = tc.enabled || n > 0;
+      tcBar.style.display = show ? '' : 'none';
+      if (!show) return;
+      const parts = [];
+      if (tc.enabled) parts.push('Track Changes On');
+      if (n > 0) parts.push(`${n} change${n === 1 ? '' : 's'}`);
+      else if (tc.enabled) parts.push('No changes yet');
+      tcStatus.textContent = parts.join(' · ');
+      tcAcceptAll.style.display = n > 0 ? '' : 'none';
+      tcRejectAll.style.display = n > 0 ? '' : 'none';
+      tcBtn.classList.toggle('tc-on', tc.enabled);
+      tcBtn.setAttribute('aria-pressed', String(tc.enabled));
+    }
+
+    function acceptAllChanges() {
+      body.querySelectorAll('del[data-tc-id]').forEach(el => el.remove());
+      body.querySelectorAll('ins[data-tc-id]').forEach(el => {
+        while (el.firstChild) el.parentNode.insertBefore(el.firstChild, el);
+        el.remove();
+      });
+      body.normalize();
+      updateTcBar();
+    }
+
+    function rejectAllChanges() {
+      body.querySelectorAll('ins[data-tc-id]').forEach(el => el.remove());
+      body.querySelectorAll('del[data-tc-id]').forEach(el => {
+        while (el.firstChild) el.parentNode.insertBefore(el.firstChild, el);
+        el.remove();
+      });
+      body.normalize();
+      updateTcBar();
+    }
+
+    function hasTrackedChanges() {
+      return !!body.querySelector('[data-tc-id]');
+    }
+
+    function getCleanHtml() {
+      const clone = body.cloneNode(true);
+      clone.querySelectorAll('del[data-tc-id]').forEach(el => el.remove());
+      clone.querySelectorAll('ins[data-tc-id]').forEach(el => {
+        while (el.firstChild) el.parentNode.insertBefore(el.firstChild, el);
+        el.remove();
+      });
+      return clone.innerHTML.replace(/(<br\s*\/?>|\s|&nbsp;)*$/, '').trim();
+    }
+
+    // Convert a StaticRange (from getTargetRanges) to a live Range
+    function staticToRange(sr) {
+      const r = document.createRange();
+      r.setStart(sr.startContainer, sr.startOffset);
+      r.setEnd(sr.endContainer, sr.endOffset);
+      return r;
+    }
+
+    // Wrap a range's content in a <del data-tc-id> element.
+    // placeCursorAfter: true = cursor after del, false = cursor before del.
+    function wrapRangeAsDeletion(range, placeCursorAfter) {
+      if (range.collapsed) return null;
+      try {
+        const id = newTcId();
+        const frag = range.cloneContents();
+        const del = document.createElement('del');
+        del.setAttribute('data-tc-id', id);
+        del.setAttribute('data-tc-author', tc.authorName);
+        del.setAttribute('data-tc-time', new Date().toISOString());
+        del.title = `Deleted by ${tc.authorName}`;
+        del.appendChild(frag);
+        range.deleteContents();
+        range.insertNode(del);
+        // Reposition cursor
+        const sel = window.getSelection();
+        sel.removeAllRanges();
+        const r = document.createRange();
+        placeCursorAfter ? r.setStartAfter(del) : r.setStartBefore(del);
+        r.collapse(true);
+        sel.addRange(r);
+        return del;
+      } catch (_) {
+        try { range.deleteContents(); } catch (__) {}
+        return null;
+      }
+    }
+
+    // Insert text as a tracked <ins> element at the current cursor.
+    // Extends an adjacent <ins> by the same author if possible.
+    function insertTracked(text) {
+      if (!text) return;
+      const sel = window.getSelection();
+      if (!sel.rangeCount) return;
+      const range = sel.getRangeAt(0);
+
+      // Extend an existing adjacent <ins> by the same author
+      const { startContainer, startOffset } = range;
+      if (startContainer.nodeType === Node.TEXT_NODE) {
+        const parent = startContainer.parentElement;
+        if (parent && parent.tagName === 'INS' &&
+            parent.getAttribute('data-tc-author') === tc.authorName &&
+            startOffset === startContainer.length) {
+          startContainer.textContent += text;
+          const r = document.createRange();
+          r.setStart(startContainer, startContainer.length);
+          r.collapse(true);
+          sel.removeAllRanges();
+          sel.addRange(r);
+          return;
+        }
+      }
+
+      // Create a new <ins>
+      const id = newTcId();
+      const ins = document.createElement('ins');
+      ins.setAttribute('data-tc-id', id);
+      ins.setAttribute('data-tc-author', tc.authorName);
+      ins.setAttribute('data-tc-time', new Date().toISOString());
+      ins.title = `Added by ${tc.authorName}`;
+      ins.textContent = text;
+      range.insertNode(ins);
+      const r = document.createRange();
+      r.setStartAfter(ins);
+      r.collapse(true);
+      sel.removeAllRanges();
+      sel.addRange(r);
+    }
+
+    // --- TC button and bar events ---
+
+    tcBtn.addEventListener('mousedown', e => e.preventDefault());
+    tcBtn.addEventListener('click', () => {
+      if (!body.isContentEditable) return;
+      tc.enabled = !tc.enabled;
+      updateTcBar();
+    });
+
+    tcAcceptAll.addEventListener('mousedown', e => e.preventDefault());
+    tcAcceptAll.addEventListener('click', () => { acceptAllChanges(); body.focus(); });
+
+    tcRejectAll.addEventListener('mousedown', e => e.preventDefault());
+    tcRejectAll.addEventListener('click', () => { rejectAllChanges(); body.focus(); });
+
+    // --- beforeinput: intercept when track changes is ON ---
+
+    const TC_INPUT_TYPES = new Set([
+      'insertText', 'insertReplacementText',
+      'deleteContentBackward', 'deleteContentForward',
+      'deleteWordBackward', 'deleteWordForward',
+      'deleteHardLineBackward', 'deleteHardLineForward',
+      'deleteSoftLineBackward', 'deleteSoftLineForward',
+      'deleteByCut', 'insertFromPaste', 'insertFromDrop',
+    ]);
+
+    body.addEventListener('beforeinput', e => {
+      if (!tc.enabled || !TC_INPUT_TYPES.has(e.inputType)) return;
+      e.preventDefault();
+
+      const staticRanges = e.getTargetRanges ? e.getTargetRanges() : [];
+      const targetRange = staticRanges[0]
+        ? staticToRange(staticRanges[0])
+        : (window.getSelection().rangeCount ? window.getSelection().getRangeAt(0).cloneRange() : null);
+      if (!targetRange) return;
+
+      const type = e.inputType;
+
+      if (type === 'insertText' || type === 'insertReplacementText') {
+        // Replace selection (if any) with deletion, then insert tracked text
+        if (!targetRange.collapsed) wrapRangeAsDeletion(targetRange, true);
+        insertTracked(e.data);
+      } else if (type === 'insertFromPaste' || type === 'insertFromDrop') {
+        if (!targetRange.collapsed) wrapRangeAsDeletion(targetRange, true);
+        const text = (e.dataTransfer || e.clipboardData || null)?.getData('text/plain') || '';
+        if (text) insertTracked(text);
+      } else if (type === 'deleteByCut') {
+        if (!targetRange.collapsed) wrapRangeAsDeletion(targetRange, false);
+      } else if (type.startsWith('delete')) {
+        // For all other deletes, wrap in <del> — cursor stays before the deletion
+        wrapRangeAsDeletion(targetRange, false);
+      }
+
+      updateTcBar();
+    });
+
+    // --- Active state update ---
 
     function updateActive() {
       toolbar.querySelectorAll('.gcp-re-btn').forEach(btn => {
@@ -286,13 +544,16 @@
       }
     });
 
+    // --- Public API ---
+
     function getHtml() {
-      // Clean up empty paragraphs at end
+      // Returns HTML as-is (may contain <ins>/<del> tracked-change markup)
       return body.innerHTML.replace(/(<br\s*\/?>|\s|&nbsp;)*$/, '').trim();
     }
 
     function setHtml(html) {
       body.innerHTML = html || '';
+      updateTcBar(); // refresh count in case loaded HTML has tracked changes
     }
 
     function destroy() {
@@ -303,7 +564,11 @@
       body.focus();
     }
 
-    return { getHtml, setHtml, destroy, focus, el: body };
+    // Show TC bar on load if the initial HTML already contains tracked changes
+    updateTcBar();
+
+    return { getHtml, getCleanHtml, setHtml, destroy, focus, el: body,
+             acceptAllChanges, rejectAllChanges, hasTrackedChanges };
   }
 
   window.GCP = window.GCP || {};
