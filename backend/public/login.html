@@ -6,11 +6,22 @@
   <title>GOV COLLAB PORTAL • Login</title>
   <link rel="stylesheet" href="styles.css?v=20260306sb1" />
   <link rel="stylesheet" href="styles/apple.css?v=20260306sb1" />
+  <style>
+    .login-wrap { max-width: 520px; margin: 0 auto; padding-top: 70px; }
+    .login-btn  { min-width: 110px; }
+    .login-logo { display: block; width: 100%; max-width: 260px; height: auto; margin: 0 auto 20px; }
+    @media (max-width: 600px) {
+      .login-wrap    { padding-top: 28px; }
+      .login-actions { flex-direction: column; align-items: stretch; }
+      .login-btn     { width: 100%; }
+      .login-logo    { max-width: 200px; }
+    }
+  </style>
 </head>
 <body>
-  <div class="main" style="max-width:520px; margin:0 auto; padding-top:70px;">
+  <div class="main login-wrap">
     <div class="card">
-      <div style="font-size:18px; font-weight:900; margin-bottom:10px;">GOV COLLAB PORTAL</div>
+      <img src="assets/logo.svg" alt="GOV COLLAB PORTAL" class="login-logo" />
       <div class="muted small" style="margin-bottom:14px;">Login with your username and password.</div>
       <form id="loginForm" class="grid">
         <div class="col-12 field">
@@ -21,14 +32,11 @@
           <label>Password</label>
           <input id="password" type="password" autocomplete="current-password" required />
         </div>
-        <div class="col-12 row" style="justify-content:space-between;">
-          <button class="btn primary" type="submit">Login</button>
+        <div class="col-12 row login-actions" style="justify-content:space-between;">
+          <button class="btn primary login-btn" type="submit">Login</button>
           <div id="errBox" class="small" style="color:var(--danger); font-weight:800;"></div>
         </div>
       </form>
-      <div class="small muted" style="margin-top:14px;">
-        Default seed user: <b>admin</b> / <b>123</b>
-      </div>
     </div>
   </div>
 
