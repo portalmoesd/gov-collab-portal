@@ -655,16 +655,18 @@
       if (!sel.rangeCount) return;
       const range = sel.getRangeAt(0);
 
-      // Extend adjacent same-author <ins>
+      // Extend / edit within an existing same-author <ins>
       const { startContainer, startOffset } = range;
       if (startContainer.nodeType === Node.TEXT_NODE) {
         const parent = startContainer.parentElement;
         if (parent && parent.tagName === 'INS' &&
-            parent.getAttribute('data-tc-author') === tc.authorName &&
-            startOffset === startContainer.length) {
-          startContainer.textContent += text;
+            parent.getAttribute('data-tc-author') === tc.authorName) {
+          // Cursor is anywhere inside our own <ins> — just splice the text in
+          const before = startContainer.textContent.slice(0, startOffset);
+          const after  = startContainer.textContent.slice(startOffset);
+          startContainer.textContent = before + text + after;
           const r = document.createRange();
-          r.setStart(startContainer, startContainer.length);
+          r.setStart(startContainer, before.length + text.length);
           r.collapse(true); sel.removeAllRanges(); sel.addRange(r);
           return;
         }
@@ -677,8 +679,12 @@
       ins.textContent = text;
       range.insertNode(ins);
 
+      // Place cursor INSIDE the <ins> text node so the next keystroke
+      // finds itself inside a same-author <ins> and extends it rather
+      // than creating a new element for every character.
       const r = document.createRange();
-      r.setStartAfter(ins); r.collapse(true);
+      const tn = ins.firstChild;
+      r.setStart(tn, tn.length); r.collapse(true);
       sel.removeAllRanges(); sel.addRange(r);
     }
 
