@@ -81,6 +81,8 @@ async function ensureSchema() {
   await pool.query(`ALTER TABLE events ADD COLUMN IF NOT EXISTS lower_submitter_role TEXT DEFAULT 'collaborator_2'`).catch(()=>{});
   await pool.query(`ALTER TABLE tp_content ADD COLUMN IF NOT EXISTS original_submitter_role TEXT DEFAULT NULL`).catch(()=>{});
   await pool.query(`ALTER TABLE tp_content ADD COLUMN IF NOT EXISTS return_target_role TEXT DEFAULT NULL`).catch(()=>{});
+  await pool.query(`ALTER TABLE tp_content ADD COLUMN IF NOT EXISTS last_content_edited_at TIMESTAMPTZ DEFAULT NULL`).catch(()=>{});
+  await pool.query(`ALTER TABLE tp_content ADD COLUMN IF NOT EXISTS last_content_edited_by_user_id INTEGER REFERENCES users(id) DEFAULT NULL`).catch(()=>{});
   await pool.query(`CREATE TABLE IF NOT EXISTS section_return_requests (
     id SERIAL PRIMARY KEY,
     event_id INTEGER NOT NULL,
@@ -1646,12 +1648,15 @@ app.get('/api/tp', authRequired, async (req, res) => {
     t.return_target_role,
     t.original_submitter_role,
     t.last_updated_at,
-    u.full_name AS last_updated_by
+    u.full_name AS last_updated_by,
+    t.last_content_edited_at,
+    ue.full_name AS last_content_edited_by
   FROM tp_content t
   JOIN events e ON e.id = t.event_id
   JOIN countries c ON c.id = t.country_id
   JOIN sections s ON s.id = t.section_id
   LEFT JOIN users u ON u.id = t.last_updated_by_user_id
+  LEFT JOIN users ue ON ue.id = t.last_content_edited_by_user_id
   WHERE t.event_id=$1 AND t.country_id=$2 AND t.section_id=$3
   `,
   [eventId, countryId, sectionId]
@@ -1670,6 +1675,8 @@ return res.json({
   originalSubmitterRole: row.original_submitter_role || null,
   lastUpdatedAt: row.last_updated_at,
   lastUpdatedBy: row.last_updated_by || null,
+  lastContentEditedAt: row.last_content_edited_at || null,
+  lastContentEditedBy: row.last_content_edited_by || null,
   stepNames: await (async () => {
     const snRes = await pool.query(
       `SELECT u.full_name, r.key AS role_key
@@ -1749,25 +1756,15 @@ app.post('/api/tp/save', authRequired, async (req, res) => {
   const currentStatusRow = await queryOne(`SELECT status::text AS status FROM tp_content WHERE event_id=$1 AND country_id=$2 AND section_id=$3`, [eventId, countryId, sectionId]);
   const currentStatus = currentStatusRow?.status || 'draft';
 
-  if (isCollab) {
-    await pool.query(
-      `
-      UPDATE tp_content
-      SET html_content=$4, last_updated_at=NOW(), last_updated_by_user_id=$5
-      WHERE event_id=$1 AND country_id=$2 AND section_id=$3
-      `,
-      [eventId, countryId, sectionId, htmlContent, req.user.id]
-    );
-  } else {
-    await pool.query(
-      `
-      UPDATE tp_content
-      SET html_content=$4, last_updated_at=NOW(), last_updated_by_user_id=$5
-      WHERE event_id=$1 AND country_id=$2 AND section_id=$3
-      `,
-      [eventId, countryId, sectionId, htmlContent, req.user.id]
-    );
-  }
+  await pool.query(
+    `
+    UPDATE tp_content
+    SET html_content=$4, last_updated_at=NOW(), last_updated_by_user_id=$5,
+        last_content_edited_at=NOW(), last_content_edited_by_user_id=$5
+    WHERE event_id=$1 AND country_id=$2 AND section_id=$3
+    `,
+    [eventId, countryId, sectionId, htmlContent, req.user.id]
+  );
 
   await recordHistory({ eventId, countryId, sectionId, action: 'saved', fromStatus: currentStatus, toStatus: currentStatus,
     userId: req.user.id, userName: req.user.full_name || req.user.username, userRole: roleKey });
@@ -1886,7 +1883,8 @@ app.post('/api/tp/submit', authRequired, attachUser, async (req, res) => {
       await pool.query(
         `UPDATE tp_content
          SET html_content=$4, last_updated_at=NOW(), last_updated_by_user_id=$5, status=$6, status_comment=NULL,
-             original_submitter_role=$7, return_target_role=NULL
+             original_submitter_role=$7, return_target_role=NULL,
+             last_content_edited_at=NOW(), last_content_edited_by_user_id=$5
          WHERE event_id=$1 AND country_id=$2 AND section_id=$3`,
         [eventId, countryId, sectionId, htmlContent, req.user.id, targetStatus, roleKey]
       );
@@ -1903,7 +1901,8 @@ app.post('/api/tp/submit', authRequired, attachUser, async (req, res) => {
     if (htmlContent !== null) {
       await pool.query(
         `UPDATE tp_content
-         SET html_content=$4, last_updated_at=NOW(), last_updated_by_user_id=$5, status=$6, status_comment=NULL
+         SET html_content=$4, last_updated_at=NOW(), last_updated_by_user_id=$5, status=$6, status_comment=NULL,
+             last_content_edited_at=NOW(), last_content_edited_by_user_id=$5
          WHERE event_id=$1 AND country_id=$2 AND section_id=$3`,
         [eventId, countryId, sectionId, htmlContent, req.user.id, targetStatus]
       );
