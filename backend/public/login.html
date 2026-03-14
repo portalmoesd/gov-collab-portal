@@ -9,12 +9,17 @@
   <style>
     .login-wrap { max-width: 520px; margin: 0 auto; padding-top: 70px; }
     .login-btn  { min-width: 110px; }
-    .login-logo { display: block; width: 160px; height: auto; margin: 0 0 20px; }
+    .login-logo {
+      display: block; width: 144px; height: auto; margin: 0 0 20px;
+      filter: invert(22%) sepia(20%) saturate(800%) hue-rotate(172deg) brightness(90%) contrast(95%);
+      -webkit-mask-image: linear-gradient(135deg, #2b445b 60%, #4a7096 100%);
+      mask-image: linear-gradient(135deg, #2b445b 60%, #4a7096 100%);
+    }
     @media (max-width: 600px) {
       .login-wrap    { padding-top: 28px; padding-left: 16px; padding-right: 16px; }
       .login-actions { flex-direction: column; align-items: stretch; }
       .login-btn     { width: 100%; }
-      .login-logo    { width: 130px; }
+      .login-logo    { width: 117px; }
     }
   </style>
 </head>
@@ -22,7 +27,7 @@
   <div class="main login-wrap">
     <div class="card">
       <img src="assets/logo.svg" alt="GOV COLLAB PORTAL" class="login-logo" />
-      <div class="muted small" style="margin-bottom:14px;">Login with your username and password.</div>
+
       <form id="loginForm" class="grid">
         <div class="col-12 field">
           <label>Username</label>
