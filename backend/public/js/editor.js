@@ -21,7 +21,6 @@
   const btnReturn = document.getElementById("btnReturn");
   const btnUpload = document.getElementById("btnUpload");
   const btnAskToReturn = document.getElementById("btnAskToReturn");
-  const btnComments = document.getElementById("btnComments");
   const commentsPanel = document.getElementById("commentsPanel");
   const commentsList = document.getElementById("commentsList");
   const commentInput = document.getElementById("commentInput");
@@ -221,7 +220,7 @@
       if (richEditorInstance){
         richEditorInstance.setHtml(tp.htmlContent || '');
       } else {
-        richEditorInstance = window.GCP.RichEditor({ container: editorFrame, initialHtml: tp.htmlContent || '', authorName: me.full_name || me.username || 'Unknown' });
+        richEditorInstance = window.GCP.RichEditor({ container: editorFrame, initialHtml: tp.htmlContent || '', authorName: me.full_name || me.username || 'Unknown', onCommentsClick: toggleCommentsPanel });
       }
       if (richEditorInstance && richEditorInstance.el){
         richEditorInstance.el.contentEditable = canEdit ? 'true' : 'false';
@@ -434,12 +433,11 @@
 
   function renderComments(comments) {
     if (!commentsList) return;
+    if (richEditorInstance) richEditorInstance.setCommentsBadge((comments || []).length);
     if (!comments || !comments.length) {
       commentsList.innerHTML = '<div class="ecp-empty">No comments yet.</div>';
-      if (btnComments) btnComments.classList.remove('has-comments');
       return;
     }
-    if (btnComments) btnComments.classList.add('has-comments');
     commentsList.innerHTML = comments.map(c => {
       const author = window.GCP.escapeHtml(c.author_name || 'Unknown');
       const text   = window.GCP.escapeHtml(c.comment_text || '');
@@ -483,16 +481,19 @@
     }
   }
 
-  if (btnComments && commentsPanel) {
-    btnComments.addEventListener('click', () => {
-      const open = commentsPanel.style.display !== 'none';
-      commentsPanel.style.display = open ? 'none' : '';
-      if (!open) loadComments();
-    });
+  function toggleCommentsPanel() {
+    if (!commentsPanel) return;
+    const open = commentsPanel.style.display !== 'none';
+    commentsPanel.style.display = open ? 'none' : '';
+    if (richEditorInstance) richEditorInstance.setCommentsActive(!open);
+    if (!open) loadComments();
   }
 
   if (closePanelBtn && commentsPanel) {
-    closePanelBtn.addEventListener('click', () => { commentsPanel.style.display = 'none'; });
+    closePanelBtn.addEventListener('click', () => {
+      commentsPanel.style.display = 'none';
+      if (richEditorInstance) richEditorInstance.setCommentsActive(false);
+    });
   }
 
   if (addCommentBtn && commentInput) {
