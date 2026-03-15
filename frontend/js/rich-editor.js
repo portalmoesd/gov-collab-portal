@@ -187,13 +187,20 @@
     .gcp-re-balloon-del { background:rgba(185,28,28,.10); color:#b91c1c; }
     .gcp-re-balloon-del:hover { background:rgba(185,28,28,.22); }
     /* ── Fullscreen ── */
-    .gcp-re-wrap.gcp-fullscreen { position:fixed; inset:0; z-index:9990; border-radius:0; border:none; width:100vw; height:100dvh; display:flex; flex-direction:column; background:#ffffff !important; }
-    .gcp-re-wrap.gcp-fullscreen .gcp-re-content-row { flex:1 1 0; min-height:0; overflow-y:auto; }
-    .gcp-re-wrap.gcp-fullscreen .gcp-re-body { min-height:0; height:100%; }
+    .gcp-re-wrap.gcp-fullscreen { position:fixed; inset:0; z-index:9990; border-radius:0; border:none; width:100vw; height:100dvh; display:flex; flex-direction:column; background:#f1f5f9 !important; }
+    .gcp-re-wrap.gcp-fullscreen .gcp-re-content-row { flex:1 1 0; min-height:0; overflow-y:auto; padding:0 48px; }
+    .gcp-re-wrap.gcp-fullscreen .gcp-re-body { min-height:0; height:100%; background:#ffffff; box-shadow:0 1px 4px rgba(15,23,42,.08); border-radius:4px; padding:32px 48px; }
+    .gcp-re-fs-titlebar { display:none; align-items:center; gap:10px; padding:10px 56px; background:#ffffff; border-bottom:1px solid #e2e8f0; flex-shrink:0; }
+    .gcp-re-wrap.gcp-fullscreen .gcp-re-fs-titlebar { display:flex; }
+    .gcp-re-fs-title { font-size:14px; font-weight:700; color:#0f172a; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    [data-theme="dark"] .gcp-re-wrap.gcp-fullscreen { background:#161b27 !important; }
+    [data-theme="dark"] .gcp-re-wrap.gcp-fullscreen .gcp-re-body { background:#1e212c; box-shadow:0 1px 4px rgba(0,0,0,.25); }
+    [data-theme="dark"] .gcp-re-wrap.gcp-fullscreen .gcp-re-fs-titlebar { background:#1e212c; border-color:#2d3348; }
+    [data-theme="dark"] .gcp-re-fs-title { color:#f1f5f9; }
     .gcp-re-btn-fullscreen-icon-expand,.gcp-re-btn-fullscreen-icon-compress { pointer-events:none; }
     .gcp-re-wrap:not(.gcp-fullscreen) .gcp-re-btn-fullscreen-icon-compress { display:none; }
     .gcp-re-wrap.gcp-fullscreen .gcp-re-btn-fullscreen-icon-expand { display:none; }
-    [data-theme="dark"] .gcp-re-wrap.gcp-fullscreen { background:#1e212c !important; }
+    /* dark-mode fullscreen handled above */
     /* Right-click context menu */
     .gcp-re-ctx { position:fixed; z-index:9999; background:#fff; border:1px solid #e2e8f0; border-radius:9px; box-shadow:0 4px 20px rgba(15,23,42,.14); padding:4px; min-width:160px; }
     .gcp-re-ctx-item { display:flex; align-items:center; gap:7px; padding:7px 12px; border-radius:6px; font-size:13px; font-weight:600; color:#0f172a; cursor:pointer; white-space:nowrap; transition:background .1s; }
@@ -267,7 +274,7 @@
 
   // ── RichEditor factory ─────────────────────────────────────────────────────
 
-  function RichEditor({ container, initialHtml, placeholder, authorName, onCommentsClick, onDeleteComment, onReplyComment }) {
+  function RichEditor({ container, initialHtml, placeholder, authorName, sectionTitle, onCommentsClick, onDeleteComment, onReplyComment }) {
     injectStyle();
 
     const wrap = document.createElement('div');
@@ -506,7 +513,15 @@
     contentRow.appendChild(marginEl);
     contentRow.addEventListener('scroll', positionBalloons);
 
+    const fsTitleBar = document.createElement('div');
+    fsTitleBar.className = 'gcp-re-fs-titlebar';
+    const fsTitleEl = document.createElement('span');
+    fsTitleEl.className = 'gcp-re-fs-title';
+    fsTitleEl.textContent = sectionTitle || '';
+    fsTitleBar.appendChild(fsTitleEl);
+
     wrap.appendChild(toolbar);
+    wrap.appendChild(fsTitleBar);
     wrap.appendChild(tcBar);
     wrap.appendChild(contentRow);
     container.innerHTML = '';
