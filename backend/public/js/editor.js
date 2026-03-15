@@ -21,11 +21,8 @@
   const btnReturn = document.getElementById("btnReturn");
   const btnUpload = document.getElementById("btnUpload");
   const btnAskToReturn = document.getElementById("btnAskToReturn");
-  const commentsPanel = document.getElementById("commentsPanel");
-  const commentsList = document.getElementById("commentsList");
-  const commentInput = document.getElementById("commentInput");
-  const addCommentBtn = document.getElementById("addCommentBtn");
-  const closePanelBtn = document.getElementById("closePanelBtn");
+  const cmtCol     = document.getElementById("cmtCol");
+  const cmtOverlay = document.getElementById("cmtOverlay");
 
   const actionButtons = [btnSave, btnSubmit, btnApprove, btnReturn];
 
@@ -422,54 +419,94 @@
     });
   }
 
-  // ---- Comments panel ----
+  // ── Comments (Word-style bubbles) ────────────────────────────────────────
 
-  function formatCommentTime(iso) {
+  function cmtGetInitials(name) {
+    return (name || '').split(/\s+/).filter(Boolean).slice(0, 2)
+      .map(s => s[0] && s[0].toUpperCase()).filter(Boolean).join('') || '?';
+  }
+
+  function cmtAuthorColor(name) {
+    const palette = ['#1d4ed8','#b91c1c','#15803d','#7c3aed','#c2410c','#0f766e','#9d174d','#3730a3'];
+    let h = 0;
+    for (let i = 0; i < (name || '').length; i++) h = (h * 31 + name.charCodeAt(i)) >>> 0;
+    return palette[h % palette.length];
+  }
+
+  function cmtRelTime(iso) {
+    if (!iso) return '';
     try {
-      const d = new Date(iso);
-      return d.toLocaleString(undefined, { month:'short', day:'numeric', year:'numeric', hour:'2-digit', minute:'2-digit' });
-    } catch(_) { return iso || ''; }
+      const diff = Math.floor((Date.now() - new Date(iso)) / 1000);
+      if (diff < 60)    return 'just now';
+      if (diff < 3600)  return Math.floor(diff / 60) + 'm ago';
+      if (diff < 86400) return Math.floor(diff / 3600) + 'h ago';
+      return new Date(iso).toLocaleString(undefined, { month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' });
+    } catch(_) { return ''; }
+  }
+
+  function positionBubbles() {
+    if (!cmtOverlay || !richEditorInstance) return;
+    const overlayTop = cmtOverlay.getBoundingClientRect().top + window.scrollY;
+    const bubbles = Array.from(cmtOverlay.querySelectorAll('.gcp-cmt-bubble'));
+    let minTop = 0;
+    bubbles.forEach(bubble => {
+      const anchorId = bubble.dataset.anchorId;
+      let idealTop = minTop;
+      if (anchorId) {
+        const anchor = richEditorInstance.el.querySelector(`[data-cmt-anchor-id="${anchorId}"]`);
+        if (anchor) {
+          const absY = anchor.getBoundingClientRect().top + window.scrollY;
+          idealTop = Math.max(absY - overlayTop, minTop);
+        }
+      }
+      bubble.style.top = idealTop + 'px';
+      minTop = idealTop + bubble.offsetHeight + 8;
+    });
+    if (bubbles.length) {
+      const last = bubbles[bubbles.length - 1];
+      cmtOverlay.style.minHeight = (parseFloat(last.style.top) + last.offsetHeight + 20) + 'px';
+    }
+  }
+
+  function createCommentBubble(c) {
+    const color    = cmtAuthorColor(c.author_name || '');
+    const initials = cmtGetInitials(c.author_name || '');
+    const div = document.createElement('div');
+    div.className = 'gcp-cmt-bubble';
+    if (c.anchor_id) div.dataset.anchorId = c.anchor_id;
+    div.dataset.commentId = String(c.id);
+    div.innerHTML = `
+      <div class="gcp-cmt-header">
+        <span class="gcp-cmt-avatar" style="background:${window.GCP.escapeHtml(color)}">${window.GCP.escapeHtml(initials)}</span>
+        <span class="gcp-cmt-author">${window.GCP.escapeHtml(c.author_name || 'Unknown')}</span>
+        <span class="gcp-cmt-time">${window.GCP.escapeHtml(cmtRelTime(c.created_at))}</span>
+      </div>
+      <div class="gcp-cmt-text">${window.GCP.escapeHtml(c.comment_text || '')}</div>
+      ${c.is_own ? `<div class="gcp-cmt-actions"><button class="gcp-cmt-resolve" type="button">Resolve</button></div>` : ''}
+    `;
+    if (c.is_own) {
+      div.querySelector('.gcp-cmt-resolve').addEventListener('click', async () => {
+        try {
+          await window.GCP.apiFetch(`/tp/comments/${c.id}`, { method: 'DELETE' });
+          if (c.anchor_id && richEditorInstance) richEditorInstance.removeCommentAnchor(c.anchor_id);
+          await loadComments();
+        } catch(e) { msg.textContent = e.message || 'Could not resolve comment'; }
+      });
+    }
+    return div;
   }
 
   function renderComments(comments) {
-    if (!commentsList) return;
+    if (!cmtOverlay) return;
     if (richEditorInstance) richEditorInstance.setCommentsBadge((comments || []).length);
-    if (!comments || !comments.length) {
-      commentsList.innerHTML = '<div class="ecp-empty">No comments yet.</div>';
-      return;
-    }
-    commentsList.innerHTML = comments.map(c => {
-      const author = window.GCP.escapeHtml(c.author_name || 'Unknown');
-      const text   = window.GCP.escapeHtml(c.comment_text || '');
-      const time   = window.GCP.escapeHtml(formatCommentTime(c.created_at));
-      const delBtn = c.is_own
-        ? `<button class="ecp-comment-del" data-id="${c.id}" type="button">Delete</button>`
-        : '';
-      return `<div class="ecp-comment" data-comment-id="${c.id}">
-        <div class="ecp-comment-meta">
-          <span class="ecp-comment-author">${author}</span>
-          <span class="ecp-comment-time">${time}</span>
-        </div>
-        <div class="ecp-comment-text">${text}</div>
-        ${delBtn}
-      </div>`;
-    }).join('');
-    // Wire delete buttons
-    commentsList.querySelectorAll('.ecp-comment-del').forEach(btn => {
-      btn.addEventListener('click', async () => {
-        const id = btn.dataset.id;
-        try {
-          await window.GCP.apiFetch(`/tp/comments/${id}`, { method: 'DELETE' });
-          await loadComments();
-        } catch(e) {
-          msg.textContent = e.message || 'Delete failed';
-        }
-      });
-    });
+    // Remove existing comment bubbles (keep the new-comment bubble if present)
+    cmtOverlay.querySelectorAll('.gcp-cmt-bubble:not(.gcp-cmt-bubble--new)').forEach(el => el.remove());
+    (comments || []).forEach(c => cmtOverlay.appendChild(createCommentBubble(c)));
+    requestAnimationFrame(positionBubbles);
   }
 
   async function loadComments() {
-    if (!commentsList || !eventId || !sectionId) return;
+    if (!cmtOverlay || !eventId || !sectionId) return;
     try {
       const data = await window.GCP.apiFetch(
         `/tp/comments?event_id=${encodeURIComponent(eventId)}&section_id=${encodeURIComponent(sectionId)}`,
@@ -477,48 +514,92 @@
       );
       renderComments(data.comments || []);
     } catch(e) {
-      if (commentsList) commentsList.innerHTML = `<div class="ecp-empty" style="color:#dc2626">Could not load comments.</div>`;
+      if (cmtOverlay) cmtOverlay.innerHTML = `<div class="gcp-cmt-error">Could not load comments.</div>`;
     }
   }
 
-  function toggleCommentsPanel() {
-    if (!commentsPanel) return;
-    const open = commentsPanel.style.display !== 'none';
-    commentsPanel.style.display = open ? 'none' : '';
-    if (richEditorInstance) richEditorInstance.setCommentsActive(!open);
-    if (!open) loadComments();
-  }
+  // New-comment input bubble (shown when toolbar Comments button is clicked)
+  let _newCmtBubble = null;
 
-  if (closePanelBtn && commentsPanel) {
-    closePanelBtn.addEventListener('click', () => {
-      commentsPanel.style.display = 'none';
+  function toggleCommentsPanel(anchorId) {
+    // If a new-comment bubble is already open, cancel it
+    if (_newCmtBubble) {
+      const oldAnchor = _newCmtBubble._anchorId;
+      _newCmtBubble.remove();
+      _newCmtBubble = null;
+      if (oldAnchor && richEditorInstance) richEditorInstance.removeCommentAnchor(oldAnchor);
       if (richEditorInstance) richEditorInstance.setCommentsActive(false);
-    });
-  }
+      return;
+    }
 
-  if (addCommentBtn && commentInput) {
-    addCommentBtn.addEventListener('click', async () => {
-      const text = (commentInput.value || '').trim();
+    if (!cmtOverlay) return;
+
+    const myColor    = cmtAuthorColor(me.full_name || me.username || '');
+    const myInitials = cmtGetInitials(me.full_name || me.username || '');
+    const bubble = document.createElement('div');
+    bubble.className = 'gcp-cmt-bubble gcp-cmt-bubble--new';
+    bubble._anchorId = anchorId;
+    bubble.innerHTML = `
+      <div class="gcp-cmt-header">
+        <span class="gcp-cmt-avatar" style="background:${window.GCP.escapeHtml(myColor)}">${window.GCP.escapeHtml(myInitials)}</span>
+        <span class="gcp-cmt-author">${window.GCP.escapeHtml(me.full_name || me.username || 'You')}</span>
+      </div>
+      <textarea class="gcp-cmt-input" placeholder="Add a comment…" rows="3"></textarea>
+      <div class="gcp-cmt-actions">
+        <button class="gcp-cmt-save" type="button">Save</button>
+        <button class="gcp-cmt-cancel" type="button">Cancel</button>
+      </div>
+    `;
+    cmtOverlay.appendChild(bubble);
+    _newCmtBubble = bubble;
+    if (richEditorInstance) richEditorInstance.setCommentsActive(true);
+
+    // Position the bubble next to its anchor
+    requestAnimationFrame(() => {
+      if (anchorId && richEditorInstance) {
+        const anchor = richEditorInstance.el.querySelector(`[data-cmt-anchor-id="${anchorId}"]`);
+        if (anchor) {
+          const overlayTop = cmtOverlay.getBoundingClientRect().top + window.scrollY;
+          const absY = anchor.getBoundingClientRect().top + window.scrollY;
+          bubble.style.top = Math.max(0, absY - overlayTop) + 'px';
+        }
+      }
+      bubble.querySelector('.gcp-cmt-input').focus();
+    });
+
+    bubble.querySelector('.gcp-cmt-save').addEventListener('click', async () => {
+      const text = bubble.querySelector('.gcp-cmt-input').value.trim();
       if (!text) return;
-      addCommentBtn.disabled = true;
+      bubble.querySelector('.gcp-cmt-save').disabled = true;
       try {
         await window.GCP.apiFetch('/tp/comments', {
           method: 'POST',
-          body: JSON.stringify({ eventId, sectionId, commentText: text })
+          body: JSON.stringify({ eventId, sectionId, commentText: text, anchorId: anchorId || null })
         });
-        commentInput.value = '';
+        bubble.remove(); _newCmtBubble = null;
+        if (richEditorInstance) richEditorInstance.setCommentsActive(false);
         await loadComments();
       } catch(e) {
         msg.textContent = e.message || 'Could not post comment';
-      } finally {
-        addCommentBtn.disabled = false;
+        bubble.querySelector('.gcp-cmt-save').disabled = false;
       }
     });
-    // Post on Ctrl+Enter
-    commentInput.addEventListener('keydown', e => {
-      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') { e.preventDefault(); addCommentBtn.click(); }
+
+    bubble.querySelector('.gcp-cmt-cancel').addEventListener('click', () => {
+      if (anchorId && richEditorInstance) richEditorInstance.removeCommentAnchor(anchorId);
+      bubble.remove(); _newCmtBubble = null;
+      if (richEditorInstance) richEditorInstance.setCommentsActive(false);
+    });
+
+    bubble.querySelector('.gcp-cmt-input').addEventListener('keydown', e => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') { e.preventDefault(); bubble.querySelector('.gcp-cmt-save').click(); }
+      if (e.key === 'Escape') bubble.querySelector('.gcp-cmt-cancel').click();
     });
   }
+
+  // Re-position bubbles on window scroll/resize
+  window.addEventListener('scroll', () => requestAnimationFrame(positionBubbles), { passive: true });
+  window.addEventListener('resize', () => requestAnimationFrame(positionBubbles), { passive: true });
 
   try{
     await load();

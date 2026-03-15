@@ -203,6 +203,9 @@
     }
     [data-theme="dark"] .gcp-re-wrap.tc-visible .gcp-re-body ins[data-tc-id] { background:color-mix(in srgb, var(--tc-color,#1d4ed8) 18%, transparent); }
     [data-theme="dark"] .gcp-re-wrap.tc-visible .gcp-re-body del[data-tc-id] { background:color-mix(in srgb, var(--tc-color,#1d4ed8) 18%, transparent); }
+    /* Comment anchors – yellow highlight on anchored text */
+    .gcp-re-body .gcp-cmt-anchor { background:rgba(255,210,0,.28); border-bottom:2px solid rgba(200,150,0,.5); border-radius:2px; cursor:default; }
+    .gcp-re-body .gcp-cmt-anchor:hover { background:rgba(255,210,0,.45); }
   `;
 
   let styleInjected = false;
@@ -577,7 +580,18 @@
         while (el.firstChild) el.parentNode.insertBefore(el.firstChild, el);
         el.remove();
       });
+      clone.querySelectorAll('.gcp-cmt-anchor').forEach(el => {
+        while (el.firstChild) el.parentNode.insertBefore(el.firstChild, el);
+        el.remove();
+      });
       return clone.innerHTML.replace(/(<br\s*\/?>|\s|&nbsp;)*$/, '').trim();
+    }
+
+    function removeCommentAnchor(anchorId) {
+      const span = body.querySelector(`.gcp-cmt-anchor[data-cmt-anchor-id="${anchorId}"]`);
+      if (!span) return;
+      while (span.firstChild) span.parentNode.insertBefore(span.firstChild, span);
+      span.remove();
     }
 
     // ── TC mutation helpers ──────────────────────────────────────────────────
@@ -700,7 +714,24 @@
 
     cmtBtn.addEventListener('mousedown', e => e.preventDefault());
     cmtBtn.addEventListener('click', () => {
-      if (onCommentsClick) onCommentsClick();
+      const sel = window.getSelection();
+      let anchorId = null;
+      if (sel && !sel.isCollapsed && sel.rangeCount) {
+        const range = sel.getRangeAt(0);
+        if (body.contains(range.commonAncestorContainer)) {
+          anchorId = 'cmt-' + Math.random().toString(36).slice(2, 10);
+          const span = document.createElement('span');
+          span.className = 'gcp-cmt-anchor';
+          span.setAttribute('data-cmt-anchor-id', anchorId);
+          try {
+            const frag = range.extractContents();
+            span.appendChild(frag);
+            range.insertNode(span);
+            sel.removeAllRanges();
+          } catch(_) { anchorId = null; }
+        }
+      }
+      if (onCommentsClick) onCommentsClick(anchorId);
     });
 
     // ── beforeinput: always intercept text mutations ─────────────────────────
@@ -785,7 +816,7 @@
     return {
       getHtml, getCleanHtml, setHtml, destroy, focus, el: body,
       acceptAllChanges, rejectAllChanges, hasTrackedChanges,
-      setCommentsActive, setCommentsBadge,
+      setCommentsActive, setCommentsBadge, removeCommentAnchor,
     };
   }
 

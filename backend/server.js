@@ -154,9 +154,11 @@ async function ensureSchema() {
       user_id     INTEGER NOT NULL REFERENCES users(id),
       author_name TEXT NOT NULL,
       comment_text TEXT NOT NULL,
+      anchor_id   TEXT,
       created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )
   `).catch(()=>{});
+  await pool.query(`ALTER TABLE tp_section_comments ADD COLUMN IF NOT EXISTS anchor_id TEXT`).catch(()=>{});
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_tsc_lookup ON tp_section_comments(event_id, country_id, section_id)`).catch(()=>{});
 }
 
@@ -2902,7 +2904,7 @@ app.get('/api/tp/comments', authRequired, attachUser, asyncRoute(async (req, res
   const countryId = await resolveCountryIdForEvent(event_id);
   if (!countryId) return res.status(404).json({ error: 'Country not found for event' });
   const rows = await pool.query(
-    `SELECT id, author_name, comment_text, created_at,
+    `SELECT id, author_name, comment_text, anchor_id, created_at,
             (user_id = $4) AS is_own
      FROM tp_section_comments
      WHERE event_id=$1 AND country_id=$2 AND section_id=$3
@@ -2913,16 +2915,16 @@ app.get('/api/tp/comments', authRequired, attachUser, asyncRoute(async (req, res
 }));
 
 app.post('/api/tp/comments', authRequired, attachUser, asyncRoute(async (req, res) => {
-  const { eventId, sectionId, commentText } = req.body || {};
+  const { eventId, sectionId, commentText, anchorId } = req.body || {};
   if (!eventId || !sectionId || !commentText?.trim())
     return res.status(400).json({ error: 'Missing required fields' });
   const countryId = await resolveCountryIdForEvent(eventId);
   if (!countryId) return res.status(404).json({ error: 'Country not found for event' });
   const authorName = req.user.full_name || req.user.username || 'Unknown';
   const row = await pool.query(
-    `INSERT INTO tp_section_comments (event_id, country_id, section_id, user_id, author_name, comment_text)
-     VALUES ($1,$2,$3,$4,$5,$6) RETURNING id, author_name, comment_text, created_at`,
-    [eventId, countryId, sectionId, req.user.id, authorName, commentText.trim()]
+    `INSERT INTO tp_section_comments (event_id, country_id, section_id, user_id, author_name, comment_text, anchor_id)
+     VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING id, author_name, comment_text, anchor_id, created_at`,
+    [eventId, countryId, sectionId, req.user.id, authorName, commentText.trim(), anchorId || null]
   );
   res.json({ comment: { ...row.rows[0], is_own: true } });
 }));
