@@ -278,6 +278,11 @@
         if (node.color) m.color = node.color;
       }
 
+      // Comment anchor spans
+      if (tag === 'span' && node.hasAttribute('data-cmt-anchor-id')) {
+        m.cmtAnchorId = node.getAttribute('data-cmt-anchor-id');
+      }
+
       // Track-change markup (v1 compatibility)
       if (tag === 'ins' && node.hasAttribute('data-tc-id')) {
         p = {
@@ -407,6 +412,10 @@
   .gcp-re-v2-host:not(.tc-visible) ins[data-tc-id]{color:inherit;text-decoration:none}
   .gcp-re-v2-host:not(.tc-visible) del[data-tc-id]{display:none}
   .gcp-re-v2-host:not(.tc-visible) span[data-tc-fmt-id]{outline:none}
+  /* ── Comment anchors ── */
+  .gcp-re-cmt-anchor{border-bottom:2px solid #f59e0b;cursor:pointer;border-radius:2px;transition:background .1s}
+  .gcp-re-cmt-anchor:hover,.gcp-re-cmt-anchor--active{background:rgba(245,158,11,.18)}
+  .gcp-re-v2-wrapper.gcp-re-v2-comments-active .gcp-re-cmt-anchor{background:rgba(245,158,11,.10)}
   `;
 
   // ── Model → DOM renderer ───────────────────────────────────────────────────
@@ -496,7 +505,16 @@
     if (m.italic)        { const el = document.createElement('em');     el.appendChild(node); node = el; }
     if (m.bold)          { const el = document.createElement('strong'); el.appendChild(node); node = el; }
 
-    // 4. Track-change wrapper
+    // 4. Comment-anchor wrapper
+    if (m.cmtAnchorId) {
+      const span = document.createElement('span');
+      span.setAttribute('data-cmt-anchor-id', m.cmtAnchorId);
+      span.className = 'gcp-re-cmt-anchor';
+      span.appendChild(node);
+      node = span;
+    }
+
+    // 5. Track-change wrapper
     const p = run.pending;
     if (p) {
       const [color] = TC_PALETTE[authorColorIdx(p.author)];
@@ -642,6 +660,7 @@
       if (m.underline)     html = `<u>${html}</u>`;
       if (m.italic)        html = `<em>${html}</em>`;
       if (m.bold)          html = `<strong>${html}</strong>`;
+      if (m.cmtAnchorId)   html = `<span data-cmt-anchor-id="${esc(m.cmtAnchorId)}" class="gcp-re-cmt-anchor">${html}</span>`;
       return html;
     }).join('');
   }
@@ -1493,9 +1512,11 @@
                           onDeleteComment, onReplyComment }) {
 
     // ── State ─────────────────────────────────────────────────────────────
-    let model     = htmlToModel(initialHtml || '');
-    let tcVisible = true;
-    const author  = authorName || 'Unknown';
+    let model          = htmlToModel(initialHtml || '');
+    let tcVisible      = true;
+    let comments       = [];       // latest comments array from setComments()
+    let commentsActive = false;    // true while a comment-input float is open
+    const author       = authorName || 'Unknown';
 
     // ── CSS injection (once per page) ─────────────────────────────────────
     if (!document.getElementById('gcp-re-v2-style')) {
@@ -1525,6 +1546,14 @@
     editorArea.append(host, balloonArea);
     wrapper.append(toolbar, editorArea);
     container.appendChild(wrapper);
+
+    // editor.js does `richEditorInstance.el.contentEditable = 'true'/'false'`
+    // which must control the inner host, not the wrapper div.
+    Object.defineProperty(wrapper, 'contentEditable', {
+      get()  { return host.contentEditable; },
+      set(v) { host.contentEditable = v; },
+      configurable: true,
+    });
 
     // ── Popup registry ────────────────────────────────────────────────────
     const allPopups = [];
@@ -1666,6 +1695,7 @@
       host.appendChild(renderModel(model));
       host.classList.toggle('tc-visible', tcVisible);
       updateBalloons();
+      updateCommentHighlights();
       updateToolbarState();
       if (cursorPos) restoreCaret(cursorPos);
     }
@@ -1908,6 +1938,19 @@
     });
     toolbar.append(btnTcToggle, btnAcceptAll, btnRejectAll);
 
+    // ── Comment anchor button ─────────────────────────────────────────────
+    const btnComment = mkBtn('Add comment', '&#128172;', () => {
+      if (!onCommentsClick) return;
+      const range = getDocRange();
+      if (!range) return;
+      const anchorId = 'cmt-' + Date.now() + '-' + Math.random().toString(36).slice(2, 7);
+      // Apply anchor mark without TC tracking (it's not a content change)
+      model = cmdApplyMarkFn(model, range, m => ({ ...m, cmtAnchorId: anchorId }));
+      rerender();
+      onCommentsClick(anchorId);
+    });
+    if (onCommentsClick) { toolbar.append(mkSep(), btnComment); }
+
     // ── Balloons ──────────────────────────────────────────────────────────
 
     function updateBalloons() {
@@ -1955,6 +1998,37 @@
         balloon.append(header, desc, acts);
         balloonArea.appendChild(balloon);
       });
+    }
+
+    // ── Comment highlights ────────────────────────────────────────────────
+
+    function updateCommentHighlights() {
+      const activeIds = new Set((comments || []).map(c => c.anchorId).filter(Boolean));
+      host.querySelectorAll('[data-cmt-anchor-id]').forEach(el => {
+        const id = el.getAttribute('data-cmt-anchor-id');
+        el.classList.toggle('gcp-re-cmt-anchor--active', activeIds.has(id));
+        el.onclick = () => { if (onCommentsClick) onCommentsClick(id); };
+      });
+    }
+
+    function setComments(newComments) {
+      comments = newComments || [];
+      updateCommentHighlights();
+    }
+
+    function removeCommentAnchor(anchorId) {
+      model = transformAllRuns(model, run => {
+        if (!run.marks || run.marks.cmtAnchorId !== anchorId) return run;
+        const { cmtAnchorId, ...rest } = run.marks;
+        return { ...run, marks: rest };
+      });
+      rerender();
+    }
+
+    function setCommentsActive(bool) {
+      commentsActive = !!bool;
+      wrapper.classList.toggle('gcp-re-v2-comments-active', commentsActive);
+      if (btnComment) btnComment.classList.toggle('active', commentsActive);
     }
 
     // ── Toolbar state sync ────────────────────────────────────────────────
@@ -2072,12 +2146,15 @@
 
     // ── Public API ────────────────────────────────────────────────────────
     return {
-      el:          wrapper,
-      getHtml()    { return modelToHtml(model); },
-      setHtml(html){ model = htmlToModel(html || ''); rerender(); },
-      getModel()   { return model; },
-      hasChanges() { return tcHasChanges(model); },
-      setComments(){ },
+      el:                    wrapper,
+      getHtml()              { return modelToHtml(model); },
+      setHtml(html)          { model = htmlToModel(html || ''); rerender(); },
+      getModel()             { return model; },
+      hasChanges()           { return tcHasChanges(model); },
+      hasTrackedChanges()    { return tcHasChanges(model); },  // alias used by editor.js
+      setComments(c)         { setComments(c); },
+      removeCommentAnchor(id){ removeCommentAnchor(id); },
+      setCommentsActive(b)   { setCommentsActive(b); },
     };
   }
 
@@ -2116,11 +2193,11 @@
     tcGetChanges, tcCountChanges, tcHasChanges, tcGetAuthors,
   };
 
-  // NOTE: window.GCP.RichEditor is intentionally NOT replaced here.
-  // That swap happens in Step 7 once the full feature set is in place.
-  // During development, load this file alongside rich-editor.js and call
-  //   window.GCP._editorModel.htmlToModel(html)
-  // to verify the pipeline without affecting the running app.
+  // Step 7: live cutover — v2 becomes the canonical RichEditor.
+  // The v1 implementation (if present) is preserved as _RichEditorV1 so it
+  // can still be invoked for debugging: window.GCP._RichEditorV1({…})
   window.GCP.RichEditorV2 = RichEditorV2;
+  if (window.GCP.RichEditor) window.GCP._RichEditorV1 = window.GCP.RichEditor;
+  window.GCP.RichEditor = RichEditorV2;
 
 })();
