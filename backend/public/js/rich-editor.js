@@ -198,23 +198,12 @@
     .gcp-re-wrap.tc-visible .gcp-re-body del[data-tc-id] {
       display:inline;
       text-decoration:line-through;
-      text-decoration-color:var(--tc-color,#1d4ed8);
-      background:var(--tc-bg,rgba(29,78,216,.11));
+      text-decoration-color:var(--tc-color,#b91c1c);
+      color:var(--tc-color,#b91c1c);
       border-radius:2px; padding:0 1px; cursor:default;
     }
-    /* Author initials chip after each marked-up element */
-    .gcp-re-wrap.tc-visible .gcp-re-body ins[data-tc-id]::after,
-    .gcp-re-wrap.tc-visible .gcp-re-body del[data-tc-id]::after {
-      content: attr(data-tc-initials);
-      font-size:8px; font-weight:900; letter-spacing:.04em;
-      color:var(--tc-color,#1d4ed8);
-      border:1px solid var(--tc-color,#1d4ed8);
-      border-radius:3px; padding:0 3px; margin-left:3px;
-      vertical-align:middle; line-height:1.5;
-      white-space:nowrap; pointer-events:none;
-    }
     [data-theme="dark"] .gcp-re-wrap.tc-visible .gcp-re-body ins[data-tc-id] { background:color-mix(in srgb, var(--tc-color,#1d4ed8) 18%, transparent); }
-    [data-theme="dark"] .gcp-re-wrap.tc-visible .gcp-re-body del[data-tc-id] { background:color-mix(in srgb, var(--tc-color,#1d4ed8) 18%, transparent); }
+    [data-theme="dark"] .gcp-re-wrap.tc-visible .gcp-re-body del[data-tc-id] { background:color-mix(in srgb, var(--tc-color,#b91c1c) 18%, transparent); }
     /* Comment anchors – yellow highlight on anchored text */
     .gcp-re-body .gcp-cmt-anchor { background:rgba(255,210,0,.28); border-bottom:2px solid rgba(200,150,0,.5); border-radius:2px; cursor:default; }
     .gcp-re-body .gcp-cmt-anchor:hover { background:rgba(255,210,0,.45); }
@@ -654,6 +643,28 @@
 
     // ── TC mutation helpers ──────────────────────────────────────────────────
 
+    // Merge consecutive <ins> elements by the same author into one.
+    // Fixes old per-character stored data on load.
+    function mergeAdjacentIns() {
+      let merged = true;
+      while (merged) {
+        merged = false;
+        body.querySelectorAll('ins[data-tc-id]').forEach(el => {
+          let next = el.nextSibling;
+          // Skip empty text nodes between them
+          while (next && next.nodeType === Node.TEXT_NODE && !next.textContent) next = next.nextSibling;
+          if (next && next.nodeType === Node.ELEMENT_NODE && next.tagName === 'INS' &&
+              next.hasAttribute('data-tc-id') &&
+              next.getAttribute('data-tc-author') === el.getAttribute('data-tc-author')) {
+            while (next.firstChild) el.appendChild(next.firstChild);
+            next.remove();
+            merged = true;
+          }
+        });
+      }
+      body.normalize();
+    }
+
     // Apply author colour/initials attributes to a new ins/del element
     function applyAuthorAttrs(el) {
       const idx = authorColorIdx(tc.authorName);
@@ -914,7 +925,7 @@
       return body.innerHTML.replace(/(<br\s*\/?>|\s|&nbsp;)*$/, '').trim();
     }
 
-    function setHtml(html) { body.innerHTML = html || ''; updateTcBar(); }
+    function setHtml(html) { body.innerHTML = html || ''; mergeAdjacentIns(); updateTcBar(); }
     function destroy()     { container.innerHTML = ''; }
     function focus()       { body.focus(); }
 
@@ -929,6 +940,8 @@
       updateTcBar();
     }
 
+    // Merge any per-character <ins> runs left in the initial HTML
+    if (initialHtml) mergeAdjacentIns();
     updateTcBar();
 
     return {
