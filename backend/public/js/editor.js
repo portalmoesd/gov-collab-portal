@@ -224,6 +224,7 @@
           container: editorFrame,
           initialHtml: tp.htmlContent || '',
           authorName: me.full_name || me.username || 'Unknown',
+          sectionTitle: tp.sectionLabel || '',
           onCommentsClick: toggleCommentsPanel,
           onDeleteComment: handleDeleteComment,
           onReplyComment: handleReplyComment,

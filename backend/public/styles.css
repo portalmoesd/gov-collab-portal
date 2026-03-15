@@ -249,92 +249,69 @@ textarea{min-height:120px; resize:vertical}
 .checkitem:hover{ background:#f8fafc; }
 .checkitem input{ margin-top:2px; }
 
-
-/* Admin assignments layout */
-.grid2{ display:grid; grid-template-columns:1fr 1fr; gap:14px; }
-@media(max-width:900px){ .grid2{ grid-template-columns:1fr; } }
-.cardSub{ background:#fff; border:1px solid #e6e6e6; border-radius:14px; padding:12px; }
-.checklist{ max-height:380px; overflow:auto; padding:4px; }
-.checklist .group{ margin:10px 0; }
-.checklist .group-title{ font-weight:800; margin:8px 0 6px; }
-.checklist label{ display:flex; gap:8px; align-items:center; padding:2px 0; }
-.btn.secondary{ background:#eef2f7; color:#233e57; border:1px solid #cdd7e2; }
-
-
-/* Grouped countries in admin assignments */
-.groupbox{
-  border:1px solid var(--border);
-  background:#fff;
-  border-radius:14px;
-  padding:10px;
-  margin:10px 0;
-}
-.grouphead{
-  font-weight:800;
-  color:var(--ink);
-  margin:0 0 8px;
-}
-
-/* Status progress bar (Collaborator/Super-collab status box) */
+/* ------------------------------
+   Dynamic status progress bar
+   (line sits behind dots only; labels are below so nothing gets crossed out)
+------------------------------ */
 .gcp-progress{
-  position:relative;
-  display:flex;
-  align-items:flex-start;
-  flex-wrap:nowrap;
-  gap:0;
-  padding:4px 2px 0;
-  overflow-x:auto;
+  position: relative;
+  display: flex;
+  gap: 22px;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding: 14px 6px 2px;
 }
-.gcp-progress::before{
-  content:"";
+.gcp-progress .gcp-line{
   position:absolute;
-  left:11px;
-  right:11px;
-  top:13px;
-  height:2px;
-  background: rgba(43,68,91,.18);
-  z-index:0;
+  left: 18px;
+  right: 18px;
+  top: 26px;
+  height: 3px;
+  background: #e5e7eb;
+  border-radius: 999px;
+  z-index: 0;
 }
 .gcp-step{
-  position:relative;
+  position: relative;
+  z-index: 1;
   display:flex;
-  flex:1 0 96px;
-  flex-direction:column;
-  align-items:center;
-  gap:6px;
-  min-width:96px;
+  flex-direction: column;
+  align-items: center;
+  min-width: 84px;
+  text-align: center;
 }
 .gcp-dot{
-  position:relative;
-  z-index:1;
-  width:18px;
-  height:18px;
-  border-radius:999px;
-  border:2px solid rgba(43,68,91,.28);
-  background:#fff;
-  flex:0 0 auto;
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  background: #ffffff;
+  border: 4px solid #d1d5db;
+  box-sizing: border-box;
 }
+.gcp-step.active .gcp-dot{ border-color: #7aa7ff; }
+.gcp-step.done .gcp-dot{ border-color: #2c3e50; }
 .gcp-label{
-  position:relative;
-  z-index:1;
-  font-size:12px;
-  color: rgba(43,68,91,.75);
-  white-space:nowrap;
+  margin-top: 10px;
+  font-size: 14px;
+  color: #6b7280;
+  line-height: 1.1;
   background:#fff;
   padding:0 6px;
   border-radius:8px;
 }
-.gcp-step.done .gcp-dot{
-  background: rgba(16,185,129,.18);
-  border-color: rgba(16,185,129,.65);
+.gcp-step.active .gcp-label{ color:#1f2937; font-weight:600; }
+
+.statusbox{
+  width:100%;
+  background:#f3f4f6;
+  border:1px solid #e5e7eb;
+  border-radius: 14px;
+  padding: 16px 18px;
+  margin-top: 14px;
 }
-.gcp-step.active .gcp-dot{
-  background: rgba(59,130,246,.18);
-  border-color: rgba(59,130,246,.7);
-}
-.gcp-step.todo .gcp-dot{
-  background:#fff;
-}
+.statusbox .meta{ color:#6b7280; font-weight:600; margin-top:6px; }
+.statusbox .taskline{ margin-top: 10px; font-size: 16px; color:#111827; }
+.statusbox .taskline b{ font-weight:800; }
 
 
 /* === Apple status bar v3 (ref) === */

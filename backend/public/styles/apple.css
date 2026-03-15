@@ -1338,6 +1338,19 @@ body.gp-shell-ready .gp-sidebar__scrim{
   --hover-color:#111827;
   --hover-bg:#f1f5f9;
 }
+/* Save button is always fully expanded — never folds */
+#btnSave,
+#btnSave:hover,
+#btnSave:focus-visible,
+#btnSave[disabled],
+#btnSave[disabled]:hover,
+#btnSave[disabled]:focus-visible{
+  width:176px;
+}
+#btnSave .micro-action__label{
+  opacity:1;
+  transform:translateX(0);
+}
 .micro-action--submit{
   --icon-url:url('../assets/submit-icon.svg');
   --icon-color:#1d4ed8;
@@ -1357,7 +1370,7 @@ body.gp-shell-ready .gp-sidebar__scrim{
   --hover-bg:#fdecec;
 }
 .micro-action--ask-to-return{
-  --icon-url:url('../assets/ask_to_return_icon.svg');
+  --icon-url:url('../assets/return-icon.svg');
   --icon-color:#d97706;
   --hover-color:#92400e;
   --hover-bg:#fef3c7;
@@ -1383,6 +1396,13 @@ body.gp-shell-ready .gp-sidebar__scrim{
   .micro-action__icon{ flex-basis:52px; width:52px; height:52px; }
   .micro-action__icon::before{ width:24px; height:24px; }
   .micro-action__label{ display:none; }
+  /* Restore compact size for Save on mobile */
+  #btnSave,
+  #btnSave:hover,
+  #btnSave:focus-visible,
+  #btnSave[disabled],
+  #btnSave[disabled]:hover,
+  #btnSave[disabled]:focus-visible{ width:52px; min-width:52px; }
 }
 
 
@@ -1883,8 +1903,6 @@ body.gp-shell-ready .gp-sidebar__scrim{
 #openEditorSection .field{
   flex:1 1 220px;
   min-width:0;
-  width:min(520px, 100%);
-  max-width:100%;
 }
 #openEditorSection .field select,
 #openEditorSection .field .input,
@@ -3791,126 +3809,12 @@ body.gp-shell-ready .gp-sidebar__scrim{
 .required-sections-table thead th.th-actions{ text-align:right; }
 
 /* File upload action */
-.micro-action--upload{ --icon-url:url('../assets/upload-icon.svg'); --icon-color:#6d28d9; --hover-color:#6d28d9; --hover-bg:#ede9fe; }
+.micro-action--upload{ --icon-url:url('../assets/save-icon.svg'); --icon-color:#6d28d9; --hover-color:#6d28d9; --hover-bg:#ede9fe; }
 .editor-files-list{ margin-top:12px; display:flex; flex-direction:column; gap:8px; }
 .editor-file-item{ display:flex; align-items:center; gap:10px; padding:8px 12px; border-radius:12px; border:1px solid rgba(39,70,112,.08); background:#fbfdff; font-size:13px; }
 .editor-file-download{ background:none; border:none; padding:0; color:#0a84ff; font-weight:700; font-size:13px; cursor:pointer; flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; text-align:left; }
 .editor-file-download:hover{ text-decoration:underline; }
 .editor-file-error{ padding:8px 12px; border-radius:12px; border:1px solid rgba(220,38,38,.2); background:rgba(254,226,226,.5); font-size:13px; color:#b91c1c; }
-
-/* Comments button */
-.micro-action--comments{
-  --icon-url:url('../assets/comment-icon.svg');
-  --icon-color:#0369a1;
-  --hover-color:#0369a1;
-  --hover-bg:#e0f2fe;
-}
-.micro-action--comments.has-comments .micro-action__icon::after{
-  content:"";
-  position:absolute;
-  top:10px; right:10px;
-  width:8px; height:8px;
-  border-radius:50%;
-  background:#ef4444;
-  border:2px solid #fff;
-}
-
-/* Editor body row: frame + comments side-by-side */
-.editor-body-row{
-  display:flex;
-  gap:16px;
-  align-items:flex-start;
-}
-.editor-body-main{
-  flex:1 1 0;
-  min-width:0;
-}
-
-/* Floating comment-input card (position:fixed, outside editor card) */
-.gcp-cmt-float{
-  position:fixed;
-  z-index:9000;
-  width:290px;
-  background:#fff;
-  border:2px solid #0a84ff;
-  border-radius:14px;
-  padding:14px 16px;
-  box-shadow:0 8px 32px rgba(15,23,42,.18);
-  box-sizing:border-box;
-}
-.gcp-cmt-float-header{
-  display:flex;
-  align-items:center;
-  gap:8px;
-  margin-bottom:10px;
-}
-.gcp-cmt-float-avatar{
-  width:28px;
-  height:28px;
-  border-radius:50%;
-  color:#fff;
-  font-size:10px;
-  font-weight:800;
-  display:grid;
-  place-items:center;
-  flex-shrink:0;
-}
-.gcp-cmt-float-author{
-  font-size:13px;
-  font-weight:800;
-  color:#0f172a;
-}
-.gcp-cmt-float-input{
-  width:100%;
-  resize:none;
-  border:1px solid rgba(17,24,39,.12);
-  border-radius:8px;
-  padding:8px 10px;
-  font-size:13px;
-  font-family:inherit;
-  color:#0f172a;
-  background:#fff;
-  outline:none;
-  box-sizing:border-box;
-  transition:border-color .14s;
-  line-height:1.5;
-}
-.gcp-cmt-float-input:focus{ border-color:rgba(10,132,255,.55); }
-.gcp-cmt-float-actions{
-  display:flex;
-  gap:7px;
-  margin-top:10px;
-}
-.gcp-cmt-float-save{
-  padding:6px 18px;
-  border-radius:7px;
-  border:none;
-  background:#0a84ff;
-  color:#fff;
-  font-size:12px;
-  font-weight:800;
-  cursor:pointer;
-  transition:background .13s;
-}
-.gcp-cmt-float-save:hover{ background:#0070e0; }
-.gcp-cmt-float-save:disabled{ background:#94a3b8; cursor:not-allowed; }
-.gcp-cmt-float-cancel{
-  padding:6px 14px;
-  border-radius:7px;
-  border:1px solid #e2e8f0;
-  background:#f8fafc;
-  color:#64748b;
-  font-size:12px;
-  font-weight:700;
-  cursor:pointer;
-  transition:background .13s;
-}
-.gcp-cmt-float-cancel:hover{ background:#f1f5f9; }
-
-[data-theme="dark"] .gcp-cmt-float{ background:#1e212c; border-color:#0a84ff; }
-[data-theme="dark"] .gcp-cmt-float-author{ color:#e8ecf4; }
-[data-theme="dark"] .gcp-cmt-float-input{ background:rgba(22,25,34,.8); border-color:rgba(255,255,255,.12); color:#e8ecf4; }
-[data-theme="dark"] .gcp-cmt-float-cancel{ background:rgba(255,255,255,.05); border-color:rgba(255,255,255,.12); color:#94a3b8; }
 
 /* Dark mode toggle button (light mode color) */
 .dm-toggle{
@@ -4052,6 +3956,36 @@ body.gp-shell-ready .gp-sidebar__scrim{
 [data-theme="dark"] .sh-stage-role{ opacity:.5; }
 [data-theme="dark"] .sh-actor{ color:#e0eaf6; }
 [data-theme="dark"] .sh-date{ color:#6b7280; }
+
+/* Save button: always expanded, no folding */
+.tp-actionbar .micro-action--save,
+.tp-actionbar .micro-action--save:hover,
+.tp-actionbar .micro-action--save:focus-visible{
+  width:176px;
+}
+.tp-actionbar .micro-action--save .micro-action__label{
+  opacity:1;
+  transform:translateX(0);
+  display:block;
+}
+.tp-actionbar .micro-action--save[disabled]:hover,
+.tp-actionbar .micro-action--save[disabled]:focus-visible{
+  width:176px;
+}
+@media (max-width: 900px){
+  .tp-actionbar .micro-action--save,
+  .tp-actionbar .micro-action--save:hover,
+  .tp-actionbar .micro-action--save:focus-visible{
+    width:176px;
+    min-width:176px;
+    padding:0 22px 0 0;
+  }
+  .tp-actionbar .micro-action--save .micro-action__label{
+    display:block;
+    opacity:1;
+    transform:translateX(0);
+  }
+}
 
 /* Ask to Return button on Editor page: wider expanded width to fit label */
 .tp-actionbar .micro-action--ask-to-return:hover,

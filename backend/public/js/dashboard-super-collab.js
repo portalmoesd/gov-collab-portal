@@ -187,7 +187,7 @@
 
   function createMicroAction(label, kind, onClick){
     const btn=document.createElement('button'); btn.type='button';
-    btn.className=`micro-action micro-action--${kind} required-action required-action--${kind}`;
+    btn.className=`micro-action required-action required-action--${kind}`;
     btn.setAttribute('aria-label',label);
     btn.innerHTML=`<span class="micro-action__icon"></span><span class="micro-action__label">${esc(label)}</span>`;
     btn.addEventListener('click',onClick);
@@ -264,7 +264,6 @@
         <div class="required-section-name">${esc(s.sectionLabel)}</div>
         <div class="required-section-meta">${esc(last||'—')} · ${esc(updatedBy)}</div>
         ${note?`<div class="required-section-note"><b>Comment:</b> ${esc(note)}</div>`:''}
-        ${s.returnRequest?`<div class="section-return-request-notice"><strong>Return requested</strong> by ${esc(s.returnRequest.from)}: ${esc(s.returnRequest.note||'(no comment)')}</div>`:''}
       </td>
       <td class="required-progress-cell"><div class="lower-progress-inline">${progressHtml}</div><div class="section-history-toggle-mount"></div></td>
       <td class="required-actions-cell"></td>

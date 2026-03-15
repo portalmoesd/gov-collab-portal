@@ -184,7 +184,7 @@
 
   function createMicroAction(label, kind, onClick){
     const btn=document.createElement('button'); btn.type='button';
-    btn.className=`micro-action micro-action--${kind} required-action required-action--${kind}`;
+    btn.className=`micro-action required-action required-action--${kind}`;
     btn.setAttribute('aria-label',label);
     btn.innerHTML=`<span class="micro-action__icon"></span><span class="micro-action__label">${esc(label)}</span>`;
     btn.addEventListener('click',onClick);
@@ -198,9 +198,8 @@
     const isAssigned=!!section.isAssigned;
     // At me: section is submitted/returned to Head Collab, OR explicitly returned to me
     const isAtMe=['submitted_to_collaborator_2','returned_by_collaborator_2'].includes(s)||rtr==='collaborator_2';
-    // Can act as lowest: assigned section at draft state (no Collab I first),
-    // OR section returned to Collab I but Head Collab is assigned and can step in
-    const canActAsLowest=isAssigned&&(s==='draft'||rtr==='collaborator_1');
+    // Can act as lowest: assigned section at draft state (no Collab I first)
+    const canActAsLowest=isAssigned&&s==='draft';
     const canOpen=isAssigned||isAtMe||canActAsLowest;
 
     if(canOpen){
