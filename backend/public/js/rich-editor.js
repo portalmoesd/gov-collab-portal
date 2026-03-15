@@ -107,13 +107,6 @@
     .gcp-re-color-a { font-size:13px; font-weight:900; line-height:1; color:var(--text,#1f2a37); }
     .gcp-re-color-bar { height:3px; width:14px; border-radius:2px; background:#000; }
     .gcp-re-color-input { position:absolute; inset:0; opacity:0; cursor:pointer; width:100%; height:100%; border:none; padding:0; }
-    .gcp-re-body { flex:1; min-height:260px; padding:14px 16px; outline:none; font-size:15px; line-height:1.65; color:var(--text,#1f2a37); overflow-y:auto; }
-    .gcp-re-body:empty::before { content:attr(data-placeholder); color:var(--muted,#6b7280); pointer-events:none; }
-    .gcp-re-body h2 { font-size:1.3em; font-weight:800; margin:.8em 0 .3em; }
-    .gcp-re-body h3 { font-size:1.1em; font-weight:700; margin:.7em 0 .25em; }
-    .gcp-re-body ul,.gcp-re-body ol { margin:.4em 0; padding-left:1.6em; }
-    .gcp-re-body li { margin:.2em 0; }
-    .gcp-re-body p { margin:.3em 0; }
     [data-theme="dark"] .gcp-re-wrap { background:rgba(30,33,44,.92); }
     [data-theme="dark"] .gcp-re-toolbar { background:rgba(22,25,34,.60); }
     [data-theme="dark"] .gcp-re-btn { color:#c0cce0; }
@@ -147,34 +140,50 @@
     [data-theme="dark"] .gcp-re-tc-bar { background:rgba(120,80,10,.16); color:#fcd34d; }
     [data-theme="dark"] .gcp-re-tc-authors-row { color:#fbbf24; }
 
-    /* ── Reviewing pane ── */
-    .gcp-re-tc-pane { border-bottom:1px solid var(--border,#e5e7eb); background:rgba(248,250,252,.9); max-height:168px; overflow-y:auto; }
-    .gcp-re-tc-pane-empty { padding:10px 14px; font-size:12px; color:#94a3b8; text-align:center; }
-    .gcp-re-tc-pane-item { display:flex; align-items:flex-start; gap:8px; padding:7px 12px; border-bottom:1px solid rgba(17,24,39,.04); cursor:pointer; transition:background .1s; }
-    .gcp-re-tc-pane-item:hover { background:rgba(0,0,0,.025); }
-    .gcp-re-tc-pane-item:last-child { border-bottom:none; }
-    .gcp-re-tc-dot { width:8px; height:8px; border-radius:50%; flex-shrink:0; margin-top:4px; }
-    .gcp-re-tc-pane-body { flex:1; min-width:0; }
-    .gcp-re-tc-pane-who { font-size:11px; font-weight:800; color:#0f172a; display:flex; align-items:center; gap:4px; flex-wrap:wrap; }
-    .gcp-re-tc-pane-kind { font-size:10px; font-weight:700; padding:1px 5px; border-radius:4px; }
-    .gcp-re-tc-pane-kind.ins { background:rgba(21,128,61,.12); color:#15803d; }
-    .gcp-re-tc-pane-kind.del { background:rgba(185,28,28,.12); color:#b91c1c; }
-    .gcp-re-tc-pane-excerpt { font-size:11px; color:#64748b; margin-top:1px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-    .gcp-re-tc-pane-meta { display:flex; flex-direction:column; align-items:flex-end; gap:3px; flex-shrink:0; }
-    .gcp-re-tc-pane-time { font-size:10px; color:#94a3b8; white-space:nowrap; }
-    .gcp-re-tc-pane-btns { display:flex; gap:3px; }
-    .gcp-re-tc-pane-acc,.gcp-re-tc-pane-rej { font-size:10px; font-weight:800; border:none; border-radius:4px; padding:2px 6px; cursor:pointer; transition:background .1s; line-height:1.4; }
-    .gcp-re-tc-pane-acc { background:rgba(21,128,61,.12); color:#15803d; }
-    .gcp-re-tc-pane-acc:hover { background:rgba(21,128,61,.22); }
-    .gcp-re-tc-pane-rej { background:rgba(185,28,28,.12); color:#b91c1c; }
-    .gcp-re-tc-pane-rej:hover { background:rgba(185,28,28,.22); }
-    .gcp-re-tc-pane-del { font-size:10px; font-weight:800; border:none; border-radius:4px; padding:2px 6px; cursor:pointer; background:rgba(185,28,28,.10); color:#b91c1c; transition:background .1s; line-height:1.4; }
-    .gcp-re-tc-pane-del:hover { background:rgba(185,28,28,.22); }
-    .gcp-re-tc-pane-kind.cmt { background:rgba(10,132,255,.12); color:#0a84ff; }
-    .gcp-re-tc-pane-section { padding:4px 12px 2px; font-size:10px; font-weight:800; letter-spacing:.06em; text-transform:uppercase; color:#94a3b8; border-top:1px solid rgba(17,24,39,.06); }
-    [data-theme="dark"] .gcp-re-tc-pane { background:rgba(22,25,34,.7); }
-    [data-theme="dark"] .gcp-re-tc-pane-who { color:#e8ecf4; }
-    [data-theme="dark"] .gcp-re-tc-pane-excerpt { color:#8899b4; }
+    /* ── Reviewing pane (kept for sizing reference, hidden) ── */
+    .gcp-re-tc-pane { display:none; }
+
+    /* ── Content row: body + right margin balloons ── */
+    .gcp-re-content-row { display:flex; overflow-y:auto; min-height:260px; align-items:flex-start; }
+    .gcp-re-body { flex:1 1 0; min-width:0; min-height:260px; padding:14px 16px; outline:none; font-size:15px; line-height:1.65; color:var(--text,#1f2a37); overflow-y:visible; }
+    .gcp-re-body:empty::before { content:attr(data-placeholder); color:var(--muted,#6b7280); pointer-events:none; }
+    .gcp-re-body h2 { font-size:1.3em; font-weight:800; margin:.8em 0 .3em; }
+    .gcp-re-body h3 { font-size:1.1em; font-weight:700; margin:.7em 0 .25em; }
+    .gcp-re-body ul,.gcp-re-body ol { margin:.4em 0; padding-left:1.6em; }
+    .gcp-re-body li { margin:.2em 0; }
+    .gcp-re-body p { margin:.3em 0; }
+
+    /* Left change bar on blocks that have tracked changes */
+    .gcp-re-wrap.tc-visible .gcp-re-body .gcp-tc-changed { border-left:3px solid #b91c1c; padding-left:6px; margin-left:-9px; }
+
+    /* Right margin column */
+    .gcp-re-margin { width:0; flex-shrink:0; position:relative; transition:width .2s; overflow:visible; }
+    .gcp-re-wrap.tc-visible .gcp-re-margin { width:240px; }
+
+    /* Balloon cards */
+    .gcp-re-balloon { position:absolute; left:8px; right:4px; background:#fff; border-radius:8px; padding:7px 10px; box-shadow:0 1px 6px rgba(15,23,42,.10); font-size:11px; box-sizing:border-box; border:1px solid #e2e8f0; }
+    .gcp-re-balloon--del { border-left:3px solid #dc2626; background:#fff8f8; }
+    .gcp-re-balloon--ins { border-left:3px solid var(--tc-bcolor,#1d4ed8); background:#f8faff; }
+    .gcp-re-balloon--cmt { border-left:3px solid #f59e0b; background:#fffdf5; }
+    .gcp-re-balloon-header { display:flex; align-items:center; gap:5px; margin-bottom:4px; }
+    .gcp-re-balloon-author { font-weight:800; color:#0f172a; flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .gcp-re-balloon-time { color:#94a3b8; white-space:nowrap; flex-shrink:0; }
+    .gcp-re-balloon-body { color:#334155; line-height:1.4; word-break:break-word; }
+    .gcp-re-balloon-kind { display:inline-block; font-size:9px; font-weight:800; padding:1px 4px; border-radius:3px; margin-right:3px; vertical-align:middle; }
+    .gcp-re-balloon-kind.del { background:rgba(220,38,38,.12); color:#dc2626; }
+    .gcp-re-balloon-kind.ins { background:rgba(29,78,216,.12); color:#1d4ed8; }
+    .gcp-re-balloon-kind.cmt { background:rgba(245,158,11,.14); color:#b45309; }
+    .gcp-re-balloon-btns { display:flex; gap:3px; margin-top:5px; }
+    .gcp-re-balloon-acc,.gcp-re-balloon-rej,.gcp-re-balloon-del { font-size:10px; font-weight:800; border:none; border-radius:4px; padding:2px 7px; cursor:pointer; line-height:1.4; transition:background .1s; }
+    .gcp-re-balloon-acc { background:rgba(21,128,61,.12); color:#15803d; }
+    .gcp-re-balloon-acc:hover { background:rgba(21,128,61,.22); }
+    .gcp-re-balloon-rej { background:rgba(185,28,28,.12); color:#b91c1c; }
+    .gcp-re-balloon-rej:hover { background:rgba(185,28,28,.22); }
+    .gcp-re-balloon-del { background:rgba(185,28,28,.10); color:#b91c1c; }
+    .gcp-re-balloon-del:hover { background:rgba(185,28,28,.22); }
+    [data-theme="dark"] .gcp-re-balloon { background:#1e212c; border-color:rgba(255,255,255,.10); }
+    [data-theme="dark"] .gcp-re-balloon-author { color:#e8ecf4; }
+    [data-theme="dark"] .gcp-re-balloon-body { color:#b8c8e0; }
     /* Right-click context menu */
     .gcp-re-ctx { position:fixed; z-index:9999; background:#fff; border:1px solid #e2e8f0; border-radius:9px; box-shadow:0 4px 20px rgba(15,23,42,.14); padding:4px; min-width:160px; }
     .gcp-re-ctx-item { display:flex; align-items:center; gap:7px; padding:7px 12px; border-radius:6px; font-size:13px; font-weight:600; color:#0f172a; cursor:pointer; white-space:nowrap; transition:background .1s; }
@@ -418,10 +427,16 @@
     toolbar.appendChild(cmtBtn);
 
     // ── DOM assembly ─────────────────────────────────────────────────────────
+    const contentRow = document.createElement('div');
+    contentRow.className = 'gcp-re-content-row';
+    const marginEl = document.createElement('div');
+    marginEl.className = 'gcp-re-margin';
+    contentRow.appendChild(body);
+    contentRow.appendChild(marginEl);
+
     wrap.appendChild(toolbar);
     wrap.appendChild(tcBar);
-    wrap.appendChild(tcPane);
-    wrap.appendChild(body);
+    wrap.appendChild(contentRow);
     container.innerHTML = '';
     container.appendChild(wrap);
 
@@ -474,112 +489,110 @@
       const hasCmts = storedComments.length > 0;
       const show = tc.visible && (n > 0 || hasCmts);
       tcBar.style.display = show ? '' : 'none';
-      tcPane.style.display = show ? '' : 'none';
 
       if (show) {
         const parts = [];
         if (n > 0) parts.push(`${n} tracked change${n === 1 ? '' : 's'}`);
         if (hasCmts) parts.push(`${storedComments.length} comment${storedComments.length === 1 ? '' : 's'}`);
         tcSummary.textContent = parts.join(' · ');
-        const authors = getAuthors();
-        tcAuthorsRow.textContent = authors.join(' · ');
-        updateReviewingPane();
+        tcAuthorsRow.textContent = getAuthors().join(' · ');
       }
+
+      updateChangeMarkers();
+      positionBalloons();
     }
 
-    function renderTcEntry(entry) {
-      const item = document.createElement('div');
-      item.className = 'gcp-re-tc-pane-item';
-      const excerpt = entry.text.length > 48 ? entry.text.slice(0, 48) + '…' : (entry.text || '(empty)');
-      const kindLabel = entry.kind === 'ins' ? 'Added' : 'Removed';
-      item.innerHTML = `
-        <span class="gcp-re-tc-dot" style="background:${escHtml(entry.color)}"></span>
-        <div class="gcp-re-tc-pane-body">
-          <div class="gcp-re-tc-pane-who">${escHtml(entry.author)}<span class="gcp-re-tc-pane-kind ${entry.kind}">${kindLabel}</span></div>
-          <div class="gcp-re-tc-pane-excerpt">&ldquo;${escHtml(excerpt)}&rdquo;</div>
-        </div>
-        <div class="gcp-re-tc-pane-meta">
-          <span class="gcp-re-tc-pane-time">${escHtml(fmtTime(entry.time))}</span>
-          <div class="gcp-re-tc-pane-btns">
-            <button class="gcp-re-tc-pane-acc" type="button" title="Accept">✓</button>
-            <button class="gcp-re-tc-pane-rej" type="button" title="Reject">✗</button>
-          </div>
-        </div>`;
-      item.addEventListener('click', e => {
-        if (e.target.closest('.gcp-re-tc-pane-btns')) return;
-        const target = body.querySelector(`[data-tc-id="${CSS.escape(entry.id)}"]`);
-        if (target) target.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      });
-      item.querySelector('.gcp-re-tc-pane-acc').addEventListener('click', e => { e.stopPropagation(); acceptChange(entry.id); });
-      item.querySelector('.gcp-re-tc-pane-rej').addEventListener('click', e => { e.stopPropagation(); rejectChange(entry.id); });
-      return item;
-    }
-
-    function renderCmtEntry(c) {
-      const idx = authorColorIdx(c.author_name || '');
-      const [color] = TC_PALETTE[idx];
-      const item = document.createElement('div');
-      item.className = 'gcp-re-tc-pane-item';
-      const excerpt = (c.comment_text || '').length > 52 ? (c.comment_text || '').slice(0, 52) + '…' : (c.comment_text || '');
-      const timeStr = c.created_at ? fmtTime(c.created_at) : '';
-      const delBtn = c.is_own
-        ? `<button class="gcp-re-tc-pane-del" type="button" title="Delete comment">✗</button>`
-        : '';
-      item.innerHTML = `
-        <span class="gcp-re-tc-dot" style="background:${escHtml(color)}"></span>
-        <div class="gcp-re-tc-pane-body">
-          <div class="gcp-re-tc-pane-who">${escHtml(c.author_name || 'Unknown')}<span class="gcp-re-tc-pane-kind cmt">Comment</span></div>
-          <div class="gcp-re-tc-pane-excerpt">${escHtml(excerpt)}</div>
-        </div>
-        <div class="gcp-re-tc-pane-meta">
-          <span class="gcp-re-tc-pane-time">${escHtml(timeStr)}</span>
-          <div class="gcp-re-tc-pane-btns">${delBtn}</div>
-        </div>`;
-      // Click row → scroll to anchor in editor
-      item.addEventListener('click', e => {
-        if (e.target.closest('.gcp-re-tc-pane-btns')) return;
-        if (c.anchor_id) {
-          const anchor = body.querySelector(`[data-cmt-anchor-id="${c.anchor_id}"]`);
-          if (anchor) anchor.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    // Add .gcp-tc-changed to every block element that contains a tracked change
+    function updateChangeMarkers() {
+      body.querySelectorAll('.gcp-tc-changed').forEach(el => el.classList.remove('gcp-tc-changed'));
+      if (!tc.visible) return;
+      body.querySelectorAll('[data-tc-id]').forEach(el => {
+        let block = el.parentElement;
+        while (block && block !== body) {
+          const tag = block.tagName.toLowerCase();
+          if (['p','li','h1','h2','h3','h4','h5','h6','div','blockquote'].includes(tag)) {
+            block.classList.add('gcp-tc-changed'); break;
+          }
+          block = block.parentElement;
         }
       });
-      if (c.is_own) {
-        item.querySelector('.gcp-re-tc-pane-del').addEventListener('click', e => {
-          e.stopPropagation();
-          if (onDeleteComment) onDeleteComment(c.id, c.anchor_id || null);
+    }
+
+    // Avoid-overlap helper: push idealTop down past any already-used slot
+    function noOverlap(idealTop, slots) {
+      let top = Math.max(0, idealTop);
+      for (const s of slots) {
+        if (top < s.top + s.h + 6 && top + 20 > s.top) top = s.top + s.h + 6;
+      }
+      return top;
+    }
+
+    // Build and position all balloon cards in the margin column
+    function positionBalloons() {
+      marginEl.innerHTML = '';
+      if (!tc.visible) return;
+      requestAnimationFrame(() => {
+        const mRect = marginEl.getBoundingClientRect();
+        const slots = [];
+
+        // TC change balloons
+        getChangeEntries().forEach(entry => {
+          const anchor = body.querySelector(`[data-tc-id="${CSS.escape(entry.id)}"]`);
+          const ideal = anchor ? anchor.getBoundingClientRect().top - mRect.top : 0;
+          const top = noOverlap(ideal, slots);
+
+          const b = document.createElement('div');
+          const kindClass = entry.kind === 'ins' ? 'ins' : 'del';
+          b.className = `gcp-re-balloon gcp-re-balloon--${kindClass}`;
+          b.style.top = top + 'px';
+          const kindLabel = entry.kind === 'ins' ? 'Added' : 'Deleted';
+          const excerpt = entry.text.length > 42 ? entry.text.slice(0, 42) + '…' : (entry.text || '(empty)');
+          b.innerHTML = `
+            <div class="gcp-re-balloon-header">
+              <span class="gcp-re-balloon-author">${escHtml(entry.author)}</span>
+              <span class="gcp-re-balloon-time">${escHtml(fmtTime(entry.time))}</span>
+            </div>
+            <div class="gcp-re-balloon-body"><span class="gcp-re-balloon-kind ${kindClass}">${kindLabel}</span>${escHtml(excerpt)}</div>
+            <div class="gcp-re-balloon-btns">
+              <button class="gcp-re-balloon-acc" type="button" title="Accept">✓ Accept</button>
+              <button class="gcp-re-balloon-rej" type="button" title="Reject">✗ Reject</button>
+            </div>`;
+          b.querySelector('.gcp-re-balloon-acc').addEventListener('click', () => acceptChange(entry.id));
+          b.querySelector('.gcp-re-balloon-rej').addEventListener('click', () => rejectChange(entry.id));
+          marginEl.appendChild(b);
+          slots.push({ top, h: b.offsetHeight || 70 });
         });
-      }
-      return item;
-    }
 
-    function updateReviewingPane() {
-      tcPane.innerHTML = '';
-      const entries = getChangeEntries();
-      const hasEntries = entries.length > 0;
-      const hasCmts = storedComments.length > 0;
+        // Comment balloons
+        storedComments.forEach(c => {
+          let ideal = slots.length ? (slots[slots.length - 1].top + slots[slots.length - 1].h + 6) : 0;
+          if (c.anchor_id) {
+            const anchor = body.querySelector(`[data-cmt-anchor-id="${c.anchor_id}"]`);
+            if (anchor) ideal = anchor.getBoundingClientRect().top - mRect.top;
+          }
+          const top = noOverlap(ideal, slots);
 
-      if (!hasEntries && !hasCmts) {
-        tcPane.innerHTML = '<div class="gcp-re-tc-pane-empty">No tracked changes or comments</div>';
-        return;
-      }
-
-      if (hasEntries) {
-        if (hasCmts) {
-          const sec = document.createElement('div');
-          sec.className = 'gcp-re-tc-pane-section';
-          sec.textContent = 'Changes';
-          tcPane.appendChild(sec);
-        }
-        entries.forEach(entry => tcPane.appendChild(renderTcEntry(entry)));
-      }
-
-      if (hasCmts) {
-        const sec = document.createElement('div');
-        sec.className = 'gcp-re-tc-pane-section';
-        sec.textContent = 'Comments';
-        tcPane.appendChild(sec);
-        storedComments.forEach(c => tcPane.appendChild(renderCmtEntry(c)));
-      }
+          const b = document.createElement('div');
+          b.className = 'gcp-re-balloon gcp-re-balloon--cmt';
+          b.style.top = top + 'px';
+          const excerpt = (c.comment_text || '').length > 52 ? c.comment_text.slice(0, 52) + '…' : (c.comment_text || '');
+          const delHtml = c.is_own ? `<button class="gcp-re-balloon-del" type="button" title="Delete">✗ Delete</button>` : '';
+          b.innerHTML = `
+            <div class="gcp-re-balloon-header">
+              <span class="gcp-re-balloon-author">${escHtml(c.author_name || 'Unknown')}</span>
+              <span class="gcp-re-balloon-time">${escHtml(fmtTime(c.created_at))}</span>
+            </div>
+            <div class="gcp-re-balloon-body"><span class="gcp-re-balloon-kind cmt">Comment</span>${escHtml(excerpt)}</div>
+            ${delHtml ? `<div class="gcp-re-balloon-btns">${delHtml}</div>` : ''}`;
+          if (c.is_own) {
+            b.querySelector('.gcp-re-balloon-del').addEventListener('click', () => {
+              if (onDeleteComment) onDeleteComment(c.id, c.anchor_id || null);
+            });
+          }
+          marginEl.appendChild(b);
+          slots.push({ top, h: b.offsetHeight || 60 });
+        });
+      });
     }
 
     function acceptChange(id) {
@@ -938,6 +951,7 @@
       storedComments = comments || [];
       setCommentsBadge(storedComments.length);
       updateTcBar();
+      positionBalloons();
     }
 
     // Merge any per-character <ins> runs left in the initial HTML
