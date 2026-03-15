@@ -158,7 +158,7 @@
     .gcp-re-wrap.tc-visible .gcp-re-body .gcp-tc-changed { border-left:3px solid #b91c1c; padding-left:6px; margin-left:-9px; }
 
     /* Right margin column */
-    .gcp-re-margin { width:0; flex-shrink:0; position:relative; transition:width .2s; overflow:visible; }
+    .gcp-re-margin { width:0; flex-shrink:0; position:relative; overflow:visible; }
     .gcp-re-wrap.tc-visible .gcp-re-margin,.gcp-re-wrap.has-comments .gcp-re-margin { width:240px; }
     .gcp-re-connectors { position:absolute; top:0; left:0; width:100%; height:100%; overflow:visible; pointer-events:none; }
     .gcp-re-balloon-avatar { display:inline-flex; align-items:center; justify-content:center; width:20px; height:20px; border-radius:50%; font-size:9px; font-weight:800; color:#fff; flex-shrink:0; }
@@ -710,7 +710,7 @@
           const aRect = anchorEl.getBoundingClientRect();
           // All coords in contentRow scroll-space
           const x1 = aRect.right  - crRect.left + scrollLeft;
-          const y1 = aRect.top + aRect.height / 2 - crRect.top + scrollTop;
+          const y1 = aRect.bottom - crRect.top + scrollTop;
           const x2 = mOffLeft + 2;
           const y2 = mOffTop + balloonTop + Math.min(balloonH, 26) / 2;
           const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
@@ -772,7 +772,7 @@
             b.querySelector('.gcp-re-balloon-acc').addEventListener('click', () => { group.ids.forEach(id => acceptChange(id)); });
             b.querySelector('.gcp-re-balloon-rej').addEventListener('click', () => { group.ids.forEach(id => rejectChange(id)); });
             marginEl.appendChild(b);
-            const h = b.offsetHeight || 72;
+            const h = Math.max(b.offsetHeight, 72);
             slots.push({ top, h });
             drawConnector(anchor, top, h, group.color);
           });
@@ -889,7 +889,7 @@
           });
 
           marginEl.appendChild(b);
-          const bh = b.offsetHeight || 62;
+          const bh = Math.max(b.offsetHeight, 62);
           slots.push({ top, h: bh });
           drawConnector(anchor, top, bh, '#d97706');
         });
@@ -1222,6 +1222,15 @@
 
     body.addEventListener('beforeinput', e => {
       if (!TC_INPUT_TYPES.has(e.inputType) || !body.isContentEditable) return;
+
+      // For delete operations that target empty content (e.g. merging an empty
+      // paragraph), let the browser handle it natively.  Wrapping an invisible
+      // line-break in a <del> looks broken and blocks cursor movement.
+      if (e.inputType.startsWith('delete') && e.getTargetRanges) {
+        const sr = e.getTargetRanges();
+        if (sr.length > 0 && !staticToRange(sr[0]).toString()) return;
+      }
+
       e.preventDefault();
 
       const staticRanges = e.getTargetRanges ? e.getTargetRanges() : [];
