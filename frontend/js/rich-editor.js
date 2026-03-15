@@ -17,22 +17,29 @@
   // ── Constants ──────────────────────────────────────────────────────────────
 
   const FONT_FAMILIES = [
-    { label: 'Font',            value: '' },
-    { label: 'Arial',           value: 'Arial' },
-    { label: 'Georgia',         value: 'Georgia' },
-    { label: 'Times New Roman', value: 'Times New Roman' },
-    { label: 'Courier New',     value: 'Courier New' },
-    { label: 'Verdana',         value: 'Verdana' },
-    { label: 'Trebuchet MS',    value: 'Trebuchet MS' },
+    { label: 'Font',    value: '' },
+    { label: 'Arial',   value: 'Arial' },
+    { label: 'Sylfaen', value: 'Sylfaen' },
+    { label: 'Calibri', value: 'Calibri' },
   ];
 
+  // Word-style pt sizes; value = pt number as string
   const FONT_SIZES = [
-    { label: 'Size',    value: '' },
-    { label: 'Small',   value: '2' },
-    { label: 'Normal',  value: '3' },
-    { label: 'Large',   value: '5' },
-    { label: 'X-Large', value: '6' },
-    { label: 'Huge',    value: '7' },
+    { label: 'Size',              value: '' },
+    { label: '8',                 value: '8' },
+    { label: '9',                 value: '9' },
+    { label: '10',                value: '10' },
+    { label: '11 (Recommended)',  value: '11' },
+    { label: '12',                value: '12' },
+    { label: '14',                value: '14' },
+    { label: '16',                value: '16' },
+    { label: '18',                value: '18' },
+    { label: '20',                value: '20' },
+    { label: '24',                value: '24' },
+    { label: '28',                value: '28' },
+    { label: '36',                value: '36' },
+    { label: '48',                value: '48' },
+    { label: '72',                value: '72' },
   ];
 
   const TOOLS = [
@@ -263,6 +270,34 @@
     /* Comment anchors – Word-style yellow highlight with bottom border */
     .gcp-re-body .gcp-cmt-anchor { background:rgba(255,210,0,.30); border-bottom:2px solid #d97706; border-radius:2px; cursor:default; box-shadow:0 0 0 1px rgba(217,119,6,.20); }
     .gcp-re-body .gcp-cmt-anchor:hover { background:rgba(255,210,0,.50); box-shadow:0 0 0 1px rgba(217,119,6,.45); }
+
+    /* ── Colour palette popup ── */
+    .gcp-re-palette { position:fixed; z-index:10000; background:#fff; border:1px solid #e2e8f0; border-radius:10px; box-shadow:0 6px 24px rgba(15,23,42,.16); padding:10px; min-width:196px; }
+    .gcp-re-palette-grid { display:grid; grid-template-columns:repeat(8,20px); gap:3px; }
+    .gcp-re-palette-swatch { width:20px; height:20px; border-radius:3px; border:1px solid rgba(0,0,0,.12); cursor:pointer; transition:transform .1s,box-shadow .1s; }
+    .gcp-re-palette-swatch:hover { transform:scale(1.2); box-shadow:0 0 0 2px rgba(10,132,255,.5); z-index:1; position:relative; }
+    .gcp-re-palette-divider { height:1px; background:#e2e8f0; margin:8px 0; }
+    .gcp-re-palette-custom { display:flex; align-items:center; gap:6px; font-size:11px; color:#0369a1; font-weight:700; cursor:pointer; padding:3px 2px; border-radius:5px; }
+    .gcp-re-palette-custom:hover { background:rgba(3,105,161,.08); }
+    .gcp-re-palette-custom input[type="color"] { width:20px; height:20px; border:none; padding:0; border-radius:3px; cursor:pointer; }
+    [data-theme="dark"] .gcp-re-palette { background:#1e212c; border-color:rgba(255,255,255,.1); }
+    [data-theme="dark"] .gcp-re-palette-custom { color:#60a5fa; }
+
+    /* ── Table insert grid popup ── */
+    .gcp-re-tbl-picker { position:fixed; z-index:10000; background:#fff; border:1px solid #e2e8f0; border-radius:10px; box-shadow:0 6px 24px rgba(15,23,42,.16); padding:10px; }
+    .gcp-re-tbl-grid { display:grid; grid-template-columns:repeat(8,22px); gap:2px; }
+    .gcp-re-tbl-cell { width:22px; height:22px; border:1px solid #d1d5db; border-radius:2px; background:#f8fafc; cursor:pointer; box-sizing:border-box; }
+    .gcp-re-tbl-cell.hi { background:#dbeafe; border-color:#93c5fd; }
+    .gcp-re-tbl-label { text-align:center; font-size:11px; color:#64748b; margin-top:6px; font-weight:600; }
+    [data-theme="dark"] .gcp-re-tbl-picker { background:#1e212c; border-color:rgba(255,255,255,.1); }
+    [data-theme="dark"] .gcp-re-tbl-cell { background:#252836; border-color:#3d4155; }
+    [data-theme="dark"] .gcp-re-tbl-cell.hi { background:rgba(29,78,216,.25); border-color:#4f87e8; }
+
+    /* ── Tables inside body ── */
+    .gcp-re-body table { border-collapse:collapse; width:100%; margin:.5em 0; }
+    .gcp-re-body th,.gcp-re-body td { border:1px solid #d1d5db; padding:6px 10px; font-size:14px; min-width:48px; vertical-align:top; }
+    .gcp-re-body th { background:#f1f5f9; font-weight:700; text-align:left; }
+    .gcp-re-body td:focus,.gcp-re-body th:focus { outline:2px solid #93c5fd; outline-offset:-1px; }
   `;
 
   let styleInjected = false;
@@ -275,6 +310,26 @@
   }
 
   function execCmd(cmd, value) { document.execCommand(cmd, false, value || null); }
+
+  // Apply an exact pt font size to the current selection by using fontSize=7
+  // as a DOM placeholder, then swapping created <font> elements for CSS spans.
+  // Must be called while the selection is live (after restoreSelection()).
+  function applyFontSizePt(pt) {
+    const sel = window.getSelection();
+    if (!sel || !sel.rangeCount || sel.isCollapsed) return;
+    // Tag pre-existing font[size="7"] so we can identify newly created ones
+    document.querySelectorAll('font[size="7"]').forEach(el => el.setAttribute('data-pre','1'));
+    document.execCommand('fontSize', false, '7');
+    // Replace only the newly created <font size="7"> elements
+    document.querySelectorAll('font[size="7"]:not([data-pre])').forEach(el => {
+      const span = document.createElement('span');
+      span.style.fontSize = pt + 'pt';
+      while (el.firstChild) span.appendChild(el.firstChild);
+      el.parentNode.replaceChild(span, el);
+    });
+    // Clean up the pre-existing markers
+    document.querySelectorAll('font[size="7"][data-pre]').forEach(el => el.removeAttribute('data-pre'));
+  }
 
   function handleHeading(tag) {
     const sel = window.getSelection();
@@ -390,6 +445,7 @@
 
     // ── Stored comments (passed from outside via setComments) ────────────────
     let storedComments = [];
+    let cmtPanelVisible = true; // toggled by the Comments toolbar button
 
     // ── Selection save/restore ───────────────────────────────────────────────
     let savedRange = null;
@@ -433,30 +489,103 @@
     });
     fontSizeSelect.addEventListener('mousedown', saveSelection);
     fontSizeSelect.addEventListener('change', () => {
-      if (fontSizeSelect.value) { restoreSelection(); trackFmtChange('fontSize', fontSizeSelect.value); }
+      const pt = fontSizeSelect.value;
+      if (pt) { restoreSelection(); applyFontSizePt(pt); }
       fontSizeSelect.value = ''; body.focus();
     });
     toolbar.appendChild(fontSizeSelect);
 
-    // ── Color picker ─────────────────────────────────────────────────────────
+    // ── Colour palette helper ─────────────────────────────────────────────────
+    // 40-colour Word-style preset palette (5 rows × 8)
+    const COLOUR_PALETTE = [
+      '#000000','#1f2937','#374151','#6b7280','#9ca3af','#d1d5db','#f3f4f6','#ffffff',
+      '#dc2626','#ea580c','#d97706','#16a34a','#0891b2','#2563eb','#7c3aed','#db2777',
+      '#fee2e2','#ffedd5','#fef9c3','#dcfce7','#cffafe','#dbeafe','#ede9fe','#fce7f3',
+      '#b91c1c','#c2410c','#b45309','#15803d','#0e7490','#1d4ed8','#6d28d9','#be185d',
+      '#7f1d1d','#7c2d12','#78350f','#14532d','#164e63','#1e3a8a','#4c1d95','#831843',
+    ];
+    let activePalette = null;
+    function closePalette() { if (activePalette) { activePalette.remove(); activePalette = null; } }
+    document.addEventListener('mousedown', e => {
+      if (activePalette && !activePalette.contains(e.target)) closePalette();
+    }, true);
+
+    function makePalettePopup(anchorEl, applyColor) {
+      closePalette();
+      const pop = document.createElement('div');
+      pop.className = 'gcp-re-palette';
+      const grid = document.createElement('div');
+      grid.className = 'gcp-re-palette-grid';
+      COLOUR_PALETTE.forEach(hex => {
+        const sw = document.createElement('button');
+        sw.type = 'button'; sw.className = 'gcp-re-palette-swatch';
+        sw.style.background = hex; sw.title = hex;
+        sw.addEventListener('mousedown', e => e.preventDefault());
+        sw.addEventListener('click', () => { closePalette(); applyColor(hex); });
+        grid.appendChild(sw);
+      });
+      pop.appendChild(grid);
+      const div = document.createElement('div'); div.className = 'gcp-re-palette-divider';
+      pop.appendChild(div);
+      // Custom colour row
+      const customRow = document.createElement('label');
+      customRow.className = 'gcp-re-palette-custom';
+      customRow.textContent = 'Custom colour…';
+      const customInput = document.createElement('input');
+      customInput.type = 'color'; customInput.value = '#000000';
+      customInput.addEventListener('change', () => { closePalette(); applyColor(customInput.value); });
+      customRow.appendChild(customInput);
+      pop.appendChild(customRow);
+      // Position near anchor
+      document.body.appendChild(pop);
+      const aRect = anchorEl.getBoundingClientRect();
+      let top = aRect.bottom + 4, left = aRect.left;
+      if (left + pop.offsetWidth > window.innerWidth - 8) left = window.innerWidth - pop.offsetWidth - 8;
+      if (top + pop.offsetHeight > window.innerHeight - 8) top = aRect.top - pop.offsetHeight - 4;
+      pop.style.top = top + 'px'; pop.style.left = left + 'px';
+      activePalette = pop;
+    }
+
+    // ── Font colour button ────────────────────────────────────────────────────
     const colorWrap = document.createElement('span');
     colorWrap.className = 'gcp-re-color-wrap'; colorWrap.title = 'Font colour';
+    colorWrap.style.cursor = 'pointer';
     const colorLabel = document.createElement('span');
     colorLabel.className = 'gcp-re-color-label'; colorLabel.setAttribute('aria-hidden', 'true');
     const colorA = document.createElement('span');
     colorA.className = 'gcp-re-color-a'; colorA.textContent = 'A';
     const colorBar = document.createElement('span'); colorBar.className = 'gcp-re-color-bar';
     colorLabel.appendChild(colorA); colorLabel.appendChild(colorBar);
-    const colorInput = document.createElement('input');
-    colorInput.type = 'color'; colorInput.className = 'gcp-re-color-input';
-    colorInput.value = '#000000'; colorInput.setAttribute('aria-label', 'Font colour');
-    colorWrap.appendChild(colorLabel); colorWrap.appendChild(colorInput);
-    colorInput.addEventListener('mousedown', saveSelection);
-    colorInput.addEventListener('change', () => {
-      colorBar.style.background = colorInput.value;
-      restoreSelection(); trackFmtChange('foreColor', colorInput.value); body.focus();
+    colorWrap.appendChild(colorLabel);
+    colorWrap.addEventListener('mousedown', e => { e.preventDefault(); saveSelection(); });
+    colorWrap.addEventListener('click', () => {
+      makePalettePopup(colorWrap, hex => {
+        colorBar.style.background = hex;
+        restoreSelection(); trackFmtChange('foreColor', hex); body.focus();
+      });
     });
     toolbar.appendChild(colorWrap);
+
+    // ── Background colour button ──────────────────────────────────────────────
+    const bgColorWrap = document.createElement('span');
+    bgColorWrap.className = 'gcp-re-color-wrap'; bgColorWrap.title = 'Highlight / background colour';
+    bgColorWrap.style.cursor = 'pointer';
+    const bgColorLabel = document.createElement('span');
+    bgColorLabel.className = 'gcp-re-color-label'; bgColorLabel.setAttribute('aria-hidden', 'true');
+    const bgColorA = document.createElement('span');
+    bgColorA.className = 'gcp-re-color-a'; bgColorA.style.cssText = 'font-size:11px;'; bgColorA.textContent = '▐A';
+    const bgColorBar = document.createElement('span'); bgColorBar.className = 'gcp-re-color-bar';
+    bgColorBar.style.background = '#ffff00';
+    bgColorLabel.appendChild(bgColorA); bgColorLabel.appendChild(bgColorBar);
+    bgColorWrap.appendChild(bgColorLabel);
+    bgColorWrap.addEventListener('mousedown', e => { e.preventDefault(); saveSelection(); });
+    bgColorWrap.addEventListener('click', () => {
+      makePalettePopup(bgColorWrap, hex => {
+        bgColorBar.style.background = hex;
+        restoreSelection(); trackFmtChange('backColor', hex); body.focus();
+      });
+    });
+    toolbar.appendChild(bgColorWrap);
 
     // Separator
     const firstSep = document.createElement('span');
@@ -482,6 +611,81 @@
       });
       toolbar.appendChild(btn);
     });
+
+    // ── Insert Table button ───────────────────────────────────────────────────
+    const tblSep = document.createElement('span');
+    tblSep.className = 'gcp-re-sep'; tblSep.setAttribute('aria-hidden', 'true');
+    toolbar.appendChild(tblSep);
+
+    const tblBtn = document.createElement('button');
+    tblBtn.type = 'button'; tblBtn.className = 'gcp-re-btn';
+    tblBtn.title = 'Insert table';
+    tblBtn.setAttribute('aria-label', 'Insert table');
+    tblBtn.innerHTML = `<svg viewBox="0 0 16 16" width="14" height="14" fill="currentColor" aria-hidden="true"><rect x="1" y="1" width="14" height="14" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.4"/><line x1="1" y1="5.5" x2="15" y2="5.5" stroke="currentColor" stroke-width="1.2"/><line x1="1" y1="10" x2="15" y2="10" stroke="currentColor" stroke-width="1.2"/><line x1="5.5" y1="1" x2="5.5" y2="15" stroke="currentColor" stroke-width="1.2"/><line x1="10" y1="1" x2="10" y2="15" stroke="currentColor" stroke-width="1.2"/></svg>`;
+    toolbar.appendChild(tblBtn);
+
+    let activeTblPicker = null;
+    function closeTblPicker() { if (activeTblPicker) { activeTblPicker.remove(); activeTblPicker = null; } }
+    document.addEventListener('mousedown', e => {
+      if (activeTblPicker && !activeTblPicker.contains(e.target) && e.target !== tblBtn) closeTblPicker();
+    }, true);
+
+    tblBtn.addEventListener('mousedown', e => e.preventDefault());
+    tblBtn.addEventListener('click', () => {
+      if (activeTblPicker) { closeTblPicker(); return; }
+      saveSelection();
+      const ROWS = 8, COLS = 8;
+      const picker = document.createElement('div');
+      picker.className = 'gcp-re-tbl-picker';
+      const grid = document.createElement('div');
+      grid.className = 'gcp-re-tbl-grid';
+      const label = document.createElement('div');
+      label.className = 'gcp-re-tbl-label'; label.textContent = 'Insert table';
+      let hoverR = 0, hoverC = 0;
+      function updateGrid(r, c) {
+        hoverR = r; hoverC = c;
+        label.textContent = (r && c) ? `${r} × ${c} table` : 'Insert table';
+        grid.querySelectorAll('.gcp-re-tbl-cell').forEach(cell => {
+          const cr = +cell.dataset.r, cc = +cell.dataset.c;
+          cell.classList.toggle('hi', cr <= r && cc <= c);
+        });
+      }
+      for (let r = 1; r <= ROWS; r++) {
+        for (let c = 1; c <= COLS; c++) {
+          const cell = document.createElement('div');
+          cell.className = 'gcp-re-tbl-cell';
+          cell.dataset.r = r; cell.dataset.c = c;
+          cell.addEventListener('mousemove', () => updateGrid(r, c));
+          cell.addEventListener('click', () => {
+            closeTblPicker();
+            restoreSelection();
+            insertTable(r, c);
+            body.focus();
+          });
+          grid.appendChild(cell);
+        }
+      }
+      picker.addEventListener('mouseleave', () => updateGrid(0, 0));
+      picker.appendChild(grid);
+      picker.appendChild(label);
+      document.body.appendChild(picker);
+      const bRect = tblBtn.getBoundingClientRect();
+      let top = bRect.bottom + 4, left = bRect.left;
+      if (left + picker.offsetWidth > window.innerWidth - 8) left = window.innerWidth - picker.offsetWidth - 8;
+      picker.style.top = top + 'px'; picker.style.left = left + 'px';
+      activeTblPicker = picker;
+    });
+
+    function insertTable(rows, cols) {
+      let html = '<table><tbody>';
+      for (let r = 0; r < rows; r++) {
+        html += '<tr>';
+        for (let c = 0; c < cols; c++) html += '<td>&nbsp;</td>';
+        html += '</tr>';
+      }
+      html += '</tbody></table><p><br></p>';
+      document.execCommand('insertHTML', false, html);
+    }
 
     // ── Spacer: pushes Changes / Comments / Fullscreen to the far right ────────
     const toolbarSpacer = document.createElement('span');
@@ -637,7 +841,7 @@
 
       // CSS class for markup visibility
       wrap.classList.toggle('tc-visible', tc.visible);
-      wrap.classList.toggle('has-comments', storedComments.length > 0);
+      wrap.classList.toggle('has-comments', storedComments.length > 0 && cmtPanelVisible);
       tcBtn.classList.toggle('tc-active', tc.visible);
       tcBtn.setAttribute('aria-pressed', String(tc.visible));
 
@@ -690,7 +894,7 @@
       const oldSvg = contentRow.querySelector('.gcp-re-connectors');
       if (oldSvg) oldSvg.remove();
 
-      const hasCmts = storedComments.length > 0;
+      const hasCmts = storedComments.length > 0 && cmtPanelVisible;
       if (!tc.visible && !hasCmts) return;
       cancelAnimationFrame(_positionBalloonRafId);
       _positionBalloonRafId = requestAnimationFrame(() => {
@@ -838,6 +1042,9 @@
             </div>
             <div class="gcp-re-balloon-body">${escHtml(c.comment_text || '')}</div>`;
         }
+
+        // Comment balloons — only rendered when panel is visible
+        if (!cmtPanelVisible) return;
 
         // Group: only root comments as balloon anchors; replies live inside
         const repliesMap = {};
@@ -1193,10 +1400,12 @@
       } catch(_) { return null; }
     }
 
+    // Comment button: toggle visibility of the comments side panel
     cmtBtn.addEventListener('mousedown', e => e.preventDefault());
     cmtBtn.addEventListener('click', () => {
-      const anchorId = createCommentAnchor();
-      if (onCommentsClick) onCommentsClick(anchorId);
+      cmtPanelVisible = !cmtPanelVisible;
+      cmtBtn.classList.toggle('active', cmtPanelVisible && storedComments.length > 0);
+      updateTcBar();
     });
 
     // ── Right-click context menu ──────────────────────────────────────────────
@@ -1341,10 +1550,14 @@
     }
     function focus()       { body.focus(); }
 
-    function setCommentsActive(active) { cmtBtn.classList.toggle('active', active); }
+    function setCommentsActive(active) {
+      cmtPanelVisible = active;
+      cmtBtn.classList.toggle('active', active && storedComments.length > 0);
+    }
     function setCommentsBadge(n) {
       if (n > 0) { cmtBadge.textContent = String(n); cmtBadge.style.display = ''; }
       else cmtBadge.style.display = 'none';
+      cmtBtn.classList.toggle('active', cmtPanelVisible && n > 0);
     }
     function setComments(comments) {
       storedComments = comments || [];
