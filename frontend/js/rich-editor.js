@@ -1042,6 +1042,8 @@
         if (fsOriginalParent) fsOriginalParent.insertBefore(wrap, fsOriginalNextSibling || null);
       }
       document.removeEventListener('keydown', onDocKeydown);
+      _cmtAnchorObserver.disconnect();
+      clearTimeout(_orphanTimer);
       container.innerHTML = '';
     }
     function focus()       { body.focus(); }
@@ -1067,6 +1069,28 @@
     // Merge any per-character <ins> runs left in the initial HTML
     if (initialHtml) mergeAdjacentIns();
     updateTcBar();
+
+    // ── Auto-delete comments whose anchor was removed from the body ───────────
+    // Mirrors Word: deleting anchored text removes the comment.
+    // Note: anchors inside <del> (tracked-but-not-accepted) are still in the
+    // DOM so their comments are preserved until the deletion is accepted.
+    let _orphanTimer = null;
+    function checkOrphanedComments() {
+      clearTimeout(_orphanTimer);
+      _orphanTimer = setTimeout(() => {
+        const present = new Set(
+          [...body.querySelectorAll('.gcp-cmt-anchor[data-cmt-anchor-id]')]
+            .map(el => el.getAttribute('data-cmt-anchor-id'))
+        );
+        storedComments.forEach(c => {
+          if (c.anchor_id && !present.has(c.anchor_id)) {
+            if (onDeleteComment) onDeleteComment(c.id, c.anchor_id);
+          }
+        });
+      }, 250);
+    }
+    const _cmtAnchorObserver = new MutationObserver(checkOrphanedComments);
+    _cmtAnchorObserver.observe(body, { childList: true, subtree: true });
 
     return {
       getHtml, getCleanHtml, setHtml, destroy, focus, el: body,
