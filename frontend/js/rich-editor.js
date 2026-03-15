@@ -168,6 +168,8 @@
     .gcp-re-balloon--del { border-left:3px solid #dc2626; background:#fff8f8; }
     .gcp-re-balloon--ins { border-left:3px solid var(--tc-bcolor,#1d4ed8); background:#f8faff; }
     .gcp-re-balloon--cmt { border-left:3px solid #f59e0b; background:#fffdf5; }
+    .gcp-re-balloon--tc-group { border-left:3px solid #64748b; background:#f8fafc; }
+    .gcp-re-balloon-change-count { font-size:10px; color:#64748b; margin-top:1px; }
     .gcp-re-balloon-header { display:flex; align-items:center; gap:5px; margin-bottom:4px; }
     .gcp-re-balloon-author { font-weight:800; color:#0f172a; flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
     .gcp-re-balloon-time { color:#94a3b8; white-space:nowrap; flex-shrink:0; }
@@ -630,37 +632,46 @@
           svg.appendChild(line);
         }
 
-        // TC change balloons (only when Changes panel is open)
+        // TC change balloons — grouped by author + 60-second time window (Word-style)
         if (tc.visible) {
+          const groups = [];
           getChangeEntries().forEach(entry => {
-            const anchor = body.querySelector(`[data-tc-id="${CSS.escape(entry.id)}"]`);
+            const t = entry.time ? new Date(entry.time).getTime() : 0;
+            const last = groups[groups.length - 1];
+            if (last && last.author === entry.author && Math.abs(t - last.lastT) < 60000) {
+              last.ids.push(entry.id);
+              last.lastT = t;
+            } else {
+              groups.push({ author: entry.author, initials: entry.initials, color: entry.color, time: entry.time, ids: [entry.id], lastT: t });
+            }
+          });
+
+          groups.forEach(group => {
+            const anchor = body.querySelector(`[data-tc-id="${CSS.escape(group.ids[0])}"]`);
             const ideal = anchor ? anchor.getBoundingClientRect().top - mRect.top : 0;
             const top = noOverlap(ideal, slots);
 
             const b = document.createElement('div');
-            const kindClass = entry.kind === 'ins' ? 'ins' : 'del';
-            b.className = `gcp-re-balloon gcp-re-balloon--${kindClass}`;
+            b.className = 'gcp-re-balloon gcp-re-balloon--tc-group';
             b.style.top = top + 'px';
-            const kindLabel = entry.kind === 'ins' ? 'Added' : 'Deleted';
-            const initials = (entry.initials || (entry.author || '?').split(/\s+/).filter(Boolean).slice(0, 2).map(s => s[0] && s[0].toUpperCase()).join('')) || '?';
-            const excerpt = entry.text.length > 42 ? entry.text.slice(0, 42) + '…' : (entry.text || '(empty)');
+            const n = group.ids.length;
             b.innerHTML = `
               <div class="gcp-re-balloon-header">
-                <span class="gcp-re-balloon-avatar" style="background:${escHtml(entry.color)}">${escHtml(initials)}</span>
-                <span class="gcp-re-balloon-author">${escHtml(entry.author)}</span>
-                <span class="gcp-re-balloon-time">${escHtml(fmtTime(entry.time))}</span>
+                <span class="gcp-re-balloon-avatar" style="background:${escHtml(group.color)}">${escHtml(group.initials)}</span>
+                <span class="gcp-re-balloon-author">${escHtml(group.author)}</span>
+                <span class="gcp-re-balloon-time">${escHtml(fmtTime(group.time))}</span>
               </div>
-              <div class="gcp-re-balloon-body"><span class="gcp-re-balloon-kind ${kindClass}">${kindLabel}</span>${escHtml(excerpt)}</div>
+              <div class="gcp-re-balloon-change-count">${n} change${n === 1 ? '' : 's'}</div>
               <div class="gcp-re-balloon-btns">
-                <button class="gcp-re-balloon-acc" type="button" title="Accept">✓ Accept</button>
-                <button class="gcp-re-balloon-rej" type="button" title="Reject">✗ Reject</button>
+                <button class="gcp-re-balloon-acc" type="button">✓ Accept</button>
+                <button class="gcp-re-balloon-rej" type="button">✗ Reject</button>
               </div>`;
-            b.querySelector('.gcp-re-balloon-acc').addEventListener('click', () => acceptChange(entry.id));
-            b.querySelector('.gcp-re-balloon-rej').addEventListener('click', () => rejectChange(entry.id));
+            b.querySelector('.gcp-re-balloon-acc').addEventListener('click', () => { group.ids.forEach(id => acceptChange(id)); });
+            b.querySelector('.gcp-re-balloon-rej').addEventListener('click', () => { group.ids.forEach(id => rejectChange(id)); });
             marginEl.appendChild(b);
             const h = b.offsetHeight || 72;
             slots.push({ top, h });
-            drawConnector(anchor, top, h, entry.color);
+            drawConnector(anchor, top, h, group.color);
           });
         }
 
