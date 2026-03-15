@@ -145,7 +145,7 @@
     .gcp-re-tc-pane { display:none; }
 
     /* ── Content row: body + right margin balloons ── */
-    .gcp-re-content-row { display:flex; overflow-y:auto; min-height:260px; align-items:flex-start; position:relative; }
+    .gcp-re-content-row { display:flex; overflow-y:auto; overflow-x:hidden; min-height:260px; align-items:flex-start; position:relative; }
     .gcp-re-body { flex:1 1 0; min-width:0; min-height:260px; padding:14px 16px; outline:none; font-size:15px; line-height:1.65; color:var(--text,#1f2a37); overflow-y:visible; }
     .gcp-re-body:empty::before { content:attr(data-placeholder); color:var(--muted,#6b7280); pointer-events:none; }
     .gcp-re-body h2 { font-size:1.3em; font-weight:800; margin:.8em 0 .3em; }
