@@ -2907,14 +2907,14 @@ app.get('/api/tp/comments', authRequired, attachUser, asyncRoute(async (req, res
   const isAdmin = normalizeRoleKey(req.user.role_key) === 'admin';
   const rows = await pool.query(
     `SELECT id, author_name, comment_text, anchor_id, created_at, parent_id,
-            (user_id = $4)        AS is_own,
-            (user_id = $4 OR $5)  AS can_delete
+            (user_id = $4) AS is_own
      FROM tp_section_comments
      WHERE event_id=$1 AND country_id=$2 AND section_id=$3
      ORDER BY COALESCE(parent_id, id), id ASC`,
-    [event_id, countryId, section_id, req.user.id, isAdmin]
+    [event_id, countryId, section_id, req.user.id]
   );
-  res.json({ comments: rows.rows });
+  const comments = rows.rows.map(c => ({ ...c, can_delete: c.is_own || isAdmin }));
+  res.json({ comments });
 }));
 
 app.post('/api/tp/comments', authRequired, attachUser, asyncRoute(async (req, res) => {
