@@ -710,22 +710,30 @@
         const mOffLeft = mRect.left - crRect.left + scrollLeft;
         const mOffTop  = mRect.top  - crRect.top  + scrollTop;
 
+        // Right edge of the body text area — the elbow point for L-shaped connectors
+        const bodyRight = body.getBoundingClientRect().right - crRect.left + scrollLeft;
+
         function drawConnector(anchorEl, balloonTop, balloonH, color) {
           if (!anchorEl) return;
           const aRect = anchorEl.getBoundingClientRect();
           // All coords in contentRow scroll-space
+          // Word-style L-shaped connector:
+          //   segment 1 — horizontal from anchor's right edge to body's right edge
+          //   segment 2 — diagonal from body's right edge down to the balloon card
           const x1 = aRect.right  - crRect.left + scrollLeft;
-          const y1 = aRect.bottom - crRect.top + scrollTop;
+          const y1 = aRect.bottom - crRect.top  + scrollTop;
+          const xElbow = bodyRight;
+          const yElbow = y1; // stays on the same text line
           const x2 = mOffLeft + 2;
           const y2 = mOffTop + balloonTop + Math.min(balloonH, 26) / 2;
-          const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-          line.setAttribute('x1', String(x1)); line.setAttribute('y1', String(y1));
-          line.setAttribute('x2', String(x2)); line.setAttribute('y2', String(y2));
-          line.setAttribute('stroke', color);
-          line.setAttribute('stroke-width', '1');
-          line.setAttribute('stroke-dasharray', '4,3');
-          line.setAttribute('opacity', '0.55');
-          svg.appendChild(line);
+          const poly = document.createElementNS('http://www.w3.org/2000/svg', 'polyline');
+          poly.setAttribute('points', `${x1},${y1} ${xElbow},${yElbow} ${x2},${y2}`);
+          poly.setAttribute('fill', 'none');
+          poly.setAttribute('stroke', color);
+          poly.setAttribute('stroke-width', '1');
+          poly.setAttribute('stroke-dasharray', '4,3');
+          poly.setAttribute('opacity', '0.55');
+          svg.appendChild(poly);
         }
 
         // TC change balloons — grouped by author + 60-second window + same block element

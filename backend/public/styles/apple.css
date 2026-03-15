@@ -1345,7 +1345,7 @@ body.gp-shell-ready .gp-sidebar__scrim{
 #btnSave[disabled],
 #btnSave[disabled]:hover,
 #btnSave[disabled]:focus-visible{
-  width:176px;
+  width:120px;
 }
 #btnSave .micro-action__label{
   opacity:1;
@@ -3965,7 +3965,7 @@ body.gp-shell-ready .gp-sidebar__scrim{
 .tp-actionbar .micro-action--save,
 .tp-actionbar .micro-action--save:hover,
 .tp-actionbar .micro-action--save:focus-visible{
-  width:176px;
+  width:120px;
 }
 .tp-actionbar .micro-action--save .micro-action__label{
   opacity:1;
