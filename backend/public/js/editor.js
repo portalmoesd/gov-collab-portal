@@ -21,8 +21,6 @@
   const btnReturn = document.getElementById("btnReturn");
   const btnUpload = document.getElementById("btnUpload");
   const btnAskToReturn = document.getElementById("btnAskToReturn");
-  const cmtCol     = document.getElementById("cmtCol");
-  const cmtOverlay = document.getElementById("cmtOverlay");
 
   const actionButtons = [btnSave, btnSubmit, btnApprove, btnReturn];
 
@@ -217,7 +215,13 @@
       if (richEditorInstance){
         richEditorInstance.setHtml(tp.htmlContent || '');
       } else {
-        richEditorInstance = window.GCP.RichEditor({ container: editorFrame, initialHtml: tp.htmlContent || '', authorName: me.full_name || me.username || 'Unknown', onCommentsClick: toggleCommentsPanel });
+        richEditorInstance = window.GCP.RichEditor({
+          container: editorFrame,
+          initialHtml: tp.htmlContent || '',
+          authorName: me.full_name || me.username || 'Unknown',
+          onCommentsClick: toggleCommentsPanel,
+          onDeleteComment: handleDeleteComment,
+        });
       }
       if (richEditorInstance && richEditorInstance.el){
         richEditorInstance.el.contentEditable = canEdit ? 'true' : 'false';
@@ -419,187 +423,117 @@
     });
   }
 
-  // ── Comments (Word-style bubbles) ────────────────────────────────────────
+  // ── Comments ─────────────────────────────────────────────────────────────
 
   function cmtGetInitials(name) {
     return (name || '').split(/\s+/).filter(Boolean).slice(0, 2)
       .map(s => s[0] && s[0].toUpperCase()).filter(Boolean).join('') || '?';
   }
-
   function cmtAuthorColor(name) {
-    const palette = ['#1d4ed8','#b91c1c','#15803d','#7c3aed','#c2410c','#0f766e','#9d174d','#3730a3'];
-    let h = 0;
-    for (let i = 0; i < (name || '').length; i++) h = (h * 31 + name.charCodeAt(i)) >>> 0;
-    return palette[h % palette.length];
+    const p = ['#1d4ed8','#b91c1c','#15803d','#7c3aed','#c2410c','#0f766e','#9d174d','#3730a3'];
+    let h = 0; for (let i = 0; i < (name||'').length; i++) h = (h*31+name.charCodeAt(i))>>>0;
+    return p[h % p.length];
   }
 
-  function cmtRelTime(iso) {
-    if (!iso) return '';
+  async function handleDeleteComment(commentId, anchorId) {
     try {
-      const diff = Math.floor((Date.now() - new Date(iso)) / 1000);
-      if (diff < 60)    return 'just now';
-      if (diff < 3600)  return Math.floor(diff / 60) + 'm ago';
-      if (diff < 86400) return Math.floor(diff / 3600) + 'h ago';
-      return new Date(iso).toLocaleString(undefined, { month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' });
-    } catch(_) { return ''; }
-  }
-
-  function positionBubbles() {
-    if (!cmtOverlay || !richEditorInstance) return;
-    const overlayTop = cmtOverlay.getBoundingClientRect().top + window.scrollY;
-    const bubbles = Array.from(cmtOverlay.querySelectorAll('.gcp-cmt-bubble'));
-    let minTop = 0;
-    bubbles.forEach(bubble => {
-      const anchorId = bubble.dataset.anchorId;
-      let idealTop = minTop;
-      if (anchorId) {
-        const anchor = richEditorInstance.el.querySelector(`[data-cmt-anchor-id="${anchorId}"]`);
-        if (anchor) {
-          const absY = anchor.getBoundingClientRect().top + window.scrollY;
-          idealTop = Math.max(absY - overlayTop, minTop);
-        }
-      }
-      bubble.style.top = idealTop + 'px';
-      minTop = idealTop + bubble.offsetHeight + 8;
-    });
-    if (bubbles.length) {
-      const last = bubbles[bubbles.length - 1];
-      cmtOverlay.style.minHeight = (parseFloat(last.style.top) + last.offsetHeight + 20) + 'px';
-    }
-  }
-
-  function createCommentBubble(c) {
-    const color    = cmtAuthorColor(c.author_name || '');
-    const initials = cmtGetInitials(c.author_name || '');
-    const div = document.createElement('div');
-    div.className = 'gcp-cmt-bubble';
-    if (c.anchor_id) div.dataset.anchorId = c.anchor_id;
-    div.dataset.commentId = String(c.id);
-    div.innerHTML = `
-      <div class="gcp-cmt-header">
-        <span class="gcp-cmt-avatar" style="background:${window.GCP.escapeHtml(color)}">${window.GCP.escapeHtml(initials)}</span>
-        <span class="gcp-cmt-author">${window.GCP.escapeHtml(c.author_name || 'Unknown')}</span>
-        <span class="gcp-cmt-time">${window.GCP.escapeHtml(cmtRelTime(c.created_at))}</span>
-      </div>
-      <div class="gcp-cmt-text">${window.GCP.escapeHtml(c.comment_text || '')}</div>
-      ${c.is_own ? `<div class="gcp-cmt-actions"><button class="gcp-cmt-resolve" type="button">Resolve</button></div>` : ''}
-    `;
-    if (c.is_own) {
-      div.querySelector('.gcp-cmt-resolve').addEventListener('click', async () => {
-        try {
-          await window.GCP.apiFetch(`/tp/comments/${c.id}`, { method: 'DELETE' });
-          if (c.anchor_id && richEditorInstance) richEditorInstance.removeCommentAnchor(c.anchor_id);
-          await loadComments();
-        } catch(e) { msg.textContent = e.message || 'Could not resolve comment'; }
-      });
-    }
-    return div;
-  }
-
-  function renderComments(comments) {
-    if (!cmtOverlay) return;
-    if (richEditorInstance) richEditorInstance.setCommentsBadge((comments || []).length);
-    // Remove existing comment bubbles (keep the new-comment bubble if present)
-    cmtOverlay.querySelectorAll('.gcp-cmt-bubble:not(.gcp-cmt-bubble--new)').forEach(el => el.remove());
-    (comments || []).forEach(c => cmtOverlay.appendChild(createCommentBubble(c)));
-    requestAnimationFrame(positionBubbles);
+      await window.GCP.apiFetch(`/tp/comments/${commentId}`, { method: 'DELETE' });
+      if (anchorId && richEditorInstance) richEditorInstance.removeCommentAnchor(anchorId);
+      await loadComments();
+    } catch(e) { msg.textContent = e.message || 'Could not delete comment'; }
   }
 
   async function loadComments() {
-    if (!cmtOverlay || !eventId || !sectionId) return;
+    if (!eventId || !sectionId) return;
     try {
       const data = await window.GCP.apiFetch(
         `/tp/comments?event_id=${encodeURIComponent(eventId)}&section_id=${encodeURIComponent(sectionId)}`,
         { method: 'GET' }
       );
-      renderComments(data.comments || []);
-    } catch(e) {
-      if (cmtOverlay) cmtOverlay.innerHTML = `<div class="gcp-cmt-error">Could not load comments.</div>`;
-    }
+      const comments = data.comments || [];
+      if (richEditorInstance) richEditorInstance.setComments(comments);
+    } catch(_) {}
   }
 
-  // New-comment input bubble (shown when toolbar Comments button is clicked)
-  let _newCmtBubble = null;
+  // Floating comment-input card (position:fixed, outside the editor card)
+  let _cmtFloat = null;
+
+  function closeCmtFloat() {
+    if (!_cmtFloat) return;
+    const oldAnchor = _cmtFloat._anchorId;
+    _cmtFloat.remove(); _cmtFloat = null;
+    if (oldAnchor && richEditorInstance) richEditorInstance.removeCommentAnchor(oldAnchor);
+    if (richEditorInstance) richEditorInstance.setCommentsActive(false);
+  }
 
   function toggleCommentsPanel(anchorId) {
-    // If a new-comment bubble is already open, cancel it
-    if (_newCmtBubble) {
-      const oldAnchor = _newCmtBubble._anchorId;
-      _newCmtBubble.remove();
-      _newCmtBubble = null;
-      if (oldAnchor && richEditorInstance) richEditorInstance.removeCommentAnchor(oldAnchor);
-      if (richEditorInstance) richEditorInstance.setCommentsActive(false);
-      return;
-    }
-
-    if (!cmtOverlay) return;
+    if (_cmtFloat) { closeCmtFloat(); return; }
 
     const myColor    = cmtAuthorColor(me.full_name || me.username || '');
     const myInitials = cmtGetInitials(me.full_name || me.username || '');
-    const bubble = document.createElement('div');
-    bubble.className = 'gcp-cmt-bubble gcp-cmt-bubble--new';
-    bubble._anchorId = anchorId;
-    bubble.innerHTML = `
-      <div class="gcp-cmt-header">
-        <span class="gcp-cmt-avatar" style="background:${window.GCP.escapeHtml(myColor)}">${window.GCP.escapeHtml(myInitials)}</span>
-        <span class="gcp-cmt-author">${window.GCP.escapeHtml(me.full_name || me.username || 'You')}</span>
+    const card = document.createElement('div');
+    card.className = 'gcp-cmt-float';
+    card._anchorId  = anchorId;
+    card.innerHTML = `
+      <div class="gcp-cmt-float-header">
+        <span class="gcp-cmt-float-avatar" style="background:${window.GCP.escapeHtml(myColor)}">${window.GCP.escapeHtml(myInitials)}</span>
+        <span class="gcp-cmt-float-author">${window.GCP.escapeHtml(me.full_name || me.username || 'You')}</span>
       </div>
-      <textarea class="gcp-cmt-input" placeholder="Add a comment…" rows="3"></textarea>
-      <div class="gcp-cmt-actions">
-        <button class="gcp-cmt-save" type="button">Save</button>
-        <button class="gcp-cmt-cancel" type="button">Cancel</button>
-      </div>
-    `;
-    cmtOverlay.appendChild(bubble);
-    _newCmtBubble = bubble;
+      <textarea class="gcp-cmt-float-input" placeholder="Add a comment…" rows="4"></textarea>
+      <div class="gcp-cmt-float-actions">
+        <button class="gcp-cmt-float-save" type="button">Save</button>
+        <button class="gcp-cmt-float-cancel" type="button">Cancel</button>
+      </div>`;
+    document.body.appendChild(card);
+    _cmtFloat = card;
     if (richEditorInstance) richEditorInstance.setCommentsActive(true);
 
-    // Position the bubble next to its anchor
+    // Position: to the right of the editor frame, near the anchor if possible
     requestAnimationFrame(() => {
+      const editorFrame = document.getElementById('editorFrame');
+      const frameRect = editorFrame ? editorFrame.getBoundingClientRect() : null;
+      let top = 120, left = window.innerWidth - 320;
+      if (frameRect) left = Math.min(frameRect.right + 12, window.innerWidth - 320);
       if (anchorId && richEditorInstance) {
         const anchor = richEditorInstance.el.querySelector(`[data-cmt-anchor-id="${anchorId}"]`);
-        if (anchor) {
-          const overlayTop = cmtOverlay.getBoundingClientRect().top + window.scrollY;
-          const absY = anchor.getBoundingClientRect().top + window.scrollY;
-          bubble.style.top = Math.max(0, absY - overlayTop) + 'px';
-        }
+        if (anchor) top = Math.min(Math.max(anchor.getBoundingClientRect().top, 60), window.innerHeight - 260);
+      } else if (frameRect) {
+        top = frameRect.top + 60;
       }
-      bubble.querySelector('.gcp-cmt-input').focus();
+      card.style.top  = top  + 'px';
+      card.style.left = left + 'px';
+      card.querySelector('.gcp-cmt-float-input').focus();
     });
 
-    bubble.querySelector('.gcp-cmt-save').addEventListener('click', async () => {
-      const text = bubble.querySelector('.gcp-cmt-input').value.trim();
+    card.querySelector('.gcp-cmt-float-save').addEventListener('click', async () => {
+      const text = card.querySelector('.gcp-cmt-float-input').value.trim();
       if (!text) return;
-      bubble.querySelector('.gcp-cmt-save').disabled = true;
+      card.querySelector('.gcp-cmt-float-save').disabled = true;
       try {
         await window.GCP.apiFetch('/tp/comments', {
           method: 'POST',
           body: JSON.stringify({ eventId, sectionId, commentText: text, anchorId: anchorId || null })
         });
-        bubble.remove(); _newCmtBubble = null;
+        card.remove(); _cmtFloat = null;
         if (richEditorInstance) richEditorInstance.setCommentsActive(false);
         await loadComments();
       } catch(e) {
         msg.textContent = e.message || 'Could not post comment';
-        bubble.querySelector('.gcp-cmt-save').disabled = false;
+        card.querySelector('.gcp-cmt-float-save').disabled = false;
       }
     });
 
-    bubble.querySelector('.gcp-cmt-cancel').addEventListener('click', () => {
-      if (anchorId && richEditorInstance) richEditorInstance.removeCommentAnchor(anchorId);
-      bubble.remove(); _newCmtBubble = null;
-      if (richEditorInstance) richEditorInstance.setCommentsActive(false);
-    });
-
-    bubble.querySelector('.gcp-cmt-input').addEventListener('keydown', e => {
-      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') { e.preventDefault(); bubble.querySelector('.gcp-cmt-save').click(); }
-      if (e.key === 'Escape') bubble.querySelector('.gcp-cmt-cancel').click();
+    card.querySelector('.gcp-cmt-float-cancel').addEventListener('click', closeCmtFloat);
+    card.querySelector('.gcp-cmt-float-input').addEventListener('keydown', e => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') { e.preventDefault(); card.querySelector('.gcp-cmt-float-save').click(); }
+      if (e.key === 'Escape') closeCmtFloat();
     });
   }
 
-  // Re-position bubbles on window scroll/resize
-  window.addEventListener('scroll', () => requestAnimationFrame(positionBubbles), { passive: true });
-  window.addEventListener('resize', () => requestAnimationFrame(positionBubbles), { passive: true });
+  // Close float when clicking outside it
+  document.addEventListener('mousedown', e => {
+    if (_cmtFloat && !_cmtFloat.contains(e.target)) closeCmtFloat();
+  });
 
   try{
     await load();
