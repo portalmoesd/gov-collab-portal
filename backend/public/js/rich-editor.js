@@ -334,6 +334,8 @@
     document.querySelectorAll('font[size="7"]:not([data-pre])').forEach(el => {
       const span = document.createElement('span');
       span.style.fontSize = pt + 'pt';
+      if (el.color) span.style.color = el.color;
+      if (el.face)  span.style.fontFamily = el.face;
       while (el.firstChild) span.appendChild(el.firstChild);
       el.parentNode.replaceChild(span, el);
     });
