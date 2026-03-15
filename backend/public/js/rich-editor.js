@@ -182,13 +182,13 @@
     .gcp-re-balloon-del { background:rgba(185,28,28,.10); color:#b91c1c; }
     .gcp-re-balloon-del:hover { background:rgba(185,28,28,.22); }
     /* ── Fullscreen ── */
-    .gcp-re-wrap.gcp-fullscreen { position:fixed; inset:0; z-index:9990; border-radius:0; border:none; width:100vw; height:100dvh; display:flex; flex-direction:column; background:var(--card,#fff); }
+    .gcp-re-wrap.gcp-fullscreen { position:fixed; inset:0; z-index:9990; border-radius:0; border:none; width:100vw; height:100dvh; display:flex; flex-direction:column; background:#ffffff !important; }
     .gcp-re-wrap.gcp-fullscreen .gcp-re-content-row { flex:1 1 0; min-height:0; overflow-y:auto; }
     .gcp-re-wrap.gcp-fullscreen .gcp-re-body { min-height:0; height:100%; }
     .gcp-re-btn-fullscreen-icon-expand,.gcp-re-btn-fullscreen-icon-compress { pointer-events:none; }
     .gcp-re-wrap:not(.gcp-fullscreen) .gcp-re-btn-fullscreen-icon-compress { display:none; }
     .gcp-re-wrap.gcp-fullscreen .gcp-re-btn-fullscreen-icon-expand { display:none; }
-    [data-theme="dark"] .gcp-re-wrap.gcp-fullscreen { background:rgba(30,33,44,.98); }
+    [data-theme="dark"] .gcp-re-wrap.gcp-fullscreen { background:#1e212c !important; }
     /* Right-click context menu */
     .gcp-re-ctx { position:fixed; z-index:9999; background:#fff; border:1px solid #e2e8f0; border-radius:9px; box-shadow:0 4px 20px rgba(15,23,42,.14); padding:4px; min-width:160px; }
     .gcp-re-ctx-item { display:flex; align-items:center; gap:7px; padding:7px 12px; border-radius:6px; font-size:13px; font-weight:600; color:#0f172a; cursor:pointer; white-space:nowrap; transition:background .1s; }
