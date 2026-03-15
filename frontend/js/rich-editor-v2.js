@@ -1012,6 +1012,376 @@
     });
   }
 
+  // ── Step 3: Track Changes ─────────────────────────────────────────────────
+  //
+  // TC commands are TC-aware counterparts of the Step 2 commands.
+  // They differ in one key way: instead of committing mutations directly
+  // they stamp a `pending` object on the affected runs.
+  //
+  // pending = {
+  //   op       : 'insert' | 'delete' | 'format'
+  //   id       : string          unique per user-action (not per run)
+  //   author   : string
+  //   initials : string
+  //   time     : ISO string
+  //   label    : string          human label for format changes  ('Bold' …)
+  //   oldMarks : object          format only — marks before the change
+  // }
+  //
+  // Accept(id) → insert: clear pending  |  delete: remove run  |  format: clear pending
+  // Reject(id) → insert: remove run     |  delete: clear pending|  format: restore oldMarks
+
+  let _tcCounter = 0;
+  function tcNewId() { return `tc${Date.now()}${++_tcCounter}`; }
+
+  // ── Walk / transform utilities ────────────────────────────────────────────
+
+  /** Call fn(run) for every run in the document, across all block types. */
+  function walkAllRuns(doc, fn) {
+    function walkBlock(b) {
+      if (b._t === 'paragraph' || b._t === 'heading') {
+        (b.runs || []).forEach(fn);
+      } else if (b._t === 'list') {
+        b.items.forEach(item => (item.runs || []).forEach(fn));
+      } else if (b._t === 'table') {
+        b.rows.forEach(row => row.cells.forEach(cell => cell.blocks.forEach(walkBlock)));
+      }
+    }
+    (doc.blocks || []).forEach(walkBlock);
+  }
+
+  /**
+   * Return a new doc with every run replaced by fn(run).
+   * fn should return the replacement run, or null/undefined to remove it.
+   * Runs arrays are re-normalised after transformation.
+   */
+  function transformAllRuns(doc, fn) {
+    function tr(runs) {
+      const out = [];
+      for (const r of (runs || [])) { const nr = fn(r); if (nr != null) out.push(nr); }
+      return normalizeRuns(out);
+    }
+    function tb(b) {
+      if (b._t === 'paragraph' || b._t === 'heading') return { ...b, runs: tr(b.runs) };
+      if (b._t === 'list')  return mkList(b.listType, b.items.map(i => mkListItem(tr(i.runs))), b.attrs);
+      if (b._t === 'table') return mkTable(b.rows.map(row =>
+        mkTableRow(row.cells.map(cell => mkTableCell(cell.blocks.map(tb), cell.isHeader, cell.attrs)))
+      ));
+      return b;
+    }
+    return { ...doc, blocks: doc.blocks.map(tb) };
+  }
+
+  // ── TC text commands ──────────────────────────────────────────────────────
+
+  /**
+   * Insert text at pos, marking the new run as a pending insertion.
+   *
+   * Self-correction / consecutive-typing optimisation: if the run
+   * immediately before the insert point is already a pending insert by the
+   * same author with the same marks, the new text is appended to it (same
+   * change id) rather than creating a new change entry.  This keeps one-
+   * accept/reject granularity for a whole sentence typed in one go.
+   *
+   * If range is supplied the range is TC-deleted first (replacing selection).
+   */
+  function tcInsertText(doc, pos, text, author, range) {
+    if (!text) return doc;
+    let d = (range && !posEqual(range.start, range.end))
+      ? tcDeleteRange(doc, range, author) : doc;
+    const at       = range ? range.start : pos;
+    const id       = tcNewId();
+    const time     = new Date().toISOString();
+    const initials = getInitials(author);
+
+    return withLeafRuns(d, at, runs => {
+      const cur = runs[at.runIdx] ?? mkRun('');
+      const cp  = runsCharPos(runs, at.runIdx, at.offset);
+      const [before, after] = splitRunsAt(runs, cp);
+
+      // Extend a consecutive insert from the same author (same marks)
+      const prev = before[before.length - 1];
+      if (prev?.pending?.op === 'insert' && prev.pending.author === author
+          && marksEqual(prev.marks, cur.marks || {})) {
+        before[before.length - 1] = mkRun(prev.text + text, prev.marks, prev.pending);
+        return normalizeRuns([...before, ...after]);
+      }
+
+      return normalizeRuns([
+        ...before,
+        mkRun(text, { ...cur.marks }, { op: 'insert', id, author, initials, time }),
+        ...after,
+      ]);
+    });
+  }
+
+  /**
+   * Mark the content of range as a pending deletion.
+   *
+   * Self-correction: a run that is already a pending insert by the same
+   * author is removed silently (the insert is cancelled) rather than being
+   * wrapped in a pending delete.
+   *
+   * For cross-block ranges each block's affected portion is marked
+   * independently.  Block structure is preserved; the block merge happens
+   * at accept-time.
+   */
+  function tcDeleteRange(doc, range, author) {
+    const { start, end } = range;
+    if (posEqual(start, end)) return doc;
+
+    const id       = tcNewId();
+    const time     = new Date().toISOString();
+    const initials = getInitials(author);
+
+    function markRuns(runs, fromChar, toChar) {
+      const out = [];
+      let pos = 0;
+      for (const run of (runs || [])) {
+        const re = pos + run.text.length;
+        if (re <= fromChar || pos >= toChar) {
+          out.push(run);
+        } else {
+          const sl = Math.max(0, fromChar - pos);
+          const sr = Math.min(run.text.length, toChar - pos);
+          if (sl > 0) out.push(mkRun(run.text.slice(0, sl), run.marks, run.pending));
+          const inner = run.text.slice(sl, sr);
+          if (inner) {
+            if (run.pending?.op === 'delete') {
+              out.push(mkRun(inner, run.marks, run.pending));               // already deleted
+            } else if (run.pending?.op === 'insert' && run.pending.author === author) {
+              /* self-correction — discard the insert silently */
+            } else {
+              out.push(mkRun(inner, run.marks, { op: 'delete', id, author, initials, time }));
+            }
+          }
+          if (sr < run.text.length) out.push(mkRun(run.text.slice(sr), run.marks, run.pending));
+        }
+        pos = re;
+      }
+      return normalizeRuns(out);
+    }
+
+    const sameLeaf = start.blockIdx === end.blockIdx
+      && (start.itemIdx ?? null) === (end.itemIdx ?? null)
+      && (start.rowIdx  ?? null) === (end.rowIdx  ?? null)
+      && (start.colIdx  ?? null) === (end.colIdx  ?? null);
+
+    if (sameLeaf) {
+      return withLeafRuns(doc, start, runs =>
+        markRuns(runs,
+          runsCharPos(runs, start.runIdx, start.offset),
+          runsCharPos(runs, end.runIdx,   end.offset)));
+    }
+
+    // Cross-block: mark each affected block independently
+    let d = doc;
+    for (let bi = start.blockIdx; bi <= end.blockIdx; bi++) {
+      const p = { ...start, blockIdx: bi, runIdx: 0, offset: 0 };
+      d = withLeafRuns(d, p, runs => markRuns(runs,
+        bi === start.blockIdx ? runsCharPos(runs, start.runIdx, start.offset) : 0,
+        bi === end.blockIdx   ? runsCharPos(runs, end.runIdx,   end.offset)   : runsLength(runs)));
+    }
+    return d;
+  }
+
+  // ── TC mark commands ──────────────────────────────────────────────────────
+
+  /**
+   * Apply fn(marks) → newMarks to runs in range, recording old marks in
+   * pending so the change can be rejected (undone).
+   *
+   * label is a human-readable name shown in the balloon ('Bold', 'Colour' …).
+   * If a run already has a pending op (insert/delete), the mark is applied
+   * silently without adding a format-change pending — it is part of that
+   * existing tracked change.
+   */
+  function tcApplyMarkFn(doc, range, fn, label, author) {
+    const { start, end } = range;
+    const id       = tcNewId();
+    const time     = new Date().toISOString();
+    const initials = getInitials(author);
+
+    function applyToRuns(runs, fromChar, toChar) {
+      const out = [];
+      let pos = 0;
+      for (const run of (runs || [])) {
+        const re = pos + run.text.length;
+        if (re <= fromChar || pos >= toChar || !run.text) {
+          out.push(run);
+        } else {
+          const sl = Math.max(0, fromChar - pos);
+          const sr = Math.min(run.text.length, toChar - pos);
+          if (sl > 0) out.push(mkRun(run.text.slice(0, sl), run.marks, run.pending));
+          const inner = run.text.slice(sl, sr);
+          if (inner) {
+            if (run.pending) {
+              // Already tracked — apply the mark silently (part of that change)
+              out.push(mkRun(inner, fn({ ...run.marks }), run.pending));
+            } else {
+              out.push(mkRun(inner, fn({ ...run.marks }), {
+                op: 'format', id, author, initials, time,
+                label: label || '',
+                oldMarks: { ...run.marks },
+              }));
+            }
+          }
+          if (sr < run.text.length) out.push(mkRun(run.text.slice(sr), run.marks, run.pending));
+        }
+        pos = re;
+      }
+      return normalizeRuns(out);
+    }
+
+    if (start.blockIdx === end.blockIdx) {
+      return withLeafRuns(doc, start, runs =>
+        applyToRuns(runs,
+          runsCharPos(runs, start.runIdx, start.offset),
+          runsCharPos(runs, end.runIdx,   end.offset)));
+    }
+    let d = doc;
+    for (let bi = start.blockIdx; bi <= end.blockIdx; bi++) {
+      const p = { ...start, blockIdx: bi, runIdx: 0, offset: 0 };
+      d = withLeafRuns(d, p, runs => applyToRuns(runs,
+        bi === start.blockIdx ? runsCharPos(runs, start.runIdx, start.offset) : 0,
+        bi === end.blockIdx   ? runsCharPos(runs, end.runIdx,   end.offset)   : runsLength(runs)));
+    }
+    return d;
+  }
+
+  /** Toggle a boolean mark (bold, italic …) with TC recording. */
+  function tcToggleMark(doc, range, markKey, author) {
+    const { start, end } = range;
+    let allHave = true;
+    outer: for (let bi = start.blockIdx; bi <= end.blockIdx; bi++) {
+      const runs = getLeafRuns(doc, { ...start, blockIdx: bi });
+      const from = bi === start.blockIdx ? runsCharPos(runs, start.runIdx, start.offset) : 0;
+      const to   = bi === end.blockIdx   ? runsCharPos(runs, end.runIdx,   end.offset)   : runsLength(runs);
+      let cp = 0;
+      for (const r of runs) {
+        if (cp + r.text.length > from && cp < to && r.text && !r.marks[markKey]) {
+          allHave = false; break outer;
+        }
+        cp += r.text.length;
+      }
+    }
+    const label = markKey[0].toUpperCase() + markKey.slice(1);
+    return allHave
+      ? tcApplyMarkFn(doc, range, m => { const n = { ...m }; delete n[markKey]; return n; }, 'Remove ' + label, author)
+      : tcApplyMarkFn(doc, range, m => ({ ...m, [markKey]: true }), label, author);
+  }
+
+  /** Set a value mark (font, colour, size …) with TC recording. */
+  function tcSetMark(doc, range, markKey, value, author) {
+    const label = markKey[0].toUpperCase() + markKey.slice(1);
+    return value == null || value === ''
+      ? tcApplyMarkFn(doc, range, m => { const n = { ...m }; delete n[markKey]; return n; }, 'Remove ' + label, author)
+      : tcApplyMarkFn(doc, range, m => ({ ...m, [markKey]: value }), label, author);
+  }
+
+  // ── Accept / Reject ───────────────────────────────────────────────────────
+
+  /**
+   * Accept one change by id.
+   *   insert → clear pending (text becomes permanent)
+   *   delete → remove the run (deletion is committed)
+   *   format → clear pending (new marks stay)
+   */
+  function tcAccept(doc, id) {
+    return transformAllRuns(doc, run => {
+      if (run.pending?.id !== id) return run;
+      if (run.pending.op === 'delete') return null;
+      return mkRun(run.text, run.marks, null);
+    });
+  }
+
+  /**
+   * Reject one change by id.
+   *   insert → remove the run (insertion is reverted)
+   *   delete → clear pending (text is restored)
+   *   format → restore oldMarks, clear pending
+   */
+  function tcReject(doc, id) {
+    return transformAllRuns(doc, run => {
+      if (run.pending?.id !== id) return run;
+      if (run.pending.op === 'insert') return null;
+      if (run.pending.op === 'delete') return mkRun(run.text, run.marks, null);
+      if (run.pending.op === 'format') return mkRun(run.text, run.pending.oldMarks || {}, null);
+      return run;
+    });
+  }
+
+  /** Accept every pending change in the document. */
+  function tcAcceptAll(doc) {
+    return transformAllRuns(doc, run => {
+      if (!run.pending) return run;
+      if (run.pending.op === 'delete') return null;
+      return mkRun(run.text, run.marks, null);
+    });
+  }
+
+  /** Reject every pending change in the document. */
+  function tcRejectAll(doc) {
+    return transformAllRuns(doc, run => {
+      if (!run.pending) return run;
+      if (run.pending.op === 'insert') return null;
+      if (run.pending.op === 'delete') return mkRun(run.text, run.marks, null);
+      if (run.pending.op === 'format') return mkRun(run.text, run.pending.oldMarks || {}, null);
+      return run;
+    });
+  }
+
+  // ── Change query helpers ──────────────────────────────────────────────────
+
+  /**
+   * Return an array of change-entry objects for balloon / reviewing-pane
+   * rendering.  Runs that share the same id are de-duplicated; their text
+   * is concatenated for the excerpt.
+   *
+   * Entry shape:
+   *   { id, op, label, author, initials, time, color, bg, text }
+   */
+  function tcGetChanges(doc) {
+    const map = new Map();
+    walkAllRuns(doc, run => {
+      if (!run.pending) return;
+      const p = run.pending;
+      if (map.has(p.id)) {
+        map.get(p.id).text += run.text;
+      } else {
+        const [color, bg] = TC_PALETTE[authorColorIdx(p.author)];
+        map.set(p.id, {
+          id:       p.id,
+          op:       p.op,
+          label:    p.label    || '',
+          author:   p.author,
+          initials: p.initials || getInitials(p.author),
+          time:     p.time,
+          color, bg,
+          text:     run.text,
+        });
+      }
+    });
+    return [...map.values()];
+  }
+
+  /** Number of distinct pending changes. */
+  function tcCountChanges(doc) { return tcGetChanges(doc).length; }
+
+  /** True if the document contains any pending change. */
+  function tcHasChanges(doc) {
+    let found = false;
+    walkAllRuns(doc, r => { if (r.pending) found = true; });
+    return found;
+  }
+
+  /** Unique author names of all pending changes. */
+  function tcGetAuthors(doc) {
+    const s = new Set();
+    walkAllRuns(doc, r => { if (r.pending) s.add(r.pending.author); });
+    return [...s];
+  }
+
   // ── RichEditorV2 factory stub (Step 1: load + render only) ────────────────
   //
   // Steps 2-7 will extend this with commands, track-changes, toolbar, etc.
@@ -1091,6 +1461,16 @@
     // ── Table commands ───────────────────────────────────────────────────
     cmdInsertTable, cmdInsertTableRow, cmdDeleteTableRow,
     cmdInsertTableCol, cmdDeleteTableCol,
+    // ── TC utilities ─────────────────────────────────────────────────────
+    walkAllRuns, transformAllRuns,
+    // ── TC text commands ──────────────────────────────────────────────────
+    tcInsertText, tcDeleteRange,
+    // ── TC mark commands ──────────────────────────────────────────────────
+    tcApplyMarkFn, tcToggleMark, tcSetMark,
+    // ── TC accept / reject ────────────────────────────────────────────────
+    tcAccept, tcReject, tcAcceptAll, tcRejectAll,
+    // ── TC query helpers ──────────────────────────────────────────────────
+    tcGetChanges, tcCountChanges, tcHasChanges, tcGetAuthors,
   };
 
   // NOTE: window.GCP.RichEditor is intentionally NOT replaced here.
