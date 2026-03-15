@@ -145,7 +145,7 @@
     .gcp-re-tc-pane { display:none; }
 
     /* ── Content row: body + right margin balloons ── */
-    .gcp-re-content-row { display:flex; overflow-y:auto; min-height:260px; align-items:flex-start; }
+    .gcp-re-content-row { display:flex; overflow-y:auto; min-height:260px; align-items:flex-start; position:relative; }
     .gcp-re-body { flex:1 1 0; min-width:0; min-height:260px; padding:14px 16px; outline:none; font-size:15px; line-height:1.65; color:var(--text,#1f2a37); overflow-y:visible; }
     .gcp-re-body:empty::before { content:attr(data-placeholder); color:var(--muted,#6b7280); pointer-events:none; }
     .gcp-re-body h2 { font-size:1.3em; font-weight:800; margin:.8em 0 .3em; }
@@ -618,25 +618,40 @@
     // Build and position all balloon cards in the margin column
     function positionBalloons() {
       marginEl.innerHTML = '';
+      // Remove previous SVG overlay (lives on contentRow, not marginEl)
+      const oldSvg = contentRow.querySelector('.gcp-re-connectors');
+      if (oldSvg) oldSvg.remove();
+
       const hasCmts = storedComments.length > 0;
       if (!tc.visible && !hasCmts) return;
       requestAnimationFrame(() => {
-        const mRect = marginEl.getBoundingClientRect();
+        const crRect = contentRow.getBoundingClientRect();
+        const mRect  = marginEl.getBoundingClientRect();
+        const scrollTop  = contentRow.scrollTop;
+        const scrollLeft = contentRow.scrollLeft;
         const slots = [];
 
-        // SVG overlay for Word-style dashed connecting lines
-        // (overflow:visible lets lines extend leftward over the body area)
+        // SVG overlay anchored to contentRow's scroll-space so lines span
+        // from body text all the way to the right-margin balloon cards.
         const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
         svg.setAttribute('class', 'gcp-re-connectors');
-        marginEl.appendChild(svg);
+        svg.setAttribute('width',  String(contentRow.scrollWidth));
+        svg.setAttribute('height', String(contentRow.scrollHeight));
+        svg.style.cssText = 'position:absolute;top:0;left:0;pointer-events:none;overflow:visible;';
+        contentRow.appendChild(svg);
+
+        // mRect offsets from the scroll-content origin
+        const mOffLeft = mRect.left - crRect.left + scrollLeft;
+        const mOffTop  = mRect.top  - crRect.top  + scrollTop;
 
         function drawConnector(anchorEl, balloonTop, balloonH, color) {
           if (!anchorEl) return;
           const aRect = anchorEl.getBoundingClientRect();
-          const x1 = aRect.right  - mRect.left;
-          const y1 = aRect.top + aRect.height / 2 - mRect.top;
-          const x2 = 2;
-          const y2 = balloonTop + Math.min(balloonH, 26) / 2;
+          // All coords in contentRow scroll-space
+          const x1 = aRect.right  - crRect.left + scrollLeft;
+          const y1 = aRect.top + aRect.height / 2 - crRect.top + scrollTop;
+          const x2 = mOffLeft + 2;
+          const y2 = mOffTop + balloonTop + Math.min(balloonH, 26) / 2;
           const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
           line.setAttribute('x1', String(x1)); line.setAttribute('y1', String(y1));
           line.setAttribute('x2', String(x2)); line.setAttribute('y2', String(y2));
