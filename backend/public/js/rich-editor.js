@@ -267,9 +267,9 @@
     .gcp-re-cmt-reply-cancel { background:transparent; color:#64748b; font-size:10px; font-weight:700; border:none; border-radius:4px; padding:2px 7px; cursor:pointer; line-height:1.4; transition:background .1s; }
     .gcp-re-cmt-reply-cancel:hover { background:rgba(0,0,0,.06); }
 
-    /* Comment anchors – Word-style yellow highlight with bottom border */
-    .gcp-re-body .gcp-cmt-anchor { background:rgba(255,210,0,.30); border-bottom:2px solid #d97706; border-radius:2px; cursor:default; box-shadow:0 0 0 1px rgba(217,119,6,.20); }
-    .gcp-re-body .gcp-cmt-anchor:hover { background:rgba(255,210,0,.50); box-shadow:0 0 0 1px rgba(217,119,6,.45); }
+    /* Comment anchors – yellow highlight only when panel is visible (mirrors tc-visible pattern) */
+    .gcp-re-wrap.has-comments .gcp-re-body .gcp-cmt-anchor { background:rgba(255,210,0,.30); border-bottom:2px solid #d97706; border-radius:2px; cursor:default; box-shadow:0 0 0 1px rgba(217,119,6,.20); }
+    .gcp-re-wrap.has-comments .gcp-re-body .gcp-cmt-anchor:hover { background:rgba(255,210,0,.50); box-shadow:0 0 0 1px rgba(217,119,6,.45); }
 
     /* ── Colour palette popup ── */
     .gcp-re-palette { position:fixed; z-index:10000; background:#fff; border:1px solid #e2e8f0; border-radius:10px; box-shadow:0 6px 24px rgba(15,23,42,.16); padding:10px; min-width:196px; }
