@@ -1029,6 +1029,70 @@
   }
 
   /**
+   * Insert pasted blocks at pos.
+   * - Single simple-block paste: merges pasted runs inline at cursor.
+   * - Multi-block paste at a top-level paragraph/heading: splits the host
+   *   block and stitches the pasted blocks in between.
+   * - Paste inside a list-item or table cell, or complex single block
+   *   (table): flattens to inline runs or inserts after the host block.
+   */
+  function cmdPasteBlocks(doc, pos, pastedBlocks) {
+    if (!pastedBlocks || !pastedBlocks.length) return doc;
+    const b = doc.blocks[pos.blockIdx];
+    if (!b) return doc;
+
+    function getSimpleRuns(blk) {
+      if (!blk) return null;
+      if (blk._t === 'paragraph' || blk._t === 'heading') return blk.runs || [];
+      return null;
+    }
+
+    const inTopLevel = b._t === 'paragraph' || b._t === 'heading';
+
+    if (pastedBlocks.length === 1 || !inTopLevel) {
+      // Flatten all pasted blocks to inline runs and merge at cursor
+      const allRuns = [];
+      pastedBlocks.forEach(blk => {
+        const runs = getSimpleRuns(blk);
+        if (runs) allRuns.push(...runs);
+      });
+      const cp = runsCharPos(getLeafRuns(doc, pos), pos.runIdx, pos.offset);
+      const [before, after] = splitRunsAt(getLeafRuns(doc, pos), cp);
+      return withLeafRuns(doc, pos, () => normalizeRuns([...before, ...allRuns, ...after]));
+    }
+
+    // Multi-block paste into a top-level paragraph / heading
+    const cp = runsCharPos(b.runs || [], pos.runIdx, pos.offset);
+    const [beforeRuns, afterRuns] = splitRunsAt(b.runs || [], cp);
+
+    let insertBlocks = [...pastedBlocks];
+    let leftRuns  = [...beforeRuns];
+    let rightRuns = [...afterRuns];
+
+    const firstRuns = getSimpleRuns(insertBlocks[0]);
+    if (firstRuns !== null) {
+      leftRuns = [...beforeRuns, ...firstRuns];
+      insertBlocks = insertBlocks.slice(1);
+    }
+    if (insertBlocks.length > 0) {
+      const lastRuns = getSimpleRuns(insertBlocks[insertBlocks.length - 1]);
+      if (lastRuns !== null) {
+        rightRuns = [...lastRuns, ...afterRuns];
+        insertBlocks = insertBlocks.slice(0, -1);
+      }
+    }
+
+    const leftBlock  = { ...b, runs: normalizeRuns(leftRuns.length  ? leftRuns  : [mkRun('')]) };
+    const rightBlock = mkParagraph(normalizeRuns(rightRuns.length ? rightRuns : [mkRun('')]));
+
+    return withBlocks(doc, blocks => {
+      const result = [...blocks];
+      result.splice(pos.blockIdx, 1, leftBlock, ...insertBlocks, rightBlock);
+      return result.length ? result : [mkParagraph([mkRun('')])];
+    });
+  }
+
+  /**
    * Convert a block to a different type.
    * newType: 'paragraph' | 'heading' | 'list'
    * level:   heading level (1-6) or list type ('ul' | 'ol')
@@ -2135,6 +2199,44 @@
     host.addEventListener('keyup',   updateToolbarState);
     host.addEventListener('mouseup', updateToolbarState);
     host.addEventListener('focus',   updateToolbarState);
+
+    // ── Paste / Drop ──────────────────────────────────────────────────────
+    //
+    // The `beforeinput` handler above only covers insertText / deleteContent /
+    // insertParagraph.  Paste (and drop) bypass it and write directly into the
+    // contentEditable DOM without touching `model`, so `getHtml()` would
+    // return the pre-paste state and the pasted content would disappear on
+    // save.  We intercept the native `paste` event, parse the clipboard data
+    // into model blocks, and insert them properly.
+
+    function handlePasteContent(html, text) {
+      const range = getDocRange();
+      if (!range) return;
+      const src = html ||
+        (text ? text.split('\n').map(l => `<p>${esc(l)}</p>`).join('') : '');
+      if (!src) return;
+      const pastedDoc = htmlToModel(src);
+      if (!pastedDoc.blocks.length) return;
+      let d = !posEqual(range.from, range.to)
+        ? tcDeleteRange(model, { from: range.from, to: range.to }, author)
+        : model;
+      model = cmdPasteBlocks(d, range.from, pastedDoc.blocks);
+      rerender();
+    }
+
+    host.addEventListener('paste', e => {
+      e.preventDefault();
+      const html = e.clipboardData?.getData('text/html') || '';
+      const text = e.clipboardData?.getData('text/plain') || '';
+      handlePasteContent(html, text);
+    });
+
+    host.addEventListener('drop', e => {
+      e.preventDefault();
+      const html = e.dataTransfer?.getData('text/html') || '';
+      const text = e.dataTransfer?.getData('text/plain') || '';
+      handlePasteContent(html, text);
+    });
 
     // Close popups when clicking outside the wrapper
     document.addEventListener('mousedown', e => {
