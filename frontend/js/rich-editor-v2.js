@@ -416,6 +416,9 @@
   .gcp-re-cmt-anchor{border-bottom:2px solid #f59e0b;cursor:pointer;border-radius:2px;transition:background .1s}
   .gcp-re-cmt-anchor:hover,.gcp-re-cmt-anchor--active{background:rgba(245,158,11,.18)}
   .gcp-re-v2-wrapper.gcp-re-v2-comments-active .gcp-re-cmt-anchor{background:rgba(245,158,11,.10)}
+  /* ── Fullscreen ── */
+  .gcp-re-v2-fullscreen{position:fixed!important;inset:0!important;z-index:9999!important;border-radius:0!important;border:none!important;height:100vh!important;width:100vw!important;display:flex!important;flex-direction:column!important}
+  .gcp-re-v2-fullscreen .gcp-re-v2-host{flex:1!important;height:100%!important;min-height:0!important}
   `;
 
   // ── Model → DOM renderer ───────────────────────────────────────────────────
@@ -833,8 +836,8 @@
    */
   function cmdInsertText(doc, pos, text, range) {
     if (!text) return doc;
-    let d = range && !posEqual(range.start, range.end) ? cmdDeleteRange(doc, range) : doc;
-    const insertPos = range ? range.start : pos;
+    let d = range && !posEqual(range.from, range.to) ? cmdDeleteRange(doc, range) : doc;
+    const insertPos = range ? range.from : pos;
     return withLeafRuns(d, insertPos, runs => {
       const run = runs[insertPos.runIdx] ?? mkRun('');
       const cp  = runsCharPos(runs, insertPos.runIdx, insertPos.offset);
@@ -849,19 +852,19 @@
    * For cross-block: merges the start and end blocks' surviving content.
    */
   function cmdDeleteRange(doc, range) {
-    const { start, end } = range;
-    if (posEqual(start, end)) return doc;
+    const { from, to } = range;
+    if (posEqual(from, to)) return doc;
 
-    const sameLeaf = start.blockIdx         === end.blockIdx  &&
-                     (start.itemIdx ?? null) === (end.itemIdx ?? null) &&
-                     (start.rowIdx  ?? null) === (end.rowIdx  ?? null) &&
-                     (start.colIdx  ?? null) === (end.colIdx  ?? null);
+    const sameLeaf = from.blockIdx         === to.blockIdx  &&
+                     (from.itemIdx ?? null) === (to.itemIdx ?? null) &&
+                     (from.rowIdx  ?? null) === (to.rowIdx  ?? null) &&
+                     (from.colIdx  ?? null) === (to.colIdx  ?? null);
 
     // ── intra-block ──────────────────────────────────────────────────────
     if (sameLeaf) {
-      return withLeafRuns(doc, start, runs => {
-        const s = runsCharPos(runs, start.runIdx, start.offset);
-        const e = runsCharPos(runs, end.runIdx,   end.offset);
+      return withLeafRuns(doc, from, runs => {
+        const s = runsCharPos(runs, from.runIdx, from.offset);
+        const e = runsCharPos(runs, to.runIdx,   to.offset);
         const [before] = splitRunsAt(runs, s);
         const [, after] = splitRunsAt(runs, e);
         return normalizeRuns([...before, ...after]);
@@ -869,23 +872,23 @@
     }
 
     // ── cross-block (top-level paragraphs / headings only) ───────────────
-    const startRuns = getLeafRuns(doc, start);
-    const endRuns   = getLeafRuns(doc, end);
-    const startCp   = runsCharPos(startRuns, start.runIdx, start.offset);
-    const endCp     = runsCharPos(endRuns,   end.runIdx,   end.offset);
+    const fromRuns = getLeafRuns(doc, from);
+    const toRuns   = getLeafRuns(doc, to);
+    const fromCp   = runsCharPos(fromRuns, from.runIdx, from.offset);
+    const toCp     = runsCharPos(toRuns,   to.runIdx,   to.offset);
 
-    const [keptStart] = splitRunsAt(startRuns, startCp);
-    const [, keptEnd] = splitRunsAt(endRuns,   endCp);
-    const mergedRuns  = normalizeRuns([...keptStart, ...keptEnd]);
+    const [keptFrom] = splitRunsAt(fromRuns, fromCp);
+    const [, keptTo] = splitRunsAt(toRuns,   toCp);
+    const mergedRuns = normalizeRuns([...keptFrom, ...keptTo]);
 
     return withBlocks(doc, blocks => {
-      const startBlock = blocks[start.blockIdx];
+      const fromBlock = blocks[from.blockIdx];
       const result = [];
       blocks.forEach((b, i) => {
-        if (i < start.blockIdx)  result.push(b);
-        if (i === start.blockIdx) result.push({ ...startBlock, runs: mergedRuns });
-        // i > start and i <= end: drop
-        if (i > end.blockIdx)   result.push(b);
+        if (i < from.blockIdx)  result.push(b);
+        if (i === from.blockIdx) result.push({ ...fromBlock, runs: mergedRuns });
+        // i > from.blockIdx and i <= to.blockIdx: drop
+        if (i > to.blockIdx)   result.push(b);
       });
       return result.length ? result : [mkParagraph([mkRun('')])];
     });
@@ -898,7 +901,7 @@
    * Works intra-block and across multiple top-level blocks.
    */
   function cmdApplyMarkFn(doc, range, fn) {
-    const { start, end } = range;
+    const { from, to } = range;
 
     function applyToRuns(runs, fromChar, toChar) {
       const newRuns = [];
@@ -923,24 +926,24 @@
     }
 
     // Single leaf block
-    if (start.blockIdx === end.blockIdx) {
-      return withLeafRuns(doc, start, runs => {
-        const s = runsCharPos(runs, start.runIdx, start.offset);
-        const e = runsCharPos(runs, end.runIdx,   end.offset);
+    if (from.blockIdx === to.blockIdx) {
+      return withLeafRuns(doc, from, runs => {
+        const s = runsCharPos(runs, from.runIdx, from.offset);
+        const e = runsCharPos(runs, to.runIdx,   to.offset);
         return applyToRuns(runs, s, e);
       });
     }
 
     // Cross-block: apply block by block
     let d = doc;
-    for (let bi = start.blockIdx; bi <= end.blockIdx; bi++) {
-      const pos = { ...start, blockIdx: bi, runIdx: 0, offset: 0 };
+    for (let bi = from.blockIdx; bi <= to.blockIdx; bi++) {
+      const pos = { ...from, blockIdx: bi, runIdx: 0, offset: 0 };
       d = withLeafRuns(d, pos, runs => {
-        const from = bi === start.blockIdx
-          ? runsCharPos(runs, start.runIdx, start.offset) : 0;
-        const to   = bi === end.blockIdx
-          ? runsCharPos(runs, end.runIdx, end.offset) : runsLength(runs);
-        return applyToRuns(runs, from, to);
+        const fc = bi === from.blockIdx
+          ? runsCharPos(runs, from.runIdx, from.offset) : 0;
+        const tc = bi === to.blockIdx
+          ? runsCharPos(runs, to.runIdx, to.offset) : runsLength(runs);
+        return applyToRuns(runs, fc, tc);
       });
     }
     return d;
@@ -961,18 +964,18 @@
    * mark, remove it; otherwise apply it.  Works across block boundaries.
    */
   function cmdToggleMark(doc, range, markKey) {
-    const { start, end } = range;
+    const { from, to } = range;
     let allHave = true;
 
-    outer: for (let bi = start.blockIdx; bi <= end.blockIdx; bi++) {
-      const pos  = { ...start, blockIdx: bi, runIdx: 0, offset: 0 };
+    outer: for (let bi = from.blockIdx; bi <= to.blockIdx; bi++) {
+      const pos  = { ...from, blockIdx: bi, runIdx: 0, offset: 0 };
       const runs = getLeafRuns(doc, pos);
-      const from = bi === start.blockIdx ? runsCharPos(runs, start.runIdx, start.offset) : 0;
-      const to   = bi === end.blockIdx   ? runsCharPos(runs, end.runIdx,   end.offset)   : runsLength(runs);
+      const fc = bi === from.blockIdx ? runsCharPos(runs, from.runIdx, from.offset) : 0;
+      const tc = bi === to.blockIdx   ? runsCharPos(runs, to.runIdx,   to.offset)   : runsLength(runs);
       let charPos = 0;
       for (const run of runs) {
         const re = charPos + run.text.length;
-        if (re > from && charPos < to && run.text && !run.marks[markKey]) {
+        if (re > fc && charPos < tc && run.text && !run.marks[markKey]) {
           allHave = false; break outer;
         }
         charPos = re;
@@ -1274,9 +1277,9 @@
    */
   function tcInsertText(doc, pos, text, author, range) {
     if (!text) return doc;
-    let d = (range && !posEqual(range.start, range.end))
+    let d = (range && !posEqual(range.from, range.to))
       ? tcDeleteRange(doc, range, author) : doc;
-    const at       = range ? range.start : pos;
+    const at       = range ? range.from : pos;
     const id       = tcNewId();
     const time     = new Date().toISOString();
     const initials = getInitials(author);
@@ -1314,8 +1317,8 @@
    * at accept-time.
    */
   function tcDeleteRange(doc, range, author) {
-    const { start, end } = range;
-    if (posEqual(start, end)) return doc;
+    const { from, to } = range;
+    if (posEqual(from, to)) return doc;
 
     const id       = tcNewId();
     const time     = new Date().toISOString();
@@ -1349,25 +1352,25 @@
       return normalizeRuns(out);
     }
 
-    const sameLeaf = start.blockIdx === end.blockIdx
-      && (start.itemIdx ?? null) === (end.itemIdx ?? null)
-      && (start.rowIdx  ?? null) === (end.rowIdx  ?? null)
-      && (start.colIdx  ?? null) === (end.colIdx  ?? null);
+    const sameLeaf = from.blockIdx === to.blockIdx
+      && (from.itemIdx ?? null) === (to.itemIdx ?? null)
+      && (from.rowIdx  ?? null) === (to.rowIdx  ?? null)
+      && (from.colIdx  ?? null) === (to.colIdx  ?? null);
 
     if (sameLeaf) {
-      return withLeafRuns(doc, start, runs =>
+      return withLeafRuns(doc, from, runs =>
         markRuns(runs,
-          runsCharPos(runs, start.runIdx, start.offset),
-          runsCharPos(runs, end.runIdx,   end.offset)));
+          runsCharPos(runs, from.runIdx, from.offset),
+          runsCharPos(runs, to.runIdx,   to.offset)));
     }
 
     // Cross-block: mark each affected block independently
     let d = doc;
-    for (let bi = start.blockIdx; bi <= end.blockIdx; bi++) {
-      const p = { ...start, blockIdx: bi, runIdx: 0, offset: 0 };
+    for (let bi = from.blockIdx; bi <= to.blockIdx; bi++) {
+      const p = { ...from, blockIdx: bi, runIdx: 0, offset: 0 };
       d = withLeafRuns(d, p, runs => markRuns(runs,
-        bi === start.blockIdx ? runsCharPos(runs, start.runIdx, start.offset) : 0,
-        bi === end.blockIdx   ? runsCharPos(runs, end.runIdx,   end.offset)   : runsLength(runs)));
+        bi === from.blockIdx ? runsCharPos(runs, from.runIdx, from.offset) : 0,
+        bi === to.blockIdx   ? runsCharPos(runs, to.runIdx,   to.offset)   : runsLength(runs)));
     }
     return d;
   }
@@ -1384,7 +1387,7 @@
    * existing tracked change.
    */
   function tcApplyMarkFn(doc, range, fn, label, author) {
-    const { start, end } = range;
+    const { from, to } = range;
     const id       = tcNewId();
     const time     = new Date().toISOString();
     const initials = getInitials(author);
@@ -1420,33 +1423,33 @@
       return normalizeRuns(out);
     }
 
-    if (start.blockIdx === end.blockIdx) {
-      return withLeafRuns(doc, start, runs =>
+    if (from.blockIdx === to.blockIdx) {
+      return withLeafRuns(doc, from, runs =>
         applyToRuns(runs,
-          runsCharPos(runs, start.runIdx, start.offset),
-          runsCharPos(runs, end.runIdx,   end.offset)));
+          runsCharPos(runs, from.runIdx, from.offset),
+          runsCharPos(runs, to.runIdx,   to.offset)));
     }
     let d = doc;
-    for (let bi = start.blockIdx; bi <= end.blockIdx; bi++) {
-      const p = { ...start, blockIdx: bi, runIdx: 0, offset: 0 };
+    for (let bi = from.blockIdx; bi <= to.blockIdx; bi++) {
+      const p = { ...from, blockIdx: bi, runIdx: 0, offset: 0 };
       d = withLeafRuns(d, p, runs => applyToRuns(runs,
-        bi === start.blockIdx ? runsCharPos(runs, start.runIdx, start.offset) : 0,
-        bi === end.blockIdx   ? runsCharPos(runs, end.runIdx,   end.offset)   : runsLength(runs)));
+        bi === from.blockIdx ? runsCharPos(runs, from.runIdx, from.offset) : 0,
+        bi === to.blockIdx   ? runsCharPos(runs, to.runIdx,   to.offset)   : runsLength(runs)));
     }
     return d;
   }
 
   /** Toggle a boolean mark (bold, italic …) with TC recording. */
   function tcToggleMark(doc, range, markKey, author) {
-    const { start, end } = range;
+    const { from, to } = range;
     let allHave = true;
-    outer: for (let bi = start.blockIdx; bi <= end.blockIdx; bi++) {
-      const runs = getLeafRuns(doc, { ...start, blockIdx: bi });
-      const from = bi === start.blockIdx ? runsCharPos(runs, start.runIdx, start.offset) : 0;
-      const to   = bi === end.blockIdx   ? runsCharPos(runs, end.runIdx,   end.offset)   : runsLength(runs);
+    outer: for (let bi = from.blockIdx; bi <= to.blockIdx; bi++) {
+      const runs = getLeafRuns(doc, { ...from, blockIdx: bi });
+      const fc = bi === from.blockIdx ? runsCharPos(runs, from.runIdx, from.offset) : 0;
+      const tc = bi === to.blockIdx   ? runsCharPos(runs, to.runIdx,   to.offset)   : runsLength(runs);
       let cp = 0;
       for (const r of runs) {
-        if (cp + r.text.length > from && cp < to && r.text && !r.marks[markKey]) {
+        if (cp + r.text.length > fc && cp < tc && r.text && !r.marks[markKey]) {
           allHave = false; break outer;
         }
         cp += r.text.length;
@@ -2015,6 +2018,26 @@
     });
     if (onCommentsClick) { toolbar.append(mkSep(), btnComment); }
 
+    // ── Fullscreen ────────────────────────────────────────────────────────
+    let isFullscreen = false;
+    const btnFs = mkBtn('Full screen (Esc to exit)', '&#x26F6;', () => {
+      isFullscreen = !isFullscreen;
+      wrapper.classList.toggle('gcp-re-v2-fullscreen', isFullscreen);
+      btnFs.classList.toggle('active', isFullscreen);
+      // Restore focus into editor after toggle
+      host.focus();
+    });
+    toolbar.append(mkSep(), btnFs);
+
+    // Exit fullscreen on Escape
+    host.addEventListener('keydown', e => {
+      if (e.key === 'Escape' && isFullscreen) {
+        isFullscreen = false;
+        wrapper.classList.remove('gcp-re-v2-fullscreen');
+        btnFs.classList.remove('active');
+      }
+    });
+
     // ── Balloons ──────────────────────────────────────────────────────────
 
     function updateBalloons() {
@@ -2145,10 +2168,17 @@
             model = tcDeleteRange(model, { from: fromPos, to: pos }, author);
             rerender(fromPos);
           } else if ((pos.runIdx || 0) > 0) {
-            const pr = runs[pos.runIdx - 1];
-            const fromPos = { ...pos, runIdx: pos.runIdx - 1, offset: Math.max(0, (pr.text || '').length - 1) };
-            model = tcDeleteRange(model, { from: fromPos, to: pos }, author);
-            rerender(fromPos);
+            // Walk backward past empty runs to find a run with actual content
+            let ri = (pos.runIdx || 0) - 1;
+            while (ri > 0 && !(runs[ri] && runs[ri].text)) ri--;
+            const pr = runs[ri];
+            if (pr && pr.text) {
+              const prLen = pr.text.length;
+              const fromPos = { ...pos, runIdx: ri, offset: prLen - 1 };
+              const toPos   = { ...pos, runIdx: ri, offset: prLen };
+              model = tcDeleteRange(model, { from: fromPos, to: toPos }, author);
+              rerender(fromPos);
+            }
           } else if ((pos.blockIdx || 0) > 0) {
             model = cmdMergeBlockWithPrev(model, pos.blockIdx);
             rerender();
@@ -2160,13 +2190,18 @@
             const toPos = { ...pos, offset: (pos.offset || 0) + 1 };
             model = tcDeleteRange(model, { from: pos, to: toPos }, author);
             rerender(pos);
-          } else if ((pos.runIdx || 0) < runs.length - 1) {
-            const toPos = { ...pos, runIdx: pos.runIdx + 1, offset: 1 };
-            model = tcDeleteRange(model, { from: pos, to: toPos }, author);
-            rerender(pos);
-          } else if (pos.blockIdx < model.blocks.length - 1) {
-            model = cmdMergeBlockWithPrev(model, pos.blockIdx + 1);
-            rerender(pos);
+          } else {
+            // Walk forward past empty runs to find a run with content to delete
+            let ri = (pos.runIdx || 0) + 1;
+            while (ri < runs.length && !(runs[ri] && runs[ri].text)) ri++;
+            if (ri < runs.length) {
+              const toPos = { ...pos, runIdx: ri, offset: 1 };
+              model = tcDeleteRange(model, { from: { ...pos, runIdx: ri, offset: 0 }, to: toPos }, author);
+              rerender({ ...pos, runIdx: ri, offset: 0 });
+            } else if (pos.blockIdx < model.blocks.length - 1) {
+              model = cmdMergeBlockWithPrev(model, pos.blockIdx + 1);
+              rerender(pos);
+            }
           }
         }
 
@@ -2247,9 +2282,20 @@
     rerender();
 
     // ── Public API ────────────────────────────────────────────────────────
+    // Serialise the current model including all track-change markup so it
+    // round-trips through the DB without losing pending ins/del/format ops.
+    function serializeWithTC() {
+      const div = document.createElement('div');
+      div.appendChild(renderModel(model));
+      return div.innerHTML;
+    }
+
     return {
       el:                    wrapper,
-      getHtml()              { return modelToHtml(model); },
+      // Full serialisation (TC markup preserved) — use for save / submit
+      getHtml()              { return serializeWithTC(); },
+      // Clean serialisation (TC resolved to accepted state) — use for export/print
+      getCleanHtml()         { return modelToHtml(model); },
       setHtml(html)          { model = htmlToModel(html || ''); rerender(); },
       getModel()             { return model; },
       hasChanges()           { return tcHasChanges(model); },
