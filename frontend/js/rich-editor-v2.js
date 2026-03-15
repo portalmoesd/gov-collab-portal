@@ -313,6 +313,102 @@
     }
   }
 
+  // ── Leaf-container position encoding ─────────────────────────────────────
+  //
+  // Every "leaf container" element in the rendered DOM — a <p>, <h1-h6>, <li>,
+  // or inner-block <p> inside a table cell — gets a `data-v2-lc` attribute that
+  // encodes which model node it belongs to.  This lets us convert a DOM cursor
+  // position (textNode + offset) into a DocPos without any live model state.
+
+  function encodeLeafMeta(m) {
+    let s = String(m.blockIdx);
+    if (m.itemIdx     != null) s += ':i' + m.itemIdx;
+    if (m.rowIdx      != null) s += ':r' + m.rowIdx + ':c' + m.colIdx + ':b' + (m.cellBlockIdx || 0);
+    return s;
+  }
+
+  function decodeLeafMeta(s) {
+    const blockIdx = parseInt(s, 10);
+    const ii  = s.match(/:i(\d+)/);
+    const r   = s.match(/:r(\d+)/);
+    const c   = s.match(/:c(\d+)/);
+    const b   = s.match(/:b(\d+)/);
+    return {
+      blockIdx,
+      itemIdx:      ii ? parseInt(ii[1], 10) : undefined,
+      rowIdx:       r  ? parseInt(r[1],  10) : undefined,
+      colIdx:       c  ? parseInt(c[1],  10) : undefined,
+      cellBlockIdx: b  ? parseInt(b[1],  10) : undefined,
+    };
+  }
+
+  // ── v2-specific CSS (injected once) ──────────────────────────────────────
+
+  const V2_CSS = `
+  /* ── Popups ── */
+  .gcp-v2-popup{position:absolute;z-index:10000;background:#fff;border:1px solid #d0d0d0;border-radius:6px;box-shadow:0 4px 16px rgba(0,0,0,.2);padding:8px;min-width:80px}
+  [data-theme=dark] .gcp-v2-popup{background:#2a2a2a;border-color:#555;color:#e0e0e0}
+  .gcp-v2-swatches{display:grid;grid-template-columns:repeat(8,20px);gap:3px;margin-bottom:6px}
+  .gcp-v2-swatch{width:20px;height:20px;border-radius:3px;cursor:pointer;border:1px solid rgba(0,0,0,.15);padding:0}
+  .gcp-v2-swatch:hover{outline:2px solid #1d4ed8;outline-offset:1px;transform:scale(1.15)}
+  .gcp-v2-custom-row{display:flex;gap:6px;align-items:center;border-top:1px solid #e5e5e5;padding-top:6px;font-size:11px;color:#666}
+  [data-theme=dark] .gcp-v2-custom-row{border-top-color:#444}
+  .gcp-v2-custom-row input[type=color]{width:28px;height:22px;padding:0;border:1px solid #ccc;border-radius:3px;cursor:pointer}
+  .gcp-v2-ls-item{padding:5px 12px;cursor:pointer;font-size:13px;border-radius:3px;white-space:nowrap}
+  .gcp-v2-ls-item:hover{background:#f0f4ff}
+  .gcp-v2-ls-item.active{background:#e0e8ff;color:#1d4ed8;font-weight:600}
+  [data-theme=dark] .gcp-v2-ls-item:hover{background:rgba(255,255,255,.08)}
+  .gcp-v2-tpick-grid{display:grid;grid-template-columns:repeat(8,22px);gap:2px}
+  .gcp-v2-tpick-cell{width:22px;height:22px;border:1px solid #d0d0d0;border-radius:2px;cursor:pointer;box-sizing:border-box}
+  .gcp-v2-tpick-cell.on{background:#cfe2ff;border-color:#1d4ed8}
+  .gcp-v2-tpick-label{font-size:11px;color:#888;text-align:center;margin-top:4px;min-height:14px}
+  /* ── Table ── */
+  .gcp-re-v2-table{border-collapse:collapse;width:100%;margin:.5em 0;table-layout:fixed}
+  .gcp-re-v2-table td,.gcp-re-v2-table th{border:1px solid #c9c9c9;padding:4px 8px;vertical-align:top;min-width:32px}
+  .gcp-re-v2-table th{background:#f4f4f4;font-weight:600}
+  .gcp-re-v2-table td p,.gcp-re-v2-table th p{margin:0}
+  /* ── Toolbar buttons ── */
+  .gcp-re-btn{display:inline-flex;align-items:center;justify-content:center;min-width:26px;height:26px;padding:0 5px;border:none;border-radius:4px;cursor:pointer;font-size:13px;font-weight:500;background:transparent;color:inherit;transition:background .1s,color .1s;white-space:nowrap}
+  .gcp-re-btn:hover{background:rgba(0,0,0,.07)}
+  [data-theme=dark] .gcp-re-btn:hover{background:rgba(255,255,255,.1)}
+  .gcp-re-btn.active{background:rgba(29,78,216,.12)!important;color:#1d4ed8!important}
+  .gcp-re-sep{display:inline-block;width:1px;height:20px;background:#d0d0d0;margin:0 3px;vertical-align:middle;flex-shrink:0}
+  [data-theme=dark] .gcp-re-sep{background:#555}
+  /* ── Layout ── */
+  .gcp-re-v2-wrapper{position:relative;display:flex;flex-direction:column;border:1px solid #d0d0d0;border-radius:6px;overflow:hidden;font-family:inherit}
+  [data-theme=dark] .gcp-re-v2-wrapper{border-color:#555}
+  .gcp-re-v2-toolbar{display:flex;flex-wrap:wrap;gap:2px;padding:4px 6px;background:#f8f8f8;border-bottom:1px solid #e0e0e0;align-items:center}
+  [data-theme=dark] .gcp-re-v2-toolbar{background:#2a2a2a;border-bottom-color:#444}
+  .gcp-re-v2-editor-area{display:flex;flex:1;min-height:0;position:relative}
+  .gcp-re-v2-host{flex:1;min-height:200px;padding:12px 16px;outline:none;overflow-y:auto;font-size:14px;line-height:1.6;word-break:break-word}
+  .gcp-re-v2-host p,.gcp-re-v2-host h1,.gcp-re-v2-host h2,.gcp-re-v2-host h3,.gcp-re-v2-host h4{margin:.3em 0}
+  .gcp-re-v2-host ul,.gcp-re-v2-host ol{padding-left:1.8em;margin:.3em 0}
+  /* ── Balloons ── */
+  .gcp-re-v2-balloons{width:200px;flex-shrink:0;padding:8px 6px;overflow-y:auto;border-left:1px solid #e8e8e8;display:flex;flex-direction:column;gap:8px;background:#fafafa}
+  [data-theme=dark] .gcp-re-v2-balloons{border-left-color:#444;background:#1a1a1a}
+  .gcp-re-v2-balloon{border-left:3px solid var(--tc-color,#1d4ed8);border-radius:4px;padding:6px 8px;background:#fff;font-size:12px;box-shadow:0 1px 4px rgba(0,0,0,.08)}
+  [data-theme=dark] .gcp-re-v2-balloon{background:#252525}
+  .gcp-re-v2-balloon-header{display:flex;align-items:center;gap:5px;margin-bottom:4px}
+  .gcp-re-v2-balloon-badge{display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:50%;color:#fff;font-size:10px;font-weight:700;flex-shrink:0}
+  .gcp-re-v2-balloon-info{flex:1;font-size:11px;color:#666;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  [data-theme=dark] .gcp-re-v2-balloon-info{color:#aaa}
+  .gcp-re-v2-balloon-desc{color:#333;margin-bottom:5px;line-height:1.4;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:160px}
+  [data-theme=dark] .gcp-re-v2-balloon-desc{color:#ccc}
+  .gcp-re-v2-balloon-actions{display:flex;gap:4px}
+  .gcp-re-v2-balloon-actions button{flex:1;padding:2px 6px;font-size:11px;border:1px solid #ccc;border-radius:3px;cursor:pointer;background:#fff;transition:background .1s}
+  .gcp-re-v2-balloon-actions button:hover{background:#f0f0f0}
+  [data-theme=dark] .gcp-re-v2-balloon-actions button{background:#333;border-color:#555;color:#e0e0e0}
+  [data-theme=dark] .gcp-re-v2-balloon-actions button:hover{background:#3a3a3a}
+  /* ── Track-changes visual ── */
+  ins[data-tc-id]{text-decoration:underline;text-decoration-color:var(--tc-color);text-underline-offset:2px;color:var(--tc-color)}
+  del[data-tc-id]{text-decoration:line-through;text-decoration-color:var(--tc-color);color:var(--tc-color);opacity:.8}
+  span[data-tc-fmt-id]{outline:2px dotted var(--tc-color,#7c3aed);outline-offset:1px;border-radius:2px}
+  /* ── TC hidden mode ── */
+  .gcp-re-v2-host:not(.tc-visible) ins[data-tc-id]{color:inherit;text-decoration:none}
+  .gcp-re-v2-host:not(.tc-visible) del[data-tc-id]{display:none}
+  .gcp-re-v2-host:not(.tc-visible) span[data-tc-fmt-id]{outline:none}
+  `;
+
   // ── Model → DOM renderer ───────────────────────────────────────────────────
   //
   // Pure function: takes a model, returns a DocumentFragment.
@@ -320,23 +416,26 @@
 
   function renderModel(doc) {
     const frag = document.createDocumentFragment();
-    (doc.blocks || []).forEach(b => {
-      const el = renderBlock(b);
+    (doc.blocks || []).forEach((b, bi) => {
+      const el = renderBlock(b, { blockIdx: bi });
       if (el) frag.appendChild(el);
     });
     return frag;
   }
 
-  function renderBlock(block) {
+  function renderBlock(block, meta) {
+    // meta = { blockIdx, [itemIdx], [rowIdx, colIdx, cellBlockIdx] }
     switch (block._t) {
       case 'paragraph': {
         const el = document.createElement('p');
+        if (meta) el.setAttribute('data-v2-lc', encodeLeafMeta(meta));
         applyBlockAttrs(el, block.attrs);
         appendRuns(el, block.runs);
         return el;
       }
       case 'heading': {
         const el = document.createElement('h' + (block.level || 2));
+        if (meta) el.setAttribute('data-v2-lc', encodeLeafMeta(meta));
         applyBlockAttrs(el, block.attrs);
         appendRuns(el, block.runs);
         return el;
@@ -344,14 +443,15 @@
       case 'list': {
         const el = document.createElement(block.listType === 'ol' ? 'ol' : 'ul');
         applyBlockAttrs(el, block.attrs);
-        (block.items || []).forEach(item => {
+        (block.items || []).forEach((item, ii) => {
           const li = document.createElement('li');
+          if (meta) li.setAttribute('data-v2-lc', encodeLeafMeta({ ...meta, itemIdx: ii }));
           appendRuns(li, item.runs);
           el.appendChild(li);
         });
         return el;
       }
-      case 'table': return renderTable(block);
+      case 'table': return renderTable(block, meta);
       default: return null;
     }
   }
@@ -434,13 +534,14 @@
     return node;
   }
 
-  function renderTable(block) {
+  function renderTable(block, meta) {
+    // meta = { blockIdx } inherited from the table's position in the doc
     const table  = document.createElement('table');
     table.className = 'gcp-re-v2-table';
     const tbody = document.createElement('tbody');
-    (block.rows || []).forEach(row => {
+    (block.rows || []).forEach((row, ri) => {
       const tr = document.createElement('tr');
-      (row.cells || []).forEach(cell => {
+      (row.cells || []).forEach((cell, ci) => {
         const td = document.createElement(cell.isHeader ? 'th' : 'td');
         if (cell.attrs) {
           if (cell.attrs.colspan > 1) td.colSpan = cell.attrs.colspan;
@@ -448,9 +549,12 @@
           if (cell.attrs.width)       td.style.width   = cell.attrs.width;
           if (cell.attrs.bgColor)     td.style.backgroundColor = cell.attrs.bgColor;
         }
-        // Each cell contains block nodes
-        (cell.blocks || []).forEach(b => {
-          const el = renderBlock(b);
+        // Each cell contains block nodes — each is its own leaf container
+        (cell.blocks || []).forEach((b, cbi) => {
+          const cellMeta = meta
+            ? { blockIdx: meta.blockIdx, rowIdx: ri, colIdx: ci, cellBlockIdx: cbi }
+            : undefined;
+          const el = renderBlock(b, cellMeta);
           if (el) td.appendChild(el);
         });
         tr.appendChild(td);
@@ -1382,59 +1486,598 @@
     return [...s];
   }
 
-  // ── RichEditorV2 factory stub (Step 1: load + render only) ────────────────
-  //
-  // Steps 2-7 will extend this with commands, track-changes, toolbar, etc.
-  // For now it proves the model/renderer pipeline works end-to-end and
-  // already passes the public API contract expected by editor.js.
+  // ── RichEditorV2 factory ──────────────────────────────────────────────────
 
-  function RichEditorV2({ container, initialHtml /*, future params */ }) {
-    // Parse initial HTML into model
-    let model = htmlToModel(initialHtml || '');
+  function RichEditorV2({ container, initialHtml, authorName,
+                          sectionTitle, onCommentsClick,
+                          onDeleteComment, onReplyComment }) {
 
-    // Build a minimal host element
-    const host = document.createElement('div');
-    host.className = 'gcp-re-v2-host';
-    host.style.cssText = 'outline:none;min-height:4em;padding:.5em;';
+    // ── State ─────────────────────────────────────────────────────────────
+    let model     = htmlToModel(initialHtml || '');
+    let tcVisible = true;
+    const author  = authorName || 'Unknown';
+
+    // ── CSS injection (once per page) ─────────────────────────────────────
+    if (!document.getElementById('gcp-re-v2-style')) {
+      const s = document.createElement('style');
+      s.id = 'gcp-re-v2-style';
+      s.textContent = V2_CSS;
+      document.head.appendChild(s);
+    }
+
+    // ── DOM scaffold ──────────────────────────────────────────────────────
+    const wrapper    = document.createElement('div');
+    wrapper.className = 'gcp-re-v2-wrapper';
+
+    const toolbar    = document.createElement('div');
+    toolbar.className = 'gcp-re-v2-toolbar';
+
+    const editorArea = document.createElement('div');
+    editorArea.className = 'gcp-re-v2-editor-area';
+
+    const host       = document.createElement('div');
+    host.className   = 'gcp-re-v2-host';
     host.contentEditable = 'true';
 
-    // Render model into host (full re-render; will be optimised in Step 3)
-    function rerender() {
+    const balloonArea = document.createElement('div');
+    balloonArea.className = 'gcp-re-v2-balloons';
+
+    editorArea.append(host, balloonArea);
+    wrapper.append(toolbar, editorArea);
+    container.appendChild(wrapper);
+
+    // ── Popup registry ────────────────────────────────────────────────────
+    const allPopups = [];
+
+    function makePopup(cls) {
+      const p = document.createElement('div');
+      p.className = cls;
+      p.style.display = 'none';
+      allPopups.push(p);
+      wrapper.appendChild(p);
+      return p;
+    }
+
+    function togglePopup(popup, anchorEl) {
+      const showing = popup.style.display !== 'none';
+      allPopups.forEach(p => { p.style.display = 'none'; });
+      if (!showing) {
+        const rect  = anchorEl.getBoundingClientRect();
+        const wRect = wrapper.getBoundingClientRect();
+        popup.style.top  = (rect.bottom - wRect.top + 2) + 'px';
+        popup.style.left = Math.max(0, rect.left - wRect.left) + 'px';
+        popup.style.display = 'block';
+      }
+    }
+
+    // ── Bridge: DOM ↔ Model position ──────────────────────────────────────
+
+    function findLeafEl(node) {
+      let n = (node instanceof Element) ? node : node.parentElement;
+      while (n && n !== host) {
+        if (n.hasAttribute && n.hasAttribute('data-v2-lc')) return n;
+        n = n.parentElement;
+      }
+      return null;
+    }
+
+    function leafTextOffset(leafEl, targetNode, targetOffset) {
+      const walker = document.createTreeWalker(leafEl, NodeFilter.SHOW_TEXT);
+      let count = 0, n;
+      while ((n = walker.nextNode())) {
+        if (n === targetNode) return count + targetOffset;
+        count += n.textContent.length;
+      }
+      return count;
+    }
+
+    function domToDocPos(domNode, domOffset) {
+      const leafEl = findLeafEl(domNode);
+      if (!leafEl) return null;
+      const meta = decodeLeafMeta(leafEl.getAttribute('data-v2-lc'));
+      let runs;
+      try { runs = getLeafRuns(model, meta); } catch (e) { return null; }
+      if (!runs) return null;
+      const charPos = leafTextOffset(leafEl, domNode, domOffset);
+      let rem = charPos;
+      for (let ri = 0; ri < runs.length; ri++) {
+        const len = (runs[ri].text || '').length;
+        if (rem <= len || ri === runs.length - 1) {
+          return { ...meta, runIdx: ri, offset: Math.min(rem, len) };
+        }
+        rem -= len;
+      }
+      return { ...meta, runIdx: 0, offset: 0 };
+    }
+
+    function docPosToDOM(pos) {
+      if (!pos) return null;
+      const encoded = encodeLeafMeta(pos);
+      const attr    = encoded.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+      const leafEl  = host.querySelector('[data-v2-lc="' + attr + '"]');
+      if (!leafEl) return null;
+      let runs;
+      try { runs = getLeafRuns(model, pos); } catch (e) { return null; }
+      if (!runs) return null;
+      let charPos = 0;
+      for (let ri = 0; ri < (pos.runIdx || 0); ri++) {
+        charPos += (runs[ri] ? runs[ri].text.length : 0);
+      }
+      charPos += (pos.offset || 0);
+      const walker = document.createTreeWalker(leafEl, NodeFilter.SHOW_TEXT);
+      let node, rem = charPos;
+      while ((node = walker.nextNode())) {
+        const len = node.textContent.length;
+        if (rem <= len) return { node, offset: rem };
+        rem -= len;
+      }
+      if (node) return { node, offset: node.textContent.length };
+      return { node: leafEl, offset: leafEl.childNodes.length };
+    }
+
+    function getDocRange() {
+      const sel = window.getSelection();
+      if (!sel || sel.rangeCount === 0) return null;
+      const r = sel.getRangeAt(0);
+      if (!host.contains(r.startContainer)) return null;
+      const from = domToDocPos(r.startContainer, r.startOffset);
+      const to   = domToDocPos(r.endContainer,   r.endOffset);
+      if (!from || !to) return null;
+      return { from, to };
+    }
+
+    function restoreCaret(pos) {
+      if (!pos) return;
+      try {
+        const dp = docPosToDOM(pos);
+        if (!dp) return;
+        const sel = window.getSelection();
+        const r   = document.createRange();
+        r.setStart(dp.node, dp.offset);
+        r.collapse(true);
+        sel.removeAllRanges();
+        sel.addRange(r);
+      } catch (e) {}
+    }
+
+    function advancePos(pos, delta) {
+      try {
+        const runs = getLeafRuns(model, pos);
+        if (!runs) return pos;
+        let flat = 0;
+        for (let i = 0; i < (pos.runIdx || 0); i++) flat += runs[i].text.length;
+        flat = Math.max(0, flat + (pos.offset || 0) + delta);
+        let rem = flat;
+        for (let ri = 0; ri < runs.length; ri++) {
+          const len = (runs[ri].text || '').length;
+          if (rem <= len || ri === runs.length - 1) {
+            return { ...pos, runIdx: ri, offset: Math.min(rem, len) };
+          }
+          rem -= len;
+        }
+        return pos;
+      } catch (e) { return pos; }
+    }
+
+    // ── Render ────────────────────────────────────────────────────────────
+
+    function rerender(cursorPos) {
       host.innerHTML = '';
       host.appendChild(renderModel(model));
+      host.classList.toggle('tc-visible', tcVisible);
+      updateBalloons();
+      updateToolbarState();
+      if (cursorPos) restoreCaret(cursorPos);
     }
-    rerender();
 
-    container.appendChild(host);
+    // ── Toolbar helpers ───────────────────────────────────────────────────
+
+    function mkBtn(title, html, onClick) {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.title = title;
+      b.className = 'gcp-re-btn';
+      b.innerHTML = html;
+      b.addEventListener('mousedown', e => { e.preventDefault(); onClick(e, b); });
+      return b;
+    }
+
+    function mkSep() {
+      const s = document.createElement('span');
+      s.className = 'gcp-re-sep';
+      return s;
+    }
+
+    function markBtn(title, html, markKey) {
+      const b = mkBtn(title, html, () => {
+        const range = getDocRange();
+        if (!range) return;
+        model = tcToggleMark(model, range, markKey, author);
+        rerender();
+      });
+      b.dataset.markKey = markKey;
+      return b;
+    }
+
+    function curBlockIdx() {
+      try { const r = getDocRange(); return r ? r.from.blockIdx : 0; } catch (e) { return 0; }
+    }
+
+    // ── Formatting buttons ────────────────────────────────────────────────
+    const btnBold   = markBtn('Bold (Ctrl+B)',      '<b>B</b>',  'bold');
+    const btnItalic = markBtn('Italic (Ctrl+I)',    '<i>I</i>',  'italic');
+    const btnULine  = markBtn('Underline (Ctrl+U)', '<u>U</u>',  'underline');
+    const btnStrike = markBtn('Strikethrough',      '<s>S</s>',  'strikethrough');
+    toolbar.append(btnBold, btnItalic, btnULine, btnStrike, mkSep());
+
+    // ── Block type ────────────────────────────────────────────────────────
+    function setBlockType(type, level) {
+      model = cmdSetBlockType(model, curBlockIdx(), type, level);
+      rerender();
+    }
+
+    toolbar.append(
+      mkBtn('Paragraph', 'P',  () => setBlockType('paragraph')),
+      mkBtn('Heading 1', 'H1', () => setBlockType('heading', 1)),
+      mkBtn('Heading 2', 'H2', () => setBlockType('heading', 2)),
+      mkBtn('Heading 3', 'H3', () => setBlockType('heading', 3)),
+      mkSep()
+    );
+
+    // ── Lists ─────────────────────────────────────────────────────────────
+    function toggleList(listType) {
+      const bi  = curBlockIdx();
+      const blk = model.blocks[bi];
+      if (blk && blk._t === 'list' && blk.listType === listType) {
+        model = cmdSetBlockType(model, bi, 'paragraph');
+      } else {
+        model = cmdSetBlockType(model, bi, 'list', listType);
+      }
+      rerender();
+    }
+
+    toolbar.append(
+      mkBtn('Bullet list',   '&#8226; &#8226; &#8226;', () => toggleList('ul')),
+      mkBtn('Numbered list', '1. 2. 3.',                () => toggleList('ol')),
+      mkSep()
+    );
+
+    // ── Alignment ─────────────────────────────────────────────────────────
+    function setAlign(align) {
+      model = cmdSetBlockAttrs(model, curBlockIdx(), { align });
+      rerender();
+    }
+
+    toolbar.append(
+      mkBtn('Align left',   '&#8676;', () => setAlign('left')),
+      mkBtn('Centre',       '&#8596;', () => setAlign('center')),
+      mkBtn('Align right',  '&#8677;', () => setAlign('right')),
+      mkBtn('Justify',      '&#8644;', () => setAlign('justify')),
+      mkSep()
+    );
+
+    // ── Line spacing ──────────────────────────────────────────────────────
+    const lsPopup = makePopup('gcp-v2-popup gcp-v2-ls-popup');
+    [1, 1.15, 1.5, 2, 2.5, 3].forEach(v => {
+      const item = document.createElement('div');
+      item.className = 'gcp-v2-ls-item';
+      item.textContent = String(v);
+      item.addEventListener('mousedown', e => {
+        e.preventDefault();
+        model = cmdSetBlockAttrs(model, curBlockIdx(), { lineSpacing: v });
+        rerender();
+        lsPopup.style.display = 'none';
+      });
+      lsPopup.appendChild(item);
+    });
+    const btnLs = mkBtn('Line spacing', '&#8645;', (e, b) => togglePopup(lsPopup, b));
+    toolbar.append(btnLs, mkSep());
+
+    // ── Indent / Outdent ──────────────────────────────────────────────────
+    function changeIndent(delta) {
+      const bi  = curBlockIdx();
+      const blk = model.blocks[bi];
+      const cur = (blk && blk.attrs && blk.attrs.indent) || 0;
+      model = cmdSetBlockAttrs(model, bi, { indent: Math.max(0, cur + delta) });
+      rerender();
+    }
+
+    toolbar.append(
+      mkBtn('Decrease indent', '&#8676;&#8676;', () => changeIndent(-1)),
+      mkBtn('Increase indent', '&#8677;&#8677;', () => changeIndent(1)),
+      mkSep()
+    );
+
+    // ── Insert table ──────────────────────────────────────────────────────
+    (function buildTablePicker() {
+      const ROWS = 8, COLS = 8;
+      const popup = makePopup('gcp-v2-popup');
+      const grid  = document.createElement('div');
+      grid.className = 'gcp-v2-tpick-grid';
+      const lbl   = document.createElement('div');
+      lbl.className = 'gcp-v2-tpick-label';
+      lbl.textContent = '0 \xd7 0';
+      const cells = [];
+      for (let r = 0; r < ROWS; r++) {
+        for (let c = 0; c < COLS; c++) {
+          const cell = document.createElement('div');
+          cell.className = 'gcp-v2-tpick-cell';
+          cell.dataset.r = r;
+          cell.dataset.c = c;
+          cell.addEventListener('mouseover', () => {
+            const hr = r + 1, hc = c + 1;
+            cells.forEach(x => x.classList.toggle('on', +x.dataset.r < hr && +x.dataset.c < hc));
+            lbl.textContent = hr + ' \xd7 ' + hc;
+          });
+          cell.addEventListener('mousedown', e => {
+            e.preventDefault();
+            const range    = getDocRange();
+            const afterIdx = range ? range.from.blockIdx : model.blocks.length - 1;
+            model = cmdInsertTable(model, afterIdx, r + 1, c + 1);
+            rerender();
+            popup.style.display = 'none';
+          });
+          grid.appendChild(cell);
+          cells.push(cell);
+        }
+      }
+      popup.append(grid, lbl);
+      const btnT = mkBtn('Insert table', '&#9638;', (e, b) => togglePopup(popup, b));
+      toolbar.append(btnT, mkSep());
+    })();
+
+    // ── Colour swatches helper ────────────────────────────────────────────
+    const SWATCHES = [
+      '#000000', '#434343', '#666666', '#999999', '#b7b7b7', '#d9d9d9', '#efefef', '#ffffff',
+      '#c00000', '#ff0000', '#ff9900', '#ffff00', '#00b050', '#00b0f0', '#0070c0', '#7030a0',
+    ];
+
+    function makeSwatchPopup(onPick) {
+      const popup = makePopup('gcp-v2-popup');
+      const grid  = document.createElement('div');
+      grid.className = 'gcp-v2-swatches';
+      SWATCHES.forEach(c => {
+        const sw = document.createElement('div');
+        sw.className  = 'gcp-v2-swatch';
+        sw.style.background = c;
+        sw.title = c;
+        sw.addEventListener('mousedown', e => {
+          e.preventDefault();
+          onPick(c);
+          popup.style.display = 'none';
+        });
+        grid.appendChild(sw);
+      });
+      const row = document.createElement('div');
+      row.className = 'gcp-v2-custom-row';
+      const inp = document.createElement('input');
+      inp.type  = 'color';
+      inp.value = '#000000';
+      const applyBtn = document.createElement('button');
+      applyBtn.type = 'button';
+      applyBtn.textContent = 'Apply';
+      applyBtn.addEventListener('mousedown', e => {
+        e.preventDefault();
+        onPick(inp.value);
+        popup.style.display = 'none';
+      });
+      row.append(inp, applyBtn);
+      popup.append(grid, row);
+      return popup;
+    }
+
+    const colorPopup = makeSwatchPopup(c => {
+      const range = getDocRange();
+      if (range) { model = tcSetMark(model, range, 'color', c, author); rerender(); }
+    });
+    const btnColor = mkBtn('Text colour', 'A&#9660;', (e, b) => togglePopup(colorPopup, b));
+    toolbar.append(btnColor);
+
+    const bgPopup = makeSwatchPopup(c => {
+      const range = getDocRange();
+      if (range) { model = tcSetMark(model, range, 'background', c, author); rerender(); }
+    });
+    const btnBg = mkBtn('Highlight / background', '&#9641;&#9660;', (e, b) => togglePopup(bgPopup, b));
+    toolbar.append(btnBg, mkSep());
+
+    // ── Clear formatting ──────────────────────────────────────────────────
+    toolbar.append(
+      mkBtn('Clear formatting', 'T&#10006;', () => {
+        const range = getDocRange();
+        if (!range) return;
+        model = tcApplyMarkFn(model, range, () => ({}), 'Clear formatting', author);
+        rerender();
+      }),
+      mkSep()
+    );
+
+    // ── Track-changes controls ────────────────────────────────────────────
+    const btnTcToggle = mkBtn('Show / hide tracked changes', '&#128065;', (e, b) => {
+      tcVisible = !tcVisible;
+      host.classList.toggle('tc-visible', tcVisible);
+      b.classList.toggle('active', tcVisible);
+      updateBalloons();
+    });
+    btnTcToggle.classList.add('active');
+
+    const btnAcceptAll = mkBtn('Accept all changes', '&#10003;&#10003;', () => {
+      model = tcAcceptAll(model); rerender();
+    });
+    const btnRejectAll = mkBtn('Reject all changes', '&#10007;&#10007;', () => {
+      model = tcRejectAll(model); rerender();
+    });
+    toolbar.append(btnTcToggle, btnAcceptAll, btnRejectAll);
+
+    // ── Balloons ──────────────────────────────────────────────────────────
+
+    function updateBalloons() {
+      balloonArea.innerHTML = '';
+      if (!tcVisible) return;
+      tcGetChanges(model).forEach(ch => {
+        const balloon = document.createElement('div');
+        balloon.className = 'gcp-re-v2-balloon';
+        balloon.style.setProperty('--tc-color', ch.color);
+
+        const header = document.createElement('div');
+        header.className = 'gcp-re-v2-balloon-header';
+
+        const badge = document.createElement('span');
+        badge.className = 'gcp-re-v2-balloon-badge';
+        badge.textContent = ch.initials;
+        badge.style.background = ch.color;
+
+        const info = document.createElement('span');
+        info.className = 'gcp-re-v2-balloon-info';
+        const d = new Date(ch.time);
+        info.textContent = ch.author + (isNaN(d) ? '' :
+          '\u2002' + d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }));
+
+        header.append(badge, info);
+
+        const desc = document.createElement('div');
+        desc.className = 'gcp-re-v2-balloon-desc';
+        desc.textContent = ch.label || ch.op;
+
+        const acts = document.createElement('div');
+        acts.className = 'gcp-re-v2-balloon-actions';
+
+        const aBtn = document.createElement('button');
+        aBtn.type = 'button';
+        aBtn.textContent = 'Accept';
+        aBtn.addEventListener('click', () => { model = tcAccept(model, ch.id); rerender(); });
+
+        const rBtn = document.createElement('button');
+        rBtn.type = 'button';
+        rBtn.textContent = 'Reject';
+        rBtn.addEventListener('click', () => { model = tcReject(model, ch.id); rerender(); });
+
+        acts.append(aBtn, rBtn);
+        balloon.append(header, desc, acts);
+        balloonArea.appendChild(balloon);
+      });
+    }
+
+    // ── Toolbar state sync ────────────────────────────────────────────────
+
+    function updateToolbarState() {
+      try {
+        const range = getDocRange();
+        const m = range
+          ? ((getLeafRuns(model, range.from) || [])[range.from.runIdx || 0] || {}).marks || {}
+          : {};
+        btnBold.classList.toggle('active',   !!m.bold);
+        btnItalic.classList.toggle('active', !!m.italic);
+        btnULine.classList.toggle('active',  !!m.underline);
+        btnStrike.classList.toggle('active', !!m.strikethrough);
+      } catch (e) {}
+    }
+
+    // ── contentEditable event handlers ────────────────────────────────────
+
+    host.addEventListener('beforeinput', e => {
+      const type = e.inputType;
+
+      if (type === 'insertText') {
+        e.preventDefault();
+        const range = getDocRange();
+        if (!range) return;
+        const sel  = posEqual(range.from, range.to) ? undefined : range;
+        const text = e.data || '';
+        model = tcInsertText(model, range.from, text, author, sel);
+        rerender(advancePos(range.from, text.length));
+
+      } else if (type === 'deleteContentBackward' || type === 'deleteContentForward') {
+        e.preventDefault();
+        const range = getDocRange();
+        if (!range) return;
+
+        if (!posEqual(range.from, range.to)) {
+          model = tcDeleteRange(model, range, author);
+          rerender(range.from);
+          return;
+        }
+
+        const pos  = range.from;
+        const runs = getLeafRuns(model, pos);
+        if (!runs) return;
+
+        if (type === 'deleteContentBackward') {
+          if ((pos.offset || 0) > 0) {
+            const fromPos = { ...pos, offset: pos.offset - 1 };
+            model = tcDeleteRange(model, { from: fromPos, to: pos }, author);
+            rerender(fromPos);
+          } else if ((pos.runIdx || 0) > 0) {
+            const pr = runs[pos.runIdx - 1];
+            const fromPos = { ...pos, runIdx: pos.runIdx - 1, offset: Math.max(0, (pr.text || '').length - 1) };
+            model = tcDeleteRange(model, { from: fromPos, to: pos }, author);
+            rerender(fromPos);
+          } else if ((pos.blockIdx || 0) > 0) {
+            model = cmdMergeBlockWithPrev(model, pos.blockIdx);
+            rerender();
+          }
+        } else { // deleteContentForward
+          const curRun = runs[pos.runIdx || 0];
+          const runLen = (curRun && curRun.text) ? curRun.text.length : 0;
+          if ((pos.offset || 0) < runLen) {
+            const toPos = { ...pos, offset: (pos.offset || 0) + 1 };
+            model = tcDeleteRange(model, { from: pos, to: toPos }, author);
+            rerender(pos);
+          } else if ((pos.runIdx || 0) < runs.length - 1) {
+            const toPos = { ...pos, runIdx: pos.runIdx + 1, offset: 1 };
+            model = tcDeleteRange(model, { from: pos, to: toPos }, author);
+            rerender(pos);
+          } else if (pos.blockIdx < model.blocks.length - 1) {
+            model = cmdMergeBlockWithPrev(model, pos.blockIdx + 1);
+            rerender(pos);
+          }
+        }
+
+      } else if (type === 'insertParagraph' || type === 'insertLineBreak') {
+        e.preventDefault();
+        const range = getDocRange();
+        if (!range) return;
+        model = cmdSplitBlock(model, range.from);
+        rerender({ blockIdx: range.from.blockIdx + 1, runIdx: 0, offset: 0 });
+
+      } else if (type === 'historyUndo' || type === 'historyRedo') {
+        e.preventDefault(); // undo/redo stack: future work
+      }
+    });
+
+    host.addEventListener('keydown', e => {
+      if ((e.ctrlKey || e.metaKey) && !e.shiftKey) {
+        const k = e.key.toLowerCase();
+        const doMark = (key) => {
+          e.preventDefault();
+          const r = getDocRange();
+          if (r) { model = tcToggleMark(model, r, key, author); rerender(); }
+        };
+        if (k === 'b') doMark('bold');
+        if (k === 'i') doMark('italic');
+        if (k === 'u') doMark('underline');
+      }
+    });
+
+    host.addEventListener('keyup',   updateToolbarState);
+    host.addEventListener('mouseup', updateToolbarState);
+    host.addEventListener('focus',   updateToolbarState);
+
+    // Close popups when clicking outside the wrapper
+    document.addEventListener('mousedown', e => {
+      if (!wrapper.contains(e.target)) allPopups.forEach(p => { p.style.display = 'none'; });
+    }, true);
+
+    // ── Initial render ────────────────────────────────────────────────────
+    rerender();
 
     // ── Public API ────────────────────────────────────────────────────────
     return {
-      el: host,
-
-      /** Return clean HTML (accepted-state, no track-change markup). */
-      getHtml() { return modelToHtml(model); },
-
-      /** Replace document content — parses new HTML into fresh model. */
-      setHtml(html) { model = htmlToModel(html); rerender(); },
-
-      /** Expose model for external tooling / debugging. */
-      getModel() { return model; },
-
-      /** True if model contains any pending (unresolved) changes. */
-      hasChanges() {
-        function check(blocks) {
-          return blocks.some(b => {
-            const runs = b.runs || (b._t === 'list' ? b.items.flatMap(i => i.runs) : []);
-            if (runs.some(r => r.pending)) return true;
-            if (b._t === 'table') return b.rows.some(r => r.cells.some(c => check(c.blocks)));
-            return false;
-          });
-        }
-        return check(model.blocks);
-      },
-
-      // Stubs kept for API compatibility — wired up in later steps
-      setComments() {},
+      el:          wrapper,
+      getHtml()    { return modelToHtml(model); },
+      setHtml(html){ model = htmlToModel(html || ''); rerender(); },
+      getModel()   { return model; },
+      hasChanges() { return tcHasChanges(model); },
+      setComments(){ },
     };
   }
 
