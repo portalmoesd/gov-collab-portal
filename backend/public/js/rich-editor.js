@@ -168,9 +168,21 @@
     .gcp-re-tc-pane-acc:hover { background:rgba(21,128,61,.22); }
     .gcp-re-tc-pane-rej { background:rgba(185,28,28,.12); color:#b91c1c; }
     .gcp-re-tc-pane-rej:hover { background:rgba(185,28,28,.22); }
+    .gcp-re-tc-pane-del { font-size:10px; font-weight:800; border:none; border-radius:4px; padding:2px 6px; cursor:pointer; background:rgba(185,28,28,.10); color:#b91c1c; transition:background .1s; line-height:1.4; }
+    .gcp-re-tc-pane-del:hover { background:rgba(185,28,28,.22); }
+    .gcp-re-tc-pane-kind.cmt { background:rgba(10,132,255,.12); color:#0a84ff; }
+    .gcp-re-tc-pane-section { padding:4px 12px 2px; font-size:10px; font-weight:800; letter-spacing:.06em; text-transform:uppercase; color:#94a3b8; border-top:1px solid rgba(17,24,39,.06); }
     [data-theme="dark"] .gcp-re-tc-pane { background:rgba(22,25,34,.7); }
     [data-theme="dark"] .gcp-re-tc-pane-who { color:#e8ecf4; }
     [data-theme="dark"] .gcp-re-tc-pane-excerpt { color:#8899b4; }
+    /* Right-click context menu */
+    .gcp-re-ctx { position:fixed; z-index:9999; background:#fff; border:1px solid #e2e8f0; border-radius:9px; box-shadow:0 4px 20px rgba(15,23,42,.14); padding:4px; min-width:160px; }
+    .gcp-re-ctx-item { display:flex; align-items:center; gap:7px; padding:7px 12px; border-radius:6px; font-size:13px; font-weight:600; color:#0f172a; cursor:pointer; white-space:nowrap; transition:background .1s; }
+    .gcp-re-ctx-item:hover { background:rgba(10,132,255,.09); color:#0a84ff; }
+    .gcp-re-ctx-sep { height:1px; background:#e2e8f0; margin:3px 0; }
+    [data-theme="dark"] .gcp-re-ctx { background:#1e212c; border-color:rgba(255,255,255,.10); }
+    [data-theme="dark"] .gcp-re-ctx-item { color:#e8ecf4; }
+    [data-theme="dark"] .gcp-re-ctx-item:hover { background:rgba(10,132,255,.15); color:#60a5fa; }
 
     /* ── Track-change markup — HIDDEN by default ── */
     .gcp-re-body ins[data-tc-id] { text-decoration:none; background:none; padding:0; font-style:normal; }
@@ -233,7 +245,7 @@
 
   // ── RichEditor factory ─────────────────────────────────────────────────────
 
-  function RichEditor({ container, initialHtml, placeholder, authorName, onCommentsClick }) {
+  function RichEditor({ container, initialHtml, placeholder, authorName, onCommentsClick, onDeleteComment }) {
     injectStyle();
 
     const wrap = document.createElement('div');
@@ -286,6 +298,9 @@
     const tcPane = document.createElement('div');
     tcPane.className = 'gcp-re-tc-pane';
     tcPane.style.display = 'none';
+
+    // ── Stored comments (passed from outside via setComments) ────────────────
+    let storedComments = [];
 
     // ── Selection save/restore ───────────────────────────────────────────────
     let savedRange = null;
@@ -467,72 +482,115 @@
       tcBtn.classList.toggle('tc-active', tc.visible);
       tcBtn.setAttribute('aria-pressed', String(tc.visible));
 
-      const show = tc.visible && n > 0;
+      const hasCmts = storedComments.length > 0;
+      const show = tc.visible && (n > 0 || hasCmts);
       tcBar.style.display = show ? '' : 'none';
       tcPane.style.display = show ? '' : 'none';
 
       if (show) {
-        tcSummary.textContent = `${n} tracked change${n === 1 ? '' : 's'}`;
+        const parts = [];
+        if (n > 0) parts.push(`${n} tracked change${n === 1 ? '' : 's'}`);
+        if (hasCmts) parts.push(`${storedComments.length} comment${storedComments.length === 1 ? '' : 's'}`);
+        tcSummary.textContent = parts.join(' · ');
         const authors = getAuthors();
         tcAuthorsRow.textContent = authors.join(' · ');
         updateReviewingPane();
       }
     }
 
+    function renderTcEntry(entry) {
+      const item = document.createElement('div');
+      item.className = 'gcp-re-tc-pane-item';
+      const excerpt = entry.text.length > 48 ? entry.text.slice(0, 48) + '…' : (entry.text || '(empty)');
+      const kindLabel = entry.kind === 'ins' ? 'Added' : 'Removed';
+      item.innerHTML = `
+        <span class="gcp-re-tc-dot" style="background:${escHtml(entry.color)}"></span>
+        <div class="gcp-re-tc-pane-body">
+          <div class="gcp-re-tc-pane-who">${escHtml(entry.author)}<span class="gcp-re-tc-pane-kind ${entry.kind}">${kindLabel}</span></div>
+          <div class="gcp-re-tc-pane-excerpt">&ldquo;${escHtml(excerpt)}&rdquo;</div>
+        </div>
+        <div class="gcp-re-tc-pane-meta">
+          <span class="gcp-re-tc-pane-time">${escHtml(fmtTime(entry.time))}</span>
+          <div class="gcp-re-tc-pane-btns">
+            <button class="gcp-re-tc-pane-acc" type="button" title="Accept">✓</button>
+            <button class="gcp-re-tc-pane-rej" type="button" title="Reject">✗</button>
+          </div>
+        </div>`;
+      item.addEventListener('click', e => {
+        if (e.target.closest('.gcp-re-tc-pane-btns')) return;
+        const target = body.querySelector(`[data-tc-id="${CSS.escape(entry.id)}"]`);
+        if (target) target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      });
+      item.querySelector('.gcp-re-tc-pane-acc').addEventListener('click', e => { e.stopPropagation(); acceptChange(entry.id); });
+      item.querySelector('.gcp-re-tc-pane-rej').addEventListener('click', e => { e.stopPropagation(); rejectChange(entry.id); });
+      return item;
+    }
+
+    function renderCmtEntry(c) {
+      const idx = authorColorIdx(c.author_name || '');
+      const [color] = TC_PALETTE[idx];
+      const item = document.createElement('div');
+      item.className = 'gcp-re-tc-pane-item';
+      const excerpt = (c.comment_text || '').length > 52 ? (c.comment_text || '').slice(0, 52) + '…' : (c.comment_text || '');
+      const timeStr = c.created_at ? fmtTime(c.created_at) : '';
+      const delBtn = c.is_own
+        ? `<button class="gcp-re-tc-pane-del" type="button" title="Delete comment">✗</button>`
+        : '';
+      item.innerHTML = `
+        <span class="gcp-re-tc-dot" style="background:${escHtml(color)}"></span>
+        <div class="gcp-re-tc-pane-body">
+          <div class="gcp-re-tc-pane-who">${escHtml(c.author_name || 'Unknown')}<span class="gcp-re-tc-pane-kind cmt">Comment</span></div>
+          <div class="gcp-re-tc-pane-excerpt">${escHtml(excerpt)}</div>
+        </div>
+        <div class="gcp-re-tc-pane-meta">
+          <span class="gcp-re-tc-pane-time">${escHtml(timeStr)}</span>
+          <div class="gcp-re-tc-pane-btns">${delBtn}</div>
+        </div>`;
+      // Click row → scroll to anchor in editor
+      item.addEventListener('click', e => {
+        if (e.target.closest('.gcp-re-tc-pane-btns')) return;
+        if (c.anchor_id) {
+          const anchor = body.querySelector(`[data-cmt-anchor-id="${c.anchor_id}"]`);
+          if (anchor) anchor.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      });
+      if (c.is_own) {
+        item.querySelector('.gcp-re-tc-pane-del').addEventListener('click', e => {
+          e.stopPropagation();
+          if (onDeleteComment) onDeleteComment(c.id, c.anchor_id || null);
+        });
+      }
+      return item;
+    }
+
     function updateReviewingPane() {
       tcPane.innerHTML = '';
       const entries = getChangeEntries();
-      if (!entries.length) {
-        tcPane.innerHTML = '<div class="gcp-re-tc-pane-empty">No tracked changes</div>';
+      const hasEntries = entries.length > 0;
+      const hasCmts = storedComments.length > 0;
+
+      if (!hasEntries && !hasCmts) {
+        tcPane.innerHTML = '<div class="gcp-re-tc-pane-empty">No tracked changes or comments</div>';
         return;
       }
-      entries.forEach(entry => {
-        const item = document.createElement('div');
-        item.className = 'gcp-re-tc-pane-item';
-        item.title = `${entry.author} · ${entry.time ? new Date(entry.time).toLocaleString() : ''}`;
 
-        const excerpt = entry.text.length > 48
-          ? entry.text.slice(0, 48) + '…'
-          : (entry.text || '(empty)');
+      if (hasEntries) {
+        if (hasCmts) {
+          const sec = document.createElement('div');
+          sec.className = 'gcp-re-tc-pane-section';
+          sec.textContent = 'Changes';
+          tcPane.appendChild(sec);
+        }
+        entries.forEach(entry => tcPane.appendChild(renderTcEntry(entry)));
+      }
 
-        const kindLabel = entry.kind === 'ins' ? 'Added' : 'Removed';
-
-        item.innerHTML = `
-          <span class="gcp-re-tc-dot" style="background:${escHtml(entry.color)}"></span>
-          <div class="gcp-re-tc-pane-body">
-            <div class="gcp-re-tc-pane-who">
-              ${escHtml(entry.author)}
-              <span class="gcp-re-tc-pane-kind ${entry.kind}">${kindLabel}</span>
-            </div>
-            <div class="gcp-re-tc-pane-excerpt">&ldquo;${escHtml(excerpt)}&rdquo;</div>
-          </div>
-          <div class="gcp-re-tc-pane-meta">
-            <span class="gcp-re-tc-pane-time">${escHtml(fmtTime(entry.time))}</span>
-            <div class="gcp-re-tc-pane-btns">
-              <button class="gcp-re-tc-pane-acc" type="button" data-id="${escHtml(entry.id)}" title="Accept this change">✓</button>
-              <button class="gcp-re-tc-pane-rej" type="button" data-id="${escHtml(entry.id)}" title="Reject this change">✗</button>
-            </div>
-          </div>`;
-
-        // Click row → scroll to change
-        item.addEventListener('click', e => {
-          if (e.target.closest('.gcp-re-tc-pane-btns')) return;
-          const target = body.querySelector(`[data-tc-id="${CSS.escape(entry.id)}"]`);
-          if (target) target.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        });
-
-        // Per-change accept/reject
-        item.querySelector('.gcp-re-tc-pane-acc').addEventListener('click', e => {
-          e.stopPropagation();
-          acceptChange(entry.id);
-        });
-        item.querySelector('.gcp-re-tc-pane-rej').addEventListener('click', e => {
-          e.stopPropagation();
-          rejectChange(entry.id);
-        });
-
-        tcPane.appendChild(item);
-      });
+      if (hasCmts) {
+        const sec = document.createElement('div');
+        sec.className = 'gcp-re-tc-pane-section';
+        sec.textContent = 'Comments';
+        tcPane.appendChild(sec);
+        storedComments.forEach(c => tcPane.appendChild(renderCmtEntry(c)));
+      }
     }
 
     function acceptChange(id) {
@@ -712,27 +770,82 @@
     tcRejectAll.addEventListener('mousedown', e => e.preventDefault());
     tcRejectAll.addEventListener('click', () => { rejectAllChanges(); body.focus(); });
 
+    // Shared helper: wrap current selection in an anchor span and return its ID
+    function createCommentAnchor() {
+      const sel = window.getSelection();
+      if (!sel || sel.isCollapsed || !sel.rangeCount) return null;
+      const range = sel.getRangeAt(0);
+      if (!body.contains(range.commonAncestorContainer)) return null;
+      const anchorId = 'cmt-' + Math.random().toString(36).slice(2, 10);
+      const span = document.createElement('span');
+      span.className = 'gcp-cmt-anchor';
+      span.setAttribute('data-cmt-anchor-id', anchorId);
+      try {
+        const frag = range.extractContents();
+        span.appendChild(frag);
+        range.insertNode(span);
+        sel.removeAllRanges();
+        return anchorId;
+      } catch(_) { return null; }
+    }
+
     cmtBtn.addEventListener('mousedown', e => e.preventDefault());
     cmtBtn.addEventListener('click', () => {
-      const sel = window.getSelection();
-      let anchorId = null;
-      if (sel && !sel.isCollapsed && sel.rangeCount) {
-        const range = sel.getRangeAt(0);
-        if (body.contains(range.commonAncestorContainer)) {
-          anchorId = 'cmt-' + Math.random().toString(36).slice(2, 10);
-          const span = document.createElement('span');
-          span.className = 'gcp-cmt-anchor';
-          span.setAttribute('data-cmt-anchor-id', anchorId);
-          try {
-            const frag = range.extractContents();
-            span.appendChild(frag);
-            range.insertNode(span);
-            sel.removeAllRanges();
-          } catch(_) { anchorId = null; }
-        }
-      }
+      const anchorId = createCommentAnchor();
       if (onCommentsClick) onCommentsClick(anchorId);
     });
+
+    // ── Right-click context menu ──────────────────────────────────────────────
+    let activeCtxMenu = null;
+    function removeCtxMenu() {
+      if (activeCtxMenu) { activeCtxMenu.remove(); activeCtxMenu = null; }
+    }
+    body.addEventListener('contextmenu', e => {
+      e.preventDefault();
+      removeCtxMenu();
+
+      const menu = document.createElement('div');
+      menu.className = 'gcp-re-ctx';
+      menu.style.left = e.clientX + 'px';
+      menu.style.top  = e.clientY + 'px';
+
+      // "Add Comment" item
+      const addCmt = document.createElement('div');
+      addCmt.className = 'gcp-re-ctx-item';
+      addCmt.innerHTML = `<svg viewBox="0 0 16 16" width="13" height="13" fill="currentColor" aria-hidden="true"><path d="M14 1H2a1 1 0 0 0-1 1v9a1 1 0 0 0 1 1h5.586l2.707 2.707a1 1 0 0 0 1.414 0L14 12a1 1 0 0 0 1-1V2a1 1 0 0 0-1-1z"/></svg> Add Comment`;
+      addCmt.addEventListener('mousedown', ev => ev.preventDefault());
+      addCmt.addEventListener('click', () => {
+        removeCtxMenu();
+        const anchorId = createCommentAnchor();
+        if (onCommentsClick) onCommentsClick(anchorId);
+      });
+      menu.appendChild(addCmt);
+
+      // Check if right-clicked on a TC element → offer Accept/Reject
+      const tcEl = e.target.closest('[data-tc-id]');
+      if (tcEl) {
+        const sep = document.createElement('div'); sep.className = 'gcp-re-ctx-sep';
+        menu.appendChild(sep);
+        const tcId = tcEl.getAttribute('data-tc-id');
+
+        const accItem = document.createElement('div');
+        accItem.className = 'gcp-re-ctx-item';
+        accItem.textContent = '✓ Accept Change';
+        accItem.addEventListener('click', () => { removeCtxMenu(); acceptChange(tcId); });
+        menu.appendChild(accItem);
+
+        const rejItem = document.createElement('div');
+        rejItem.className = 'gcp-re-ctx-item';
+        rejItem.textContent = '✗ Reject Change';
+        rejItem.addEventListener('click', () => { removeCtxMenu(); rejectChange(tcId); });
+        menu.appendChild(rejItem);
+      }
+
+      document.body.appendChild(menu);
+      activeCtxMenu = menu;
+    });
+    document.addEventListener('click', removeCtxMenu, { capture: true });
+    document.addEventListener('keydown', e => { if (e.key === 'Escape') removeCtxMenu(); });
 
     // ── beforeinput: always intercept text mutations ─────────────────────────
 
@@ -810,13 +923,18 @@
       if (n > 0) { cmtBadge.textContent = String(n); cmtBadge.style.display = ''; }
       else cmtBadge.style.display = 'none';
     }
+    function setComments(comments) {
+      storedComments = comments || [];
+      setCommentsBadge(storedComments.length);
+      updateTcBar();
+    }
 
     updateTcBar();
 
     return {
       getHtml, getCleanHtml, setHtml, destroy, focus, el: body,
       acceptAllChanges, rejectAllChanges, hasTrackedChanges,
-      setCommentsActive, setCommentsBadge, removeCommentAnchor,
+      setCommentsActive, setCommentsBadge, setComments, removeCommentAnchor,
     };
   }
 
