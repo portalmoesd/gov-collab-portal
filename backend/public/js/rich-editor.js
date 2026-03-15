@@ -182,9 +182,9 @@
     .gcp-re-balloon-del { background:rgba(185,28,28,.10); color:#b91c1c; }
     .gcp-re-balloon-del:hover { background:rgba(185,28,28,.22); }
     /* ── Fullscreen ── */
-    .gcp-re-wrap.gcp-fullscreen { position:fixed; inset:0; z-index:9990; border-radius:0; border:none; height:100dvh; display:flex; }
-    .gcp-re-wrap.gcp-fullscreen .gcp-re-content-row { flex:1; min-height:0; }
-    .gcp-re-wrap.gcp-fullscreen .gcp-re-body { min-height:0; }
+    .gcp-re-wrap.gcp-fullscreen { position:fixed; inset:0; z-index:9990; border-radius:0; border:none; width:100vw; height:100dvh; display:flex; flex-direction:column; background:var(--card,#fff); }
+    .gcp-re-wrap.gcp-fullscreen .gcp-re-content-row { flex:1 1 0; min-height:0; overflow-y:auto; }
+    .gcp-re-wrap.gcp-fullscreen .gcp-re-body { min-height:0; height:100%; }
     .gcp-re-btn-fullscreen-icon-expand,.gcp-re-btn-fullscreen-icon-compress { pointer-events:none; }
     .gcp-re-wrap:not(.gcp-fullscreen) .gcp-re-btn-fullscreen-icon-compress { display:none; }
     .gcp-re-wrap.gcp-fullscreen .gcp-re-btn-fullscreen-icon-expand { display:none; }
@@ -450,12 +450,26 @@
     toolbar.appendChild(fsBtn);
 
     let fsActive = false;
+    let fsOriginalParent = null;
+    let fsOriginalNextSibling = null;
     function toggleFullscreen(force) {
       fsActive = force !== undefined ? force : !fsActive;
+      if (fsActive) {
+        // Move wrap directly to <body> so position:fixed escapes any
+        // ancestor stacking context (transform, opacity, will-change, etc.)
+        fsOriginalParent = wrap.parentNode;
+        fsOriginalNextSibling = wrap.nextSibling;
+        document.body.appendChild(wrap);
+      } else {
+        // Restore original DOM position
+        if (fsOriginalParent) {
+          fsOriginalParent.insertBefore(wrap, fsOriginalNextSibling || null);
+        }
+      }
       wrap.classList.toggle('gcp-fullscreen', fsActive);
       document.body.style.overflow = fsActive ? 'hidden' : '';
       fsBtn.setAttribute('aria-pressed', String(fsActive));
-      if (fsActive) positionBalloons();
+      positionBalloons();
     }
     fsBtn.addEventListener('click', () => toggleFullscreen());
 
@@ -974,7 +988,10 @@
 
     function setHtml(html) { body.innerHTML = html || ''; mergeAdjacentIns(); updateTcBar(); }
     function destroy() {
-      if (fsActive) document.body.style.overflow = '';
+      if (fsActive) {
+        document.body.style.overflow = '';
+        if (fsOriginalParent) fsOriginalParent.insertBefore(wrap, fsOriginalNextSibling || null);
+      }
       document.removeEventListener('keydown', onDocKeydown);
       container.innerHTML = '';
     }
