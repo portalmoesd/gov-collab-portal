@@ -587,7 +587,8 @@
     const bgColorLabel = document.createElement('span');
     bgColorLabel.className = 'gcp-re-color-label'; bgColorLabel.setAttribute('aria-hidden', 'true');
     const bgColorA = document.createElement('span');
-    bgColorA.className = 'gcp-re-color-a'; bgColorA.style.cssText = 'font-size:11px;'; bgColorA.textContent = '▐A';
+    bgColorA.className = 'gcp-re-color-a'; bgColorA.style.cssText = 'display:flex;align-items:center;justify-content:center;';
+    bgColorA.innerHTML = `<svg width="14" height="13" viewBox="0 0 14 13" fill="none" style="display:block"><path d="M4.5 4 C4.5 1.5 9.5 1.5 9.5 4" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round"/><path d="M3 4.5 L4 11 L10 11 L11 4.5 Z" fill="currentColor" opacity="0.85"/></svg>`;
     const bgColorBar = document.createElement('span'); bgColorBar.className = 'gcp-re-color-bar';
     bgColorBar.style.background = '#ffff00';
     bgColorLabel.appendChild(bgColorA); bgColorLabel.appendChild(bgColorBar);
