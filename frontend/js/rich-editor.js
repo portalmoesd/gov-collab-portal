@@ -17,10 +17,13 @@
   // ── Constants ──────────────────────────────────────────────────────────────
 
   const FONT_FAMILIES = [
-    { label: 'Font',    value: '' },
-    { label: 'Arial',   value: 'Arial' },
-    { label: 'Sylfaen', value: 'Sylfaen' },
-    { label: 'Calibri', value: 'Calibri' },
+    { label: 'Font',                value: '' },
+    { label: 'Arial',               value: 'Arial' },
+    { label: 'Sylfaen',             value: 'Sylfaen' },
+    { label: 'Calibri',             value: 'Calibri' },
+    { label: 'Noto Sans Georgian',  value: 'Noto Sans Georgian' },
+    { label: 'Noto Serif Georgian', value: 'Noto Serif Georgian' },
+    { label: 'FiraGO',              value: 'FiraGO' },
   ];
 
   // Word-style pt sizes; value = pt number as string
