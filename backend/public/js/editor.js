@@ -226,6 +226,7 @@
           authorName: me.full_name || me.username || 'Unknown',
           onCommentsClick: toggleCommentsPanel,
           onDeleteComment: handleDeleteComment,
+          onReplyComment: handleReplyComment,
         });
       }
       if (richEditorInstance && richEditorInstance.el){
@@ -447,6 +448,16 @@
       if (anchorId && richEditorInstance) richEditorInstance.removeCommentAnchor(anchorId);
       await loadComments();
     } catch(e) { showMsg(e.message || 'Could not delete comment', true); }
+  }
+
+  async function handleReplyComment(parentId, text) {
+    try {
+      await window.GCP.apiFetch('/tp/comments', {
+        method: 'POST',
+        body: JSON.stringify({ eventId, sectionId, commentText: text, parentId })
+      });
+      await loadComments();
+    } catch(e) { showMsg(e.message || 'Could not post reply', true); }
   }
 
   async function loadComments() {

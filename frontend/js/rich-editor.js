@@ -221,6 +221,20 @@
     }
     [data-theme="dark"] .gcp-re-wrap.tc-visible .gcp-re-body ins[data-tc-id] { background:color-mix(in srgb, var(--tc-color,#1d4ed8) 18%, transparent); }
     [data-theme="dark"] .gcp-re-wrap.tc-visible .gcp-re-body del[data-tc-id] { background:color-mix(in srgb, var(--tc-color,#b91c1c) 18%, transparent); }
+    /* Comment thread (replies inside the same balloon) */
+    .gcp-re-cmt-replies { margin-top:6px; padding-top:6px; border-top:1px solid rgba(0,0,0,.08); display:flex; flex-direction:column; gap:5px; }
+    .gcp-re-cmt-reply { padding:0; }
+    .gcp-re-cmt-reply-form { margin-top:6px; padding-top:6px; border-top:1px solid rgba(0,0,0,.08); }
+    .gcp-re-cmt-reply-input { width:100%; box-sizing:border-box; border:1px solid #e2e8f0; border-radius:6px; padding:5px 8px; font-size:11px; resize:none; outline:none; font-family:inherit; line-height:1.4; }
+    .gcp-re-cmt-reply-input:focus { border-color:#93c5fd; box-shadow:0 0 0 2px rgba(147,197,253,.25); }
+    .gcp-re-balloon-reply { background:rgba(3,105,161,.10); color:#0369a1; font-size:10px; font-weight:800; border:none; border-radius:4px; padding:2px 7px; cursor:pointer; line-height:1.4; transition:background .1s; }
+    .gcp-re-balloon-reply:hover { background:rgba(3,105,161,.20); }
+    .gcp-re-cmt-reply-send { background:rgba(21,128,61,.12); color:#15803d; font-size:10px; font-weight:800; border:none; border-radius:4px; padding:2px 7px; cursor:pointer; line-height:1.4; transition:background .1s; }
+    .gcp-re-cmt-reply-send:hover { background:rgba(21,128,61,.22); }
+    .gcp-re-cmt-reply-send:disabled { opacity:.5; cursor:default; }
+    .gcp-re-cmt-reply-cancel { background:transparent; color:#64748b; font-size:10px; font-weight:700; border:none; border-radius:4px; padding:2px 7px; cursor:pointer; line-height:1.4; transition:background .1s; }
+    .gcp-re-cmt-reply-cancel:hover { background:rgba(0,0,0,.06); }
+
     /* Comment anchors – Word-style yellow highlight with bottom border */
     .gcp-re-body .gcp-cmt-anchor { background:rgba(255,210,0,.30); border-bottom:2px solid #d97706; border-radius:2px; cursor:default; box-shadow:0 0 0 1px rgba(217,119,6,.20); }
     .gcp-re-body .gcp-cmt-anchor:hover { background:rgba(255,210,0,.50); box-shadow:0 0 0 1px rgba(217,119,6,.45); }
@@ -251,7 +265,7 @@
 
   // ── RichEditor factory ─────────────────────────────────────────────────────
 
-  function RichEditor({ container, initialHtml, placeholder, authorName, onCommentsClick, onDeleteComment }) {
+  function RichEditor({ container, initialHtml, placeholder, authorName, onCommentsClick, onDeleteComment, onReplyComment }) {
     injectStyle();
 
     const wrap = document.createElement('div');
@@ -650,8 +664,36 @@
           });
         }
 
-        // Comment balloons — always visible when comments exist
+        // Comment balloons — threaded; always visible when comments exist
+        // Helper: avatar colour + initials from author name
+        function cmtAvatar(name) {
+          const p = ['#1d4ed8','#b91c1c','#15803d','#7c3aed','#c2410c','#0f766e','#9d174d','#3730a3'];
+          const ini = (name || 'Unknown').split(/\s+/).filter(Boolean).slice(0, 2)
+            .map(s => s[0] && s[0].toUpperCase()).filter(Boolean).join('') || '?';
+          let h = 0; for (let i = 0; i < (name || '').length; i++) h = (h * 31 + name.charCodeAt(i)) >>> 0;
+          return { ini, color: p[h % p.length] };
+        }
+        function cmtEntryHtml(c) {
+          const { ini, color } = cmtAvatar(c.author_name || 'Unknown');
+          return `<div class="gcp-re-balloon-header">
+              <span class="gcp-re-balloon-avatar" style="background:${color}">${escHtml(ini)}</span>
+              <span class="gcp-re-balloon-author">${escHtml(c.author_name || 'Unknown')}</span>
+              <span class="gcp-re-balloon-time">${escHtml(fmtTime(c.created_at))}</span>
+            </div>
+            <div class="gcp-re-balloon-body">${escHtml(c.comment_text || '')}</div>`;
+        }
+
+        // Group: only root comments as balloon anchors; replies live inside
+        const repliesMap = {};
         storedComments.forEach(c => {
+          if (c.parent_id) {
+            if (!repliesMap[c.parent_id]) repliesMap[c.parent_id] = [];
+            repliesMap[c.parent_id].push(c);
+          }
+        });
+        const rootComments = storedComments.filter(c => !c.parent_id);
+
+        rootComments.forEach(c => {
           let ideal = slots.length ? (slots[slots.length - 1].top + slots[slots.length - 1].h + 6) : 0;
           let anchor = null;
           if (c.anchor_id) {
@@ -659,30 +701,76 @@
             if (anchor) ideal = anchor.getBoundingClientRect().top - mRect.top;
           }
           const top = noOverlap(ideal, slots);
-
-          const authorName = c.author_name || 'Unknown';
-          const initials = authorName.split(/\s+/).filter(Boolean).slice(0, 2).map(s => s[0] && s[0].toUpperCase()).filter(Boolean).join('') || '?';
-          const avatarPalette = ['#1d4ed8','#b91c1c','#15803d','#7c3aed','#c2410c','#0f766e','#9d174d','#3730a3'];
-          let ah = 0; for (let i = 0; i < authorName.length; i++) ah = (ah * 31 + authorName.charCodeAt(i)) >>> 0;
-          const avatarColor = avatarPalette[ah % avatarPalette.length];
+          const replies = repliesMap[c.id] || [];
 
           const b = document.createElement('div');
           b.className = 'gcp-re-balloon gcp-re-balloon--cmt';
           b.style.top = top + 'px';
-          const delHtml = c.is_own ? `<button class="gcp-re-balloon-del" type="button" title="Delete">✗ Delete</button>` : '';
+
+          const rootDelHtml = c.can_delete
+            ? `<button class="gcp-re-root-del gcp-re-balloon-del" type="button">✗ Delete</button>` : '';
+          const repliesHtml = replies.map((r, ri) =>
+            `<div class="gcp-re-cmt-reply" data-ri="${ri}">
+              ${cmtEntryHtml(r)}
+              ${r.can_delete ? `<div class="gcp-re-balloon-btns"><button class="gcp-re-reply-del gcp-re-balloon-del" type="button">✗ Delete</button></div>` : ''}
+            </div>`
+          ).join('');
+
           b.innerHTML = `
-            <div class="gcp-re-balloon-header">
-              <span class="gcp-re-balloon-avatar" style="background:${avatarColor}">${escHtml(initials)}</span>
-              <span class="gcp-re-balloon-author">${escHtml(authorName)}</span>
-              <span class="gcp-re-balloon-time">${escHtml(fmtTime(c.created_at))}</span>
+            ${cmtEntryHtml(c)}
+            <div class="gcp-re-balloon-btns">
+              ${rootDelHtml}
+              <button class="gcp-re-balloon-reply" type="button">↩ Reply</button>
             </div>
-            <div class="gcp-re-balloon-body">${escHtml(c.comment_text || '')}</div>
-            ${delHtml ? `<div class="gcp-re-balloon-btns">${delHtml}</div>` : ''}`;
-          if (c.is_own) {
-            b.querySelector('.gcp-re-balloon-del').addEventListener('click', () => {
+            ${replies.length ? `<div class="gcp-re-cmt-replies">${repliesHtml}</div>` : ''}
+            <div class="gcp-re-cmt-reply-form" style="display:none">
+              <textarea class="gcp-re-cmt-reply-input" rows="2" placeholder="Write a reply…"></textarea>
+              <div class="gcp-re-balloon-btns" style="margin-top:4px">
+                <button class="gcp-re-cmt-reply-send" type="button">Send</button>
+                <button class="gcp-re-cmt-reply-cancel" type="button">Cancel</button>
+              </div>
+            </div>`;
+
+          // Delete root
+          if (c.can_delete) {
+            b.querySelector('.gcp-re-root-del').addEventListener('click', () => {
               if (onDeleteComment) onDeleteComment(c.id, c.anchor_id || null);
             });
           }
+          // Delete replies
+          b.querySelectorAll('.gcp-re-reply-del').forEach((btn, i) => {
+            btn.addEventListener('click', () => {
+              if (onDeleteComment) onDeleteComment(replies[i].id, null);
+            });
+          });
+
+          // Reply form toggle
+          const replyBtn   = b.querySelector('.gcp-re-balloon-reply');
+          const replyForm  = b.querySelector('.gcp-re-cmt-reply-form');
+          const replyInput = b.querySelector('.gcp-re-cmt-reply-input');
+          const replySend  = b.querySelector('.gcp-re-cmt-reply-send');
+          const replyCancel = b.querySelector('.gcp-re-cmt-reply-cancel');
+
+          replyBtn.addEventListener('click', () => {
+            replyForm.style.display = '';
+            replyInput.focus();
+          });
+          replyCancel.addEventListener('click', () => {
+            replyForm.style.display = 'none';
+            replyInput.value = '';
+          });
+          replySend.addEventListener('click', async () => {
+            const text = replyInput.value.trim();
+            if (!text) return;
+            replySend.disabled = true;
+            if (onReplyComment) onReplyComment(c.id, text);
+            // onReplyComment calls loadComments → setComments → positionBalloons
+          });
+          replyInput.addEventListener('keydown', e => {
+            if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') { e.preventDefault(); replySend.click(); }
+            if (e.key === 'Escape') replyCancel.click();
+          });
+
           marginEl.appendChild(b);
           const bh = b.offsetHeight || 62;
           slots.push({ top, h: bh });
@@ -1042,6 +1130,8 @@
         if (fsOriginalParent) fsOriginalParent.insertBefore(wrap, fsOriginalNextSibling || null);
       }
       document.removeEventListener('keydown', onDocKeydown);
+      _cmtAnchorObserver.disconnect();
+      clearTimeout(_orphanTimer);
       container.innerHTML = '';
     }
     function focus()       { body.focus(); }
@@ -1067,6 +1157,28 @@
     // Merge any per-character <ins> runs left in the initial HTML
     if (initialHtml) mergeAdjacentIns();
     updateTcBar();
+
+    // ── Auto-delete comments whose anchor was removed from the body ───────────
+    // Mirrors Word: deleting anchored text removes the comment.
+    // Note: anchors inside <del> (tracked-but-not-accepted) are still in the
+    // DOM so their comments are preserved until the deletion is accepted.
+    let _orphanTimer = null;
+    function checkOrphanedComments() {
+      clearTimeout(_orphanTimer);
+      _orphanTimer = setTimeout(() => {
+        const present = new Set(
+          [...body.querySelectorAll('.gcp-cmt-anchor[data-cmt-anchor-id]')]
+            .map(el => el.getAttribute('data-cmt-anchor-id'))
+        );
+        storedComments.forEach(c => {
+          if (c.anchor_id && !present.has(c.anchor_id)) {
+            if (onDeleteComment) onDeleteComment(c.id, c.anchor_id);
+          }
+        });
+      }, 250);
+    }
+    const _cmtAnchorObserver = new MutationObserver(checkOrphanedComments);
+    _cmtAnchorObserver.observe(body, { childList: true, subtree: true });
 
     return {
       getHtml, getCleanHtml, setHtml, destroy, focus, el: body,
