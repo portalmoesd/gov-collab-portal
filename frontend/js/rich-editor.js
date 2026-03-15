@@ -146,9 +146,10 @@
 
     /* ── Content row: body + right margin balloons ── */
     /* Gray editing environment — body floats as an A4 paper card */
-    .gcp-re-content-row { display:flex; overflow-y:auto; overflow-x:auto; min-height:260px; align-items:flex-start; position:relative; background:#e8eaed; padding:32px 32px 48px; gap:24px; }
-    /* A4 paper: 210 mm ≈ 794 px at 96 dpi; 25.4 mm (1 in) margins ≈ 96 px */
-    .gcp-re-body { flex:0 0 794px; width:794px; box-sizing:border-box; min-height:500px; padding:96px; outline:none; font-size:15px; line-height:1.65; color:var(--text,#1f2a37); overflow-y:visible; background:#fff; box-shadow:0 2px 12px rgba(0,0,0,.14); }
+    /* justify-content:center keeps paper+balloons centered as one group */
+    .gcp-re-content-row { display:flex; overflow-y:auto; overflow-x:auto; min-height:400px; align-items:flex-start; position:relative; background:#e8eaed; padding:40px 32px 64px; gap:24px; justify-content:center; }
+    /* A4 paper: 210 mm ≈ 794 px wide, 297 mm ≈ 1123 px tall at 96 dpi; 1-inch margins ≈ 96 px */
+    .gcp-re-body { flex:0 0 794px; width:794px; box-sizing:border-box; min-height:1123px; padding:96px; outline:none; font-size:15px; line-height:1.65; color:var(--text,#1f2a37); overflow-y:visible; background:#fff; box-shadow:0 4px 16px rgba(0,0,0,.18); }
     .gcp-re-body:empty::before { content:attr(data-placeholder); color:var(--muted,#6b7280); pointer-events:none; }
     .gcp-re-body h2 { font-size:1.3em; font-weight:800; margin:.8em 0 .3em; }
     .gcp-re-body h3 { font-size:1.1em; font-weight:700; margin:.7em 0 .25em; }
@@ -193,8 +194,8 @@
     .gcp-re-balloon-del:hover { background:rgba(185,28,28,.22); }
     /* ── Fullscreen ── */
     .gcp-re-wrap.gcp-fullscreen { position:fixed; inset:0; z-index:9990; border-radius:0; border:none; width:100vw; height:100dvh; display:flex; flex-direction:column; background:#f1f5f9 !important; }
-    .gcp-re-wrap.gcp-fullscreen .gcp-re-content-row { flex:1 1 0; min-height:0; overflow-y:auto; overflow-x:auto; padding:32px 32px 48px; gap:24px; }
-    .gcp-re-wrap.gcp-fullscreen .gcp-re-body { flex:0 0 794px; width:794px; box-sizing:border-box; min-height:0; background:#ffffff; box-shadow:0 2px 12px rgba(0,0,0,.14); border-radius:4px; padding:96px; }
+    .gcp-re-wrap.gcp-fullscreen .gcp-re-content-row { flex:1 1 0; min-height:0; overflow-y:auto; overflow-x:auto; padding:40px 32px 64px; gap:24px; justify-content:center; }
+    .gcp-re-wrap.gcp-fullscreen .gcp-re-body { flex:0 0 794px; width:794px; box-sizing:border-box; min-height:1123px; background:#ffffff; box-shadow:0 4px 16px rgba(0,0,0,.18); border-radius:0; padding:96px; }
     .gcp-re-fs-titlebar { display:none; align-items:center; gap:10px; padding:10px 56px; background:#ffffff; border-bottom:1px solid #e2e8f0; flex-shrink:0; }
     .gcp-re-wrap.gcp-fullscreen .gcp-re-fs-titlebar { display:flex; }
     .gcp-re-fs-title { font-size:14px; font-weight:700; color:#0f172a; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
