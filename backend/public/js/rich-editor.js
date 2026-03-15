@@ -433,8 +433,8 @@
     const tcRejectAll = document.createElement('button');
     tcRejectAll.type = 'button'; tcRejectAll.className = 'gcp-re-tc-action reject';
     tcRejectAll.textContent = 'Reject All';
-    tcBarActions.appendChild(tcRejectAll);
     tcBarActions.appendChild(tcAcceptAll);
+    tcBarActions.appendChild(tcRejectAll);
     tcBar.appendChild(tcBarLeft);
     tcBar.appendChild(tcBarActions);
 
@@ -791,8 +791,8 @@
     fsTitleBar.appendChild(fsTitleEl);
 
     wrap.appendChild(toolbar);
-    wrap.appendChild(fsTitleBar);
     wrap.appendChild(tcBar);
+    wrap.appendChild(fsTitleBar);
     wrap.appendChild(contentRow);
     container.innerHTML = '';
     container.appendChild(wrap);
