@@ -181,9 +181,14 @@
     .gcp-re-balloon-rej:hover { background:rgba(185,28,28,.22); }
     .gcp-re-balloon-del { background:rgba(185,28,28,.10); color:#b91c1c; }
     .gcp-re-balloon-del:hover { background:rgba(185,28,28,.22); }
-    [data-theme="dark"] .gcp-re-balloon { background:#1e212c; border-color:rgba(255,255,255,.10); }
-    [data-theme="dark"] .gcp-re-balloon-author { color:#e8ecf4; }
-    [data-theme="dark"] .gcp-re-balloon-body { color:#b8c8e0; }
+    /* ── Fullscreen ── */
+    .gcp-re-wrap.gcp-fullscreen { position:fixed; inset:0; z-index:9990; border-radius:0; border:none; height:100dvh; display:flex; }
+    .gcp-re-wrap.gcp-fullscreen .gcp-re-content-row { flex:1; min-height:0; }
+    .gcp-re-wrap.gcp-fullscreen .gcp-re-body { min-height:0; }
+    .gcp-re-btn-fullscreen-icon-expand,.gcp-re-btn-fullscreen-icon-compress { pointer-events:none; }
+    .gcp-re-wrap:not(.gcp-fullscreen) .gcp-re-btn-fullscreen-icon-compress { display:none; }
+    .gcp-re-wrap.gcp-fullscreen .gcp-re-btn-fullscreen-icon-expand { display:none; }
+    [data-theme="dark"] .gcp-re-wrap.gcp-fullscreen { background:rgba(30,33,44,.98); }
     /* Right-click context menu */
     .gcp-re-ctx { position:fixed; z-index:9999; background:#fff; border:1px solid #e2e8f0; border-radius:9px; box-shadow:0 4px 20px rgba(15,23,42,.14); padding:4px; min-width:160px; }
     .gcp-re-ctx-item { display:flex; align-items:center; gap:7px; padding:7px 12px; border-radius:6px; font-size:13px; font-weight:600; color:#0f172a; cursor:pointer; white-space:nowrap; transition:background .1s; }
@@ -425,6 +430,34 @@
     cmtBadge.className = 'gcp-re-cmt-badge'; cmtBadge.style.display = 'none';
     cmtBtn.appendChild(cmtBadge);
     toolbar.appendChild(cmtBtn);
+
+    // ── Fullscreen button ────────────────────────────────────────────────────
+    const fsSep = document.createElement('span');
+    fsSep.className = 'gcp-re-sep'; fsSep.setAttribute('aria-hidden', 'true');
+    toolbar.appendChild(fsSep);
+
+    const fsBtn = document.createElement('button');
+    fsBtn.type = 'button'; fsBtn.className = 'gcp-re-btn';
+    fsBtn.setAttribute('aria-label', 'Toggle fullscreen');
+    fsBtn.title = 'Fullscreen (Esc to exit)';
+    fsBtn.innerHTML = `
+      <svg class="gcp-re-btn-fullscreen-icon-expand" viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true">
+        <path d="M1 5V1h4M11 1h4v4M15 11v4h-4M5 15H1v-4"/>
+      </svg>
+      <svg class="gcp-re-btn-fullscreen-icon-compress" viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true">
+        <path d="M5 1v4H1M15 5h-4V1M11 15v-4h4M1 11h4v4"/>
+      </svg>`;
+    toolbar.appendChild(fsBtn);
+
+    let fsActive = false;
+    function toggleFullscreen(force) {
+      fsActive = force !== undefined ? force : !fsActive;
+      wrap.classList.toggle('gcp-fullscreen', fsActive);
+      document.body.style.overflow = fsActive ? 'hidden' : '';
+      fsBtn.setAttribute('aria-pressed', String(fsActive));
+      if (fsActive) positionBalloons();
+    }
+    fsBtn.addEventListener('click', () => toggleFullscreen());
 
     // ── DOM assembly ─────────────────────────────────────────────────────────
     const contentRow = document.createElement('div');
@@ -930,6 +963,7 @@
         if (e.key === 'i') { e.preventDefault(); execCmd('italic');    updateActive(); }
         if (e.key === 'u') { e.preventDefault(); execCmd('underline'); updateActive(); }
       }
+      if (e.key === 'Escape' && fsActive) { e.preventDefault(); toggleFullscreen(false); }
     });
 
     // ── Public API ───────────────────────────────────────────────────────────
@@ -939,7 +973,11 @@
     }
 
     function setHtml(html) { body.innerHTML = html || ''; mergeAdjacentIns(); updateTcBar(); }
-    function destroy()     { container.innerHTML = ''; }
+    function destroy() {
+      if (fsActive) document.body.style.overflow = '';
+      document.removeEventListener('keydown', onDocKeydown);
+      container.innerHTML = '';
+    }
     function focus()       { body.focus(); }
 
     function setCommentsActive(active) { cmtBtn.classList.toggle('active', active); }
@@ -954,6 +992,12 @@
       positionBalloons();
     }
 
+    // Escape key exits fullscreen even when focus is outside the editor body
+    function onDocKeydown(e) {
+      if (e.key === 'Escape' && fsActive) { e.preventDefault(); toggleFullscreen(false); }
+    }
+    document.addEventListener('keydown', onDocKeydown);
+
     // Merge any per-character <ins> runs left in the initial HTML
     if (initialHtml) mergeAdjacentIns();
     updateTcBar();
@@ -962,6 +1006,7 @@
       getHtml, getCleanHtml, setHtml, destroy, focus, el: body,
       acceptAllChanges, rejectAllChanges, hasTrackedChanges,
       setCommentsActive, setCommentsBadge, setComments, removeCommentAnchor,
+      toggleFullscreen,
     };
   }
 
