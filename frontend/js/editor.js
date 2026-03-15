@@ -24,6 +24,11 @@
 
   const actionButtons = [btnSave, btnSubmit, btnApprove, btnReturn];
 
+  function showMsg(text, isError) {
+    msg.textContent = text;
+    msg.className = 'small editor-msg' + (text ? (isError ? ' editor-msg--error' : ' editor-msg--success') : '');
+  }
+
   function setActionLoading(activeBtn, loading){
     actionButtons.forEach((btn) => {
       if (!btn || btn.style.display === "none") return;
@@ -71,7 +76,7 @@
   }
 
   if (!eventId || !sectionId){
-    msg.textContent = "Missing eventId/sectionId in URL.";
+    showMsg("Missing eventId/sectionId in URL.", true);
     return;
   }
 
@@ -79,7 +84,7 @@
   const isProtocol = role === "protocol";
 
   if (isProtocol){
-    msg.textContent = "Protocol role cannot edit Talking Points.";
+    showMsg("Protocol role cannot edit Talking Points.", true);
     actionButtons.forEach(b => b && (b.disabled = true));
     return;
   }
@@ -168,7 +173,7 @@
   }
 
   async function load(){
-    msg.textContent = "";
+    showMsg('');
     const tp = await window.GCP.apiFetch(`/tp?event_id=${encodeURIComponent(eventId)}&section_id=${encodeURIComponent(sectionId)}`, { method:"GET" });
 
     if (taskTitleEl) taskTitleEl.textContent = tp.eventTitle || 'Untitled task';
@@ -223,6 +228,7 @@
     } else if (textarea){
       textarea.disabled = !canEdit;
     }
+    return tp;
   }
 
   function getHtml(){
@@ -240,9 +246,9 @@
         body: JSON.stringify({ eventId, sectionId, htmlContent: getHtml() })
       });
       await load();
-      msg.textContent = "Saved.";
+      showMsg("Saved.");
     }catch(err){
-      msg.textContent = err.message || "Save failed";
+      showMsg(err.message || "Save failed", true);
     } finally {
       setActionLoading(btnSave, false);
     }
@@ -255,17 +261,19 @@
         method:"POST",
         body: JSON.stringify({ eventId, sectionId, htmlContent: getHtml() })
       });
-      await load();
-      const msgMap = {
-        collaborator_1: "Submitted to Head Collaborator.",
-        collaborator_2: "Submitted to Curator.",
-        collaborator_3: "Submitted to Collaborator.",
-        collaborator: "Submitted to Super-collaborator.",
-        super_collaborator: "Submitted to Supervisor.",
+      const tp = await load();
+      const submitMsgMap = {
+        submitted_to_collaborator_2: "Submitted to Head Collaborator.",
+        submitted_to_collaborator_3: "Submitted to Curator.",
+        submitted_to_collaborator: "Submitted to Collaborator.",
+        submitted_to_super_collaborator: "Submitted to Super-collaborator.",
+        submitted_to_supervisor: "Submitted to Supervisor.",
+        submitted_to_chairman: "Submitted to Deputy.",
+        submitted_to_minister: "Submitted to Minister.",
       };
-      msg.textContent = msgMap[role] || "Submitted.";
+      showMsg(submitMsgMap[String(tp.status || '').toLowerCase()] || "Submitted.");
     }catch(err){
-      msg.textContent = err.message || "Submit failed";
+      showMsg(err.message || "Submit failed", true);
     } finally {
       setActionLoading(btnSubmit, false);
     }
@@ -287,9 +295,9 @@
         });
       }
       await load();
-      msg.textContent = "Approved.";
+      showMsg("Approved.");
     }catch(err){
-      msg.textContent = err.message || "Approve failed";
+      showMsg(err.message || "Approve failed", true);
     } finally {
       setActionLoading(btnApprove, false);
     }
@@ -309,9 +317,9 @@
         body: JSON.stringify({ eventId, sectionId, comment })
       });
       await load();
-      msg.textContent = "Returned.";
+      showMsg("Returned.");
     }catch(err){
-      msg.textContent = err.message || "Return failed";
+      showMsg(err.message || "Return failed", true);
     } finally {
       setActionLoading(btnReturn, false);
     }
@@ -331,11 +339,9 @@
         method: "POST",
         body: JSON.stringify({ eventId, sectionId, note })
       });
-      msg.textContent = "Return request sent.";
-      msg.style.color = "#16a34a";
+      showMsg("Return request sent.");
     } catch(err) {
-      msg.textContent = err.message || "Failed to send return request.";
-      msg.style.color = "crimson";
+      showMsg(err.message || "Failed to send return request.", true);
     } finally {
       btnAskToReturn.disabled = false;
     }
@@ -369,7 +375,7 @@
           a.href=url; a.download=filename;
           document.body.appendChild(a); a.click(); a.remove();
           URL.revokeObjectURL(url);
-        }catch(e){ msg.textContent = e.message||'Download failed'; }
+        }catch(e){ showMsg(e.message||'Download failed', true); }
       });
     });
   }
@@ -404,9 +410,9 @@
         }
         fileInput.value = '';
         await loadFiles();
-        msg.textContent = `${files.length} file(s) uploaded.`;
+        showMsg(`${files.length} file(s) uploaded.`);
       }catch(err){
-        msg.textContent = err.message || 'Upload failed';
+        showMsg(err.message || 'Upload failed', true);
       } finally {
         btnUpload.disabled = false;
       }
@@ -417,6 +423,6 @@
     await load();
     await loadFiles();
   }catch(err){
-    msg.textContent = err.message || "Failed to load editor";
+    showMsg(err.message || "Failed to load editor", true);
   }
 })();

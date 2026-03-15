@@ -1565,7 +1565,10 @@ body.gp-shell-ready .gp-sidebar__scrim{
   margin-top:12px;
   padding: 2px 4px 0;
 }
-.editor-msg{ color:var(--danger); font-weight:800; }
+.editor-msg{ font-size:13px; font-weight:600; line-height:1.4; padding:0 0 6px; min-height:0; }
+.editor-msg:empty{ padding:0; }
+.editor-msg--success{ color:var(--success); }
+.editor-msg--error{ color:var(--danger); }
 .editor-note{ text-align:right; font-size:12px; max-width:360px; }
 #editor + .cke{
   border-radius:18px;
