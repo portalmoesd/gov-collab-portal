@@ -261,7 +261,7 @@
         richEditorInstance = window.GCP.RichEditor({
           container: editorFrame,
           initialHtml: tp.htmlContent || '',
-          authorName: me.full_name || me.username || 'Unknown',
+          authorName: me.fullName || me.username || 'Unknown',
           sectionTitle: tp.sectionLabel || '',
           onCommentsClick: toggleCommentsPanel,
           onDeleteComment: handleDeleteComment,
@@ -528,15 +528,15 @@
   function toggleCommentsPanel(anchorId) {
     if (_cmtFloat) { closeCmtFloat(); return; }
 
-    const myColor    = cmtAuthorColor(me.full_name || me.username || '');
-    const myInitials = cmtGetInitials(me.full_name || me.username || '');
+    const myColor    = cmtAuthorColor(me.fullName || me.username || '');
+    const myInitials = cmtGetInitials(me.fullName || me.username || '');
     const card = document.createElement('div');
     card.className = 'gcp-cmt-float';
     card._anchorId  = anchorId;
     card.innerHTML = `
       <div class="gcp-cmt-float-header">
         <span class="gcp-cmt-float-avatar" style="background:${window.GCP.escapeHtml(myColor)}">${window.GCP.escapeHtml(myInitials)}</span>
-        <span class="gcp-cmt-float-author">${window.GCP.escapeHtml(me.full_name || me.username || 'You')}</span>
+        <span class="gcp-cmt-float-author">${window.GCP.escapeHtml(me.fullName || me.username || 'You')}</span>
       </div>
       <textarea class="gcp-cmt-float-input" placeholder="Add a comment…" rows="4"></textarea>
       <div class="gcp-cmt-float-actions">
