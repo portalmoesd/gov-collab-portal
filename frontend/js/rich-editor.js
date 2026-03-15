@@ -433,8 +433,8 @@
     const tcRejectAll = document.createElement('button');
     tcRejectAll.type = 'button'; tcRejectAll.className = 'gcp-re-tc-action reject';
     tcRejectAll.textContent = 'Reject All';
-    tcBarActions.appendChild(tcAcceptAll);
     tcBarActions.appendChild(tcRejectAll);
+    tcBarActions.appendChild(tcAcceptAll);
     tcBar.appendChild(tcBarLeft);
     tcBar.appendChild(tcBarActions);
 
