@@ -510,7 +510,8 @@
       if (activePalette && !activePalette.contains(e.target)) closePalette();
     }, true);
 
-    function makePalettePopup(anchorEl, applyColor) {
+    // anchorOrPos: DOM element (uses getBoundingClientRect) or {x, y} coords
+    function makePalettePopup(anchorOrPos, applyColor) {
       closePalette();
       const pop = document.createElement('div');
       pop.className = 'gcp-re-palette';
@@ -527,7 +528,6 @@
       pop.appendChild(grid);
       const div = document.createElement('div'); div.className = 'gcp-re-palette-divider';
       pop.appendChild(div);
-      // Custom colour row
       const customRow = document.createElement('label');
       customRow.className = 'gcp-re-palette-custom';
       customRow.textContent = 'Custom colour…';
@@ -536,12 +536,18 @@
       customInput.addEventListener('change', () => { closePalette(); applyColor(customInput.value); });
       customRow.appendChild(customInput);
       pop.appendChild(customRow);
-      // Position near anchor
       document.body.appendChild(pop);
-      const aRect = anchorEl.getBoundingClientRect();
-      let top = aRect.bottom + 4, left = aRect.left;
-      if (left + pop.offsetWidth > window.innerWidth - 8) left = window.innerWidth - pop.offsetWidth - 8;
-      if (top + pop.offsetHeight > window.innerHeight - 8) top = aRect.top - pop.offsetHeight - 4;
+      // Position from element rect or raw coords
+      let baseTop, baseLeft;
+      if (anchorOrPos && 'x' in anchorOrPos) {
+        baseTop = anchorOrPos.y + 4; baseLeft = anchorOrPos.x;
+      } else {
+        const r = anchorOrPos.getBoundingClientRect();
+        baseTop = r.bottom + 4; baseLeft = r.left;
+      }
+      let top = baseTop, left = baseLeft;
+      if (left + pop.offsetWidth  > window.innerWidth  - 8) left = window.innerWidth  - pop.offsetWidth  - 8;
+      if (top  + pop.offsetHeight > window.innerHeight - 8) top  = baseTop - pop.offsetHeight - 8;
       pop.style.top = top + 'px'; pop.style.left = left + 'px';
       activePalette = pop;
     }
@@ -1433,6 +1439,52 @@
         if (onCommentsClick) onCommentsClick(anchorId);
       });
       menu.appendChild(addCmt);
+
+      // Check if right-clicked on a table cell → offer fill colour + grid options
+      const tableCell = e.target.closest('td,th');
+      if (tableCell) {
+        const tblS = document.createElement('div'); tblS.className = 'gcp-re-ctx-sep'; menu.appendChild(tblS);
+        const pos = { x: e.clientX, y: e.clientY }; // capture coords before menu is removed
+        const table = tableCell.closest('table');
+        function allCells() { return [...table.querySelectorAll('td,th')]; }
+
+        // ── Cell fill colour ──
+        const cfItem = document.createElement('div'); cfItem.className = 'gcp-re-ctx-item';
+        cfItem.innerHTML = `<svg viewBox="0 0 14 14" width="12" height="12" fill="currentColor"><rect x="1" y="1" width="12" height="12" rx="1.5" opacity=".3"/><rect x="3" y="3" width="8" height="8" rx="1"/></svg> Cell fill colour`;
+        cfItem.addEventListener('click', () => { removeCtxMenu(); makePalettePopup(pos, hex => { tableCell.style.backgroundColor = hex; }); });
+        menu.appendChild(cfItem);
+
+        // ── All cells fill colour ──
+        const afItem = document.createElement('div'); afItem.className = 'gcp-re-ctx-item';
+        afItem.innerHTML = `<svg viewBox="0 0 14 14" width="12" height="12" fill="currentColor"><rect x="1" y="1" width="12" height="12" rx="1.5"/></svg> All cells fill colour`;
+        afItem.addEventListener('click', () => { removeCtxMenu(); makePalettePopup(pos, hex => { allCells().forEach(c => { c.style.backgroundColor = hex; }); }); });
+        menu.appendChild(afItem);
+
+        const tblS2 = document.createElement('div'); tblS2.className = 'gcp-re-ctx-sep'; menu.appendChild(tblS2);
+
+        // ── Grid line presets ──
+        const GRIDS = [
+          { label: 'Grid: none',   border: 'none' },
+          { label: 'Grid: thin',   border: '1px solid #d1d5db' },
+          { label: 'Grid: medium', border: '1.5px solid #64748b' },
+          { label: 'Grid: thick',  border: '2px solid #1e293b' },
+          { label: 'Grid: dashed', border: '1px dashed #94a3b8' },
+        ];
+        GRIDS.forEach(({ label, border }) => {
+          const gi = document.createElement('div'); gi.className = 'gcp-re-ctx-item';
+          gi.textContent = label;
+          gi.addEventListener('click', () => { removeCtxMenu(); allCells().forEach(c => { c.style.border = border; }); });
+          menu.appendChild(gi);
+        });
+
+        const tblS3 = document.createElement('div'); tblS3.className = 'gcp-re-ctx-sep'; menu.appendChild(tblS3);
+
+        // ── Grid line colour ──
+        const gcItem = document.createElement('div'); gcItem.className = 'gcp-re-ctx-item';
+        gcItem.innerHTML = `<svg viewBox="0 0 14 14" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1" y="1" width="12" height="12" rx="1"/><line x1="1" y1="7" x2="13" y2="7"/><line x1="7" y1="1" x2="7" y2="13"/></svg> Grid line colour`;
+        gcItem.addEventListener('click', () => { removeCtxMenu(); makePalettePopup(pos, hex => { allCells().forEach(c => { c.style.borderColor = hex; }); }); });
+        menu.appendChild(gcItem);
+      }
 
       // Check if right-clicked on a TC element → offer Accept/Reject
       const tcEl = e.target.closest('[data-tc-id]');
