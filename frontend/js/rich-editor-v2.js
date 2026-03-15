@@ -549,6 +549,469 @@
       .replace(/>/g, '&gt;');
   }
 
+  // ── Step 2: Commands ──────────────────────────────────────────────────────
+  //
+  // All commands are PURE: (doc, …args) → newDoc.  They never mutate their
+  // input.  Track-changes (Step 3) wraps each command so the "new" state is
+  // stored as a pending op instead of being committed directly.
+  //
+  // Position model
+  // ──────────────
+  // A DocPos pinpoints a character inside a leaf block (a block that holds
+  // runs directly).  It uses a hierarchical path:
+  //
+  //   Top-level paragraph / heading:
+  //     { blockIdx, runIdx, offset }
+  //
+  //   List item (blockIdx → list, itemIdx → item):
+  //     { blockIdx, itemIdx, runIdx, offset }
+  //
+  //   Table cell (blockIdx → table, rowIdx, colIdx,
+  //               cellBlockIdx → block inside the cell):
+  //     { blockIdx, rowIdx, colIdx, cellBlockIdx, runIdx, offset }
+  //
+  // A DocRange = { start: DocPos, end: DocPos }  (start ≤ end in doc order)
+
+  // ── Leaf-block helpers ────────────────────────────────────────────────────
+
+  /** Return the runs array for the leaf block identified by pos. */
+  function getLeafRuns(doc, pos) {
+    const b = doc.blocks[pos.blockIdx];
+    if (!b) return [];
+    if (b._t === 'paragraph' || b._t === 'heading') return b.runs;
+    if (b._t === 'list')  return b.items[pos.itemIdx ?? 0]?.runs ?? [];
+    if (b._t === 'table') {
+      return b.rows[pos.rowIdx ?? 0]
+              ?.cells[pos.colIdx ?? 0]
+              ?.blocks[pos.cellBlockIdx ?? 0]
+              ?.runs ?? [];
+    }
+    return [];
+  }
+
+  /**
+   * Return a new doc with the leaf runs at pos replaced by fn(currentRuns).
+   * Handles paragraphs, headings, list items, and table cells uniformly.
+   */
+  function withLeafRuns(doc, pos, fn) {
+    const blocks = [...doc.blocks];
+    const b = blocks[pos.blockIdx];
+
+    if (b._t === 'paragraph' || b._t === 'heading') {
+      blocks[pos.blockIdx] = { ...b, runs: fn(b.runs) };
+
+    } else if (b._t === 'list') {
+      const iIdx = pos.itemIdx ?? 0;
+      const items = [...b.items];
+      items[iIdx] = mkListItem(fn(items[iIdx].runs));
+      blocks[pos.blockIdx] = mkList(b.listType, items, b.attrs);
+
+    } else if (b._t === 'table') {
+      const rIdx = pos.rowIdx    ?? 0;
+      const cIdx = pos.colIdx    ?? 0;
+      const bIdx = pos.cellBlockIdx ?? 0;
+      const rows = b.rows.map((row, ri) => {
+        if (ri !== rIdx) return row;
+        const cells = row.cells.map((cell, ci) => {
+          if (ci !== cIdx) return cell;
+          const cb = [...cell.blocks];
+          cb[bIdx] = { ...cb[bIdx], runs: fn(cb[bIdx].runs) };
+          return mkTableCell(cb, cell.isHeader, cell.attrs);
+        });
+        return mkTableRow(cells);
+      });
+      blocks[pos.blockIdx] = mkTable(rows);
+    }
+
+    return { ...doc, blocks };
+  }
+
+  /** Replace all top-level blocks (useful for cross-block mutations). */
+  function withBlocks(doc, fn) { return { ...doc, blocks: fn([...doc.blocks]) }; }
+
+  // ── Run helpers ───────────────────────────────────────────────────────────
+
+  function marksEqual(a, b) {
+    const ka = Object.keys(a || {}), kb = Object.keys(b || {});
+    return ka.length === kb.length && ka.every(k => a[k] === b[k]);
+  }
+
+  /**
+   * Merge adjacent runs that share identical marks and no pending op.
+   * Always returns at least one run (even if empty).
+   */
+  function normalizeRuns(runs) {
+    const out = [];
+    for (const run of (runs || [])) {
+      const last = out[out.length - 1];
+      if (last && !last.pending && !run.pending && marksEqual(last.marks, run.marks)) {
+        out[out.length - 1] = mkRun(last.text + run.text, last.marks);
+      } else {
+        out.push(run);
+      }
+    }
+    return out.length ? out : [mkRun('')];
+  }
+
+  /**
+   * Character offset of (runIdx, offset) from the beginning of the runs array.
+   * Used to convert run-relative positions into a flat integer for range math.
+   */
+  function runsCharPos(runs, runIdx, offset) {
+    let pos = 0;
+    for (let i = 0; i < runIdx; i++) pos += (runs[i]?.text.length ?? 0);
+    return pos + (offset ?? 0);
+  }
+
+  /** Total character length of a runs array. */
+  function runsLength(runs) {
+    return (runs || []).reduce((n, r) => n + r.text.length, 0);
+  }
+
+  /**
+   * Split runs into [before, after] at character position charPos.
+   * The split point boundary does not break pending-tracked runs unless
+   * the split falls exactly at the run boundary.
+   */
+  function splitRunsAt(runs, charPos) {
+    const before = [], after = [];
+    let pos = 0;
+    for (const run of (runs || [])) {
+      const end = pos + run.text.length;
+      if (end <= charPos) {
+        before.push(run);
+      } else if (pos >= charPos) {
+        after.push(run);
+      } else {
+        const cut = charPos - pos;
+        if (cut > 0) before.push(mkRun(run.text.slice(0, cut), run.marks, run.pending));
+        after.push(         mkRun(run.text.slice(cut),     run.marks, run.pending));
+      }
+      pos = end;
+    }
+    return [before, after];
+  }
+
+  function posEqual(a, b) {
+    return a.blockIdx         === b.blockIdx  &&
+           (a.itemIdx    ?? null) === (b.itemIdx    ?? null) &&
+           (a.rowIdx     ?? null) === (b.rowIdx     ?? null) &&
+           (a.colIdx     ?? null) === (b.colIdx     ?? null) &&
+           (a.cellBlockIdx ?? null) === (b.cellBlockIdx ?? null) &&
+           a.runIdx          === b.runIdx     &&
+           a.offset          === b.offset;
+  }
+
+  // ── Text commands ─────────────────────────────────────────────────────────
+
+  /**
+   * Insert plain text at pos, inheriting the marks of the run at the cursor.
+   * If a range is supplied, the range is deleted first.
+   */
+  function cmdInsertText(doc, pos, text, range) {
+    if (!text) return doc;
+    let d = range && !posEqual(range.start, range.end) ? cmdDeleteRange(doc, range) : doc;
+    const insertPos = range ? range.start : pos;
+    return withLeafRuns(d, insertPos, runs => {
+      const run = runs[insertPos.runIdx] ?? mkRun('');
+      const cp  = runsCharPos(runs, insertPos.runIdx, insertPos.offset);
+      const [before, after] = splitRunsAt(runs, cp);
+      return normalizeRuns([...before, mkRun(text, { ...run.marks }), ...after]);
+    });
+  }
+
+  /**
+   * Delete the content described by range.
+   * Handles intra-block and cross-block ranges.
+   * For cross-block: merges the start and end blocks' surviving content.
+   */
+  function cmdDeleteRange(doc, range) {
+    const { start, end } = range;
+    if (posEqual(start, end)) return doc;
+
+    const sameLeaf = start.blockIdx         === end.blockIdx  &&
+                     (start.itemIdx ?? null) === (end.itemIdx ?? null) &&
+                     (start.rowIdx  ?? null) === (end.rowIdx  ?? null) &&
+                     (start.colIdx  ?? null) === (end.colIdx  ?? null);
+
+    // ── intra-block ──────────────────────────────────────────────────────
+    if (sameLeaf) {
+      return withLeafRuns(doc, start, runs => {
+        const s = runsCharPos(runs, start.runIdx, start.offset);
+        const e = runsCharPos(runs, end.runIdx,   end.offset);
+        const [before] = splitRunsAt(runs, s);
+        const [, after] = splitRunsAt(runs, e);
+        return normalizeRuns([...before, ...after]);
+      });
+    }
+
+    // ── cross-block (top-level paragraphs / headings only) ───────────────
+    const startRuns = getLeafRuns(doc, start);
+    const endRuns   = getLeafRuns(doc, end);
+    const startCp   = runsCharPos(startRuns, start.runIdx, start.offset);
+    const endCp     = runsCharPos(endRuns,   end.runIdx,   end.offset);
+
+    const [keptStart] = splitRunsAt(startRuns, startCp);
+    const [, keptEnd] = splitRunsAt(endRuns,   endCp);
+    const mergedRuns  = normalizeRuns([...keptStart, ...keptEnd]);
+
+    return withBlocks(doc, blocks => {
+      const startBlock = blocks[start.blockIdx];
+      const result = [];
+      blocks.forEach((b, i) => {
+        if (i < start.blockIdx)  result.push(b);
+        if (i === start.blockIdx) result.push({ ...startBlock, runs: mergedRuns });
+        // i > start and i <= end: drop
+        if (i > end.blockIdx)   result.push(b);
+      });
+      return result.length ? result : [mkParagraph([mkRun('')])];
+    });
+  }
+
+  // ── Mark commands ─────────────────────────────────────────────────────────
+
+  /**
+   * Apply fn(marks) → newMarks to every run that overlaps range.
+   * Works intra-block and across multiple top-level blocks.
+   */
+  function cmdApplyMarkFn(doc, range, fn) {
+    const { start, end } = range;
+
+    function applyToRuns(runs, fromChar, toChar) {
+      const newRuns = [];
+      let pos = 0;
+      for (const run of runs) {
+        const re = pos + run.text.length;
+        if (re <= fromChar || pos >= toChar || !run.text) {
+          newRuns.push(run);
+        } else if (pos >= fromChar && re <= toChar) {
+          newRuns.push(mkRun(run.text, fn({ ...run.marks }), run.pending));
+        } else {
+          const sl = Math.max(0, fromChar - pos);
+          const sr = Math.min(run.text.length, toChar - pos);
+          if (sl > 0)  newRuns.push(mkRun(run.text.slice(0, sl), run.marks, run.pending));
+          newRuns.push(     mkRun(run.text.slice(sl, sr), fn({ ...run.marks }), run.pending));
+          if (sr < run.text.length)
+                       newRuns.push(mkRun(run.text.slice(sr), run.marks, run.pending));
+        }
+        pos = re;
+      }
+      return normalizeRuns(newRuns);
+    }
+
+    // Single leaf block
+    if (start.blockIdx === end.blockIdx) {
+      return withLeafRuns(doc, start, runs => {
+        const s = runsCharPos(runs, start.runIdx, start.offset);
+        const e = runsCharPos(runs, end.runIdx,   end.offset);
+        return applyToRuns(runs, s, e);
+      });
+    }
+
+    // Cross-block: apply block by block
+    let d = doc;
+    for (let bi = start.blockIdx; bi <= end.blockIdx; bi++) {
+      const pos = { ...start, blockIdx: bi, runIdx: 0, offset: 0 };
+      d = withLeafRuns(d, pos, runs => {
+        const from = bi === start.blockIdx
+          ? runsCharPos(runs, start.runIdx, start.offset) : 0;
+        const to   = bi === end.blockIdx
+          ? runsCharPos(runs, end.runIdx, end.offset) : runsLength(runs);
+        return applyToRuns(runs, from, to);
+      });
+    }
+    return d;
+  }
+
+  /** Set a specific mark key to value across the range. */
+  function cmdApplyMark(doc, range, markKey, markValue) {
+    return cmdApplyMarkFn(doc, range, m => ({ ...m, [markKey]: markValue }));
+  }
+
+  /** Remove a mark key across the range. */
+  function cmdRemoveMark(doc, range, markKey) {
+    return cmdApplyMarkFn(doc, range, m => { const n = { ...m }; delete n[markKey]; return n; });
+  }
+
+  /**
+   * Toggle a boolean mark.  If every character in the range already has the
+   * mark, remove it; otherwise apply it.  Works across block boundaries.
+   */
+  function cmdToggleMark(doc, range, markKey) {
+    const { start, end } = range;
+    let allHave = true;
+
+    outer: for (let bi = start.blockIdx; bi <= end.blockIdx; bi++) {
+      const pos  = { ...start, blockIdx: bi, runIdx: 0, offset: 0 };
+      const runs = getLeafRuns(doc, pos);
+      const from = bi === start.blockIdx ? runsCharPos(runs, start.runIdx, start.offset) : 0;
+      const to   = bi === end.blockIdx   ? runsCharPos(runs, end.runIdx,   end.offset)   : runsLength(runs);
+      let charPos = 0;
+      for (const run of runs) {
+        const re = charPos + run.text.length;
+        if (re > from && charPos < to && run.text && !run.marks[markKey]) {
+          allHave = false; break outer;
+        }
+        charPos = re;
+      }
+    }
+
+    return allHave
+      ? cmdRemoveMark(doc, range, markKey)
+      : cmdApplyMark(doc, range, markKey, true);
+  }
+
+  /** Apply a non-boolean mark value (font, colour …) across the range. */
+  function cmdSetMark(doc, range, markKey, value) {
+    return value == null || value === ''
+      ? cmdRemoveMark(doc, range, markKey)
+      : cmdApplyMark(doc, range, markKey, value);
+  }
+
+  // ── Block commands ────────────────────────────────────────────────────────
+
+  /**
+   * Split a block at pos (Enter key).
+   * The left block keeps the original type; the right becomes a paragraph.
+   * Works for top-level paragraphs and headings; delegates to list-item
+   * splitting for list blocks.
+   */
+  function cmdSplitBlock(doc, pos) {
+    return withBlocks(doc, blocks => {
+      const b   = blocks[pos.blockIdx];
+      const cp  = runsCharPos(b.runs || [], pos.runIdx, pos.offset);
+      const [before, after] = splitRunsAt(b.runs || [], cp);
+
+      const left  = { ...b,              runs: normalizeRuns(before.length ? before : [mkRun('')]) };
+      const right = mkParagraph(           normalizeRuns(after.length  ? after  : [mkRun('')]));
+      blocks.splice(pos.blockIdx, 1, left, right);
+      return blocks;
+    });
+  }
+
+  /**
+   * Merge block at blockIdx with the block immediately before it (Backspace
+   * at the very start of a block).  Only works for simple blocks with runs.
+   */
+  function cmdMergeBlockWithPrev(doc, blockIdx) {
+    if (blockIdx <= 0) return doc;
+    return withBlocks(doc, blocks => {
+      const prev = blocks[blockIdx - 1];
+      const curr = blocks[blockIdx];
+      if (!prev.runs || !curr.runs) return blocks; // can't merge table/list
+      const merged = { ...prev, runs: normalizeRuns([...prev.runs, ...curr.runs]) };
+      blocks.splice(blockIdx - 1, 2, merged);
+      return blocks;
+    });
+  }
+
+  /**
+   * Convert a block to a different type.
+   * newType: 'paragraph' | 'heading' | 'list'
+   * level:   heading level (1-6) or list type ('ul' | 'ol')
+   */
+  function cmdSetBlockType(doc, blockIdx, newType, level) {
+    return withBlocks(doc, blocks => {
+      const b    = blocks[blockIdx];
+      const runs = b.runs ?? (b._t === 'list' ? b.items[0]?.runs : []) ?? [];
+      if (newType === 'heading') {
+        blocks[blockIdx] = mkHeading(level || 2, runs, b.attrs);
+      } else if (newType === 'list') {
+        blocks[blockIdx] = mkList(level || 'ul', [mkListItem(runs)], b.attrs);
+      } else {
+        blocks[blockIdx] = mkParagraph(runs, b.attrs);
+      }
+      return blocks;
+    });
+  }
+
+  /**
+   * Merge new attrs into a block's existing attrs.
+   * Use this for align, lineSpacing, indent.
+   */
+  function cmdSetBlockAttrs(doc, blockIdx, newAttrs) {
+    return withBlocks(doc, blocks => {
+      const b = blocks[blockIdx];
+      blocks[blockIdx] = { ...b, attrs: { ...(b.attrs || {}), ...newAttrs } };
+      return blocks;
+    });
+  }
+
+  // ── Table commands ────────────────────────────────────────────────────────
+
+  /**
+   * Insert a new table with numRows × numCols cells after afterBlockIdx.
+   * Row 0 is rendered as a header row (th cells).
+   * An empty paragraph is inserted after the table for cursor placement.
+   */
+  function cmdInsertTable(doc, afterBlockIdx, numRows, numCols) {
+    const rows = Array.from({ length: numRows }, (_, ri) =>
+      mkTableRow(
+        Array.from({ length: numCols }, () =>
+          mkTableCell([mkParagraph([mkRun('')])], ri === 0)
+        )
+      )
+    );
+    return withBlocks(doc, blocks => {
+      blocks.splice(afterBlockIdx + 1, 0, mkTable(rows), mkParagraph([mkRun('')]));
+      return blocks;
+    });
+  }
+
+  /** Insert a new row after afterRowIdx (0-based) in the table at tableIdx. */
+  function cmdInsertTableRow(doc, tableIdx, afterRowIdx) {
+    return withBlocks(doc, blocks => {
+      const t   = blocks[tableIdx];
+      if (t?._t !== 'table') return blocks;
+      const nCols = t.rows[0]?.cells.length ?? 0;
+      const row   = mkTableRow(Array.from({ length: nCols }, () =>
+        mkTableCell([mkParagraph([mkRun('')])])
+      ));
+      const rows = [...t.rows];
+      rows.splice(afterRowIdx + 1, 0, row);
+      blocks[tableIdx] = mkTable(rows);
+      return blocks;
+    });
+  }
+
+  /** Delete the row at rowIdx in the table at tableIdx (minimum 1 row kept). */
+  function cmdDeleteTableRow(doc, tableIdx, rowIdx) {
+    return withBlocks(doc, blocks => {
+      const t = blocks[tableIdx];
+      if (t?._t !== 'table' || t.rows.length <= 1) return blocks;
+      blocks[tableIdx] = mkTable(t.rows.filter((_, i) => i !== rowIdx));
+      return blocks;
+    });
+  }
+
+  /** Insert a new column after afterColIdx in every row of the table. */
+  function cmdInsertTableCol(doc, tableIdx, afterColIdx) {
+    return withBlocks(doc, blocks => {
+      const t = blocks[tableIdx];
+      if (t?._t !== 'table') return blocks;
+      blocks[tableIdx] = mkTable(
+        t.rows.map((row, ri) => {
+          const cells = [...row.cells];
+          cells.splice(afterColIdx + 1, 0, mkTableCell([mkParagraph([mkRun('')])], ri === 0));
+          return mkTableRow(cells);
+        })
+      );
+      return blocks;
+    });
+  }
+
+  /** Delete the column at colIdx from every row (minimum 1 column kept). */
+  function cmdDeleteTableCol(doc, tableIdx, colIdx) {
+    return withBlocks(doc, blocks => {
+      const t = blocks[tableIdx];
+      if (t?._t !== 'table' || (t.rows[0]?.cells.length ?? 0) <= 1) return blocks;
+      blocks[tableIdx] = mkTable(
+        t.rows.map(row => mkTableRow(row.cells.filter((_, i) => i !== colIdx)))
+      );
+      return blocks;
+    });
+  }
+
   // ── RichEditorV2 factory stub (Step 1: load + render only) ────────────────
   //
   // Steps 2-7 will extend this with commands, track-changes, toolbar, etc.
@@ -608,12 +1071,26 @@
   // ── Export ─────────────────────────────────────────────────────────────────
   window.GCP = window.GCP || {};
 
-  // Expose model primitives so later step files (commands, toolbar) can import them
+  // Expose model primitives + commands for use by later steps (toolbar, TC …)
   window.GCP._editorModel = {
+    // ── Model factories ──────────────────────────────────────────────────
     mkRun, mkParagraph, mkHeading, mkList, mkListItem,
     mkTable, mkTableRow, mkTableCell, mkEmptyDoc,
+    // ── Serialisation ────────────────────────────────────────────────────
     htmlToModel, renderModel, modelToHtml,
+    // ── Helpers ──────────────────────────────────────────────────────────
     TC_PALETTE, authorColorIdx, getInitials,
+    normalizeRuns, runsCharPos, runsLength, splitRunsAt,
+    getLeafRuns, withLeafRuns, withBlocks, posEqual,
+    // ── Text commands ────────────────────────────────────────────────────
+    cmdInsertText, cmdDeleteRange,
+    // ── Mark commands ────────────────────────────────────────────────────
+    cmdApplyMark, cmdRemoveMark, cmdToggleMark, cmdSetMark, cmdApplyMarkFn,
+    // ── Block commands ───────────────────────────────────────────────────
+    cmdSplitBlock, cmdMergeBlockWithPrev, cmdSetBlockType, cmdSetBlockAttrs,
+    // ── Table commands ───────────────────────────────────────────────────
+    cmdInsertTable, cmdInsertTableRow, cmdDeleteTableRow,
+    cmdInsertTableCol, cmdDeleteTableCol,
   };
 
   // NOTE: window.GCP.RichEditor is intentionally NOT replaced here.
