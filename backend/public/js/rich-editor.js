@@ -753,16 +753,19 @@
 
           replyBtn.addEventListener('click', () => {
             replyForm.style.display = '';
+            b.style.zIndex = '10'; // float above sibling balloons
             replyInput.focus();
           });
           replyCancel.addEventListener('click', () => {
             replyForm.style.display = 'none';
+            b.style.zIndex = '';
             replyInput.value = '';
           });
           replySend.addEventListener('click', async () => {
             const text = replyInput.value.trim();
             if (!text) return;
             replySend.disabled = true;
+            b.style.zIndex = '';
             if (onReplyComment) onReplyComment(c.id, text);
             // onReplyComment calls loadComments → setComments → positionBalloons
           });
