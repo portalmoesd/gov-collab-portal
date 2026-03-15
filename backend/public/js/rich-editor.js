@@ -398,6 +398,11 @@
       toolbar.appendChild(btn);
     });
 
+    // ── Spacer: pushes Changes / Comments / Fullscreen to the far right ────────
+    const toolbarSpacer = document.createElement('span');
+    toolbarSpacer.style.cssText = 'flex:1;';
+    toolbar.appendChild(toolbarSpacer);
+
     // ── Track Changes toggle button ──────────────────────────────────────────
     const tcSep = document.createElement('span');
     tcSep.className = 'gcp-re-sep'; tcSep.setAttribute('aria-hidden', 'true');
