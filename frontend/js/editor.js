@@ -102,8 +102,8 @@
     const s   = String(tp.status || 'draft').toLowerCase();
     const rtr = String(tp.returnTargetRole || '').toLowerCase();
     if (role === 'collaborator_1')     return s === 'draft' || rtr === 'collaborator_1';
-    if (role === 'collaborator_2')     return ['submitted_to_collaborator_2','returned_by_collaborator_2'].includes(s) || rtr === 'collaborator_2' || rtr === 'collaborator_1' || s === 'draft';
-    if (role === 'collaborator_3')     return ['submitted_to_collaborator_3','returned_by_collaborator_3'].includes(s) || rtr === 'collaborator_3' || rtr === 'collaborator_1' || s === 'draft';
+    if (role === 'collaborator_2')     return ['submitted_to_collaborator_2','returned_by_collaborator_2'].includes(s) || rtr === 'collaborator_2' || s === 'draft';
+    if (role === 'collaborator_3')     return ['submitted_to_collaborator_3','returned_by_collaborator_3','approved_by_collaborator_2','submitted_to_collaborator_2','returned_by_collaborator_2'].includes(s) || rtr === 'collaborator_3' || s === 'draft';
     if (role === 'collaborator')       return ['submitted_to_collaborator','returned_by_collaborator','approved_by_collaborator_2','approved_by_collaborator_3'].includes(s) || rtr === 'collaborator' || s === 'draft';
     if (role === 'super_collaborator') return [
       'submitted_to_super_collaborator','returned_by_super_collaborator','approved_by_collaborator',
@@ -146,7 +146,7 @@
       if (btnSave)   btnSave.style.display   = "";
       if (btnSubmit) btnSubmit.style.display = "";
       if (btnUpload) btnUpload.style.display = "";
-      const canReturn = ['submitted_to_collaborator_3', 'returned_by_collaborator_3'].includes(s);
+      const canReturn = ['submitted_to_collaborator_3','returned_by_collaborator_3','approved_by_collaborator_2','submitted_to_collaborator_2','returned_by_collaborator_2'].includes(s);
       if (btnReturn) btnReturn.style.display = canReturn ? "" : "none";
     } else if (role === 'collaborator') {
       if (btnSave)   btnSave.style.display   = "";
@@ -220,7 +220,14 @@
       if (richEditorInstance){
         richEditorInstance.setHtml(tp.htmlContent || '');
       } else {
-        richEditorInstance = window.GCP.RichEditor({ container: editorFrame, initialHtml: tp.htmlContent || '' });
+        richEditorInstance = window.GCP.RichEditor({
+          container: editorFrame,
+          initialHtml: tp.htmlContent || '',
+          authorName: me.full_name || me.username || 'Unknown',
+          onCommentsClick: toggleCommentsPanel,
+          onDeleteComment: handleDeleteComment,
+          onReplyComment: handleReplyComment,
+        });
       }
       if (richEditorInstance && richEditorInstance.el){
         richEditorInstance.el.contentEditable = canEdit ? 'true' : 'false';
@@ -280,6 +287,10 @@
   });
 
   if (btnApprove) btnApprove.addEventListener("click", async () => {
+    if (richEditorInstance && richEditorInstance.hasTrackedChanges()) {
+      showMsg("Accept or reject all tracked changes before approving.", true);
+      return;
+    }
     setActionLoading(btnApprove, true);
     try{
       if (role === "chairman" || role === "minister"){
@@ -419,9 +430,132 @@
     });
   }
 
+  // ── Comments ─────────────────────────────────────────────────────────────
+
+  function cmtGetInitials(name) {
+    return (name || '').split(/\s+/).filter(Boolean).slice(0, 2)
+      .map(s => s[0] && s[0].toUpperCase()).filter(Boolean).join('') || '?';
+  }
+  function cmtAuthorColor(name) {
+    const p = ['#1d4ed8','#b91c1c','#15803d','#7c3aed','#c2410c','#0f766e','#9d174d','#3730a3'];
+    let h = 0; for (let i = 0; i < (name||'').length; i++) h = (h*31+name.charCodeAt(i))>>>0;
+    return p[h % p.length];
+  }
+
+  async function handleDeleteComment(commentId, anchorId) {
+    try {
+      await window.GCP.apiFetch(`/tp/comments/${commentId}`, { method: 'DELETE' });
+      if (anchorId && richEditorInstance) richEditorInstance.removeCommentAnchor(anchorId);
+      await loadComments();
+    } catch(e) { showMsg(e.message || 'Could not delete comment', true); }
+  }
+
+  async function handleReplyComment(parentId, text) {
+    try {
+      await window.GCP.apiFetch('/tp/comments', {
+        method: 'POST',
+        body: JSON.stringify({ eventId, sectionId, commentText: text, parentId })
+      });
+      await loadComments();
+    } catch(e) { showMsg(e.message || 'Could not post reply', true); }
+  }
+
+  async function loadComments() {
+    if (!eventId || !sectionId) return;
+    try {
+      const data = await window.GCP.apiFetch(
+        `/tp/comments?event_id=${encodeURIComponent(eventId)}&section_id=${encodeURIComponent(sectionId)}`,
+        { method: 'GET' }
+      );
+      const comments = data.comments || [];
+      if (richEditorInstance) richEditorInstance.setComments(comments);
+    } catch(_) {}
+  }
+
+  // Floating comment-input card (position:fixed, outside the editor card)
+  let _cmtFloat = null;
+
+  function closeCmtFloat() {
+    if (!_cmtFloat) return;
+    const oldAnchor = _cmtFloat._anchorId;
+    _cmtFloat.remove(); _cmtFloat = null;
+    if (oldAnchor && richEditorInstance) richEditorInstance.removeCommentAnchor(oldAnchor);
+    if (richEditorInstance) richEditorInstance.setCommentsActive(false);
+  }
+
+  function toggleCommentsPanel(anchorId) {
+    if (_cmtFloat) { closeCmtFloat(); return; }
+
+    const myColor    = cmtAuthorColor(me.full_name || me.username || '');
+    const myInitials = cmtGetInitials(me.full_name || me.username || '');
+    const card = document.createElement('div');
+    card.className = 'gcp-cmt-float';
+    card._anchorId  = anchorId;
+    card.innerHTML = `
+      <div class="gcp-cmt-float-header">
+        <span class="gcp-cmt-float-avatar" style="background:${window.GCP.escapeHtml(myColor)}">${window.GCP.escapeHtml(myInitials)}</span>
+        <span class="gcp-cmt-float-author">${window.GCP.escapeHtml(me.full_name || me.username || 'You')}</span>
+      </div>
+      <textarea class="gcp-cmt-float-input" placeholder="Add a comment…" rows="4"></textarea>
+      <div class="gcp-cmt-float-actions">
+        <button class="gcp-cmt-float-save" type="button">Save</button>
+        <button class="gcp-cmt-float-cancel" type="button">Cancel</button>
+      </div>`;
+    document.body.appendChild(card);
+    _cmtFloat = card;
+    if (richEditorInstance) richEditorInstance.setCommentsActive(true);
+
+    // Position: to the right of the editor frame, near the anchor if possible
+    requestAnimationFrame(() => {
+      const editorFrame = document.getElementById('editorFrame');
+      const frameRect = editorFrame ? editorFrame.getBoundingClientRect() : null;
+      let top = 120, left = window.innerWidth - 320;
+      if (frameRect) left = Math.min(frameRect.right + 12, window.innerWidth - 320);
+      if (anchorId && richEditorInstance) {
+        const anchor = richEditorInstance.el.querySelector(`[data-cmt-anchor-id="${anchorId}"]`);
+        if (anchor) top = Math.min(Math.max(anchor.getBoundingClientRect().top, 60), window.innerHeight - 260);
+      } else if (frameRect) {
+        top = frameRect.top + 60;
+      }
+      card.style.top  = top  + 'px';
+      card.style.left = left + 'px';
+      card.querySelector('.gcp-cmt-float-input').focus();
+    });
+
+    card.querySelector('.gcp-cmt-float-save').addEventListener('click', async () => {
+      const text = card.querySelector('.gcp-cmt-float-input').value.trim();
+      if (!text) return;
+      card.querySelector('.gcp-cmt-float-save').disabled = true;
+      try {
+        await window.GCP.apiFetch('/tp/comments', {
+          method: 'POST',
+          body: JSON.stringify({ eventId, sectionId, commentText: text, anchorId: anchorId || null })
+        });
+        card.remove(); _cmtFloat = null;
+        if (richEditorInstance) richEditorInstance.setCommentsActive(false);
+        await loadComments();
+      } catch(e) {
+        showMsg(e.message || 'Could not post comment', true);
+        card.querySelector('.gcp-cmt-float-save').disabled = false;
+      }
+    });
+
+    card.querySelector('.gcp-cmt-float-cancel').addEventListener('click', closeCmtFloat);
+    card.querySelector('.gcp-cmt-float-input').addEventListener('keydown', e => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') { e.preventDefault(); card.querySelector('.gcp-cmt-float-save').click(); }
+      if (e.key === 'Escape') closeCmtFloat();
+    });
+  }
+
+  // Close float when clicking outside it
+  document.addEventListener('mousedown', e => {
+    if (_cmtFloat && !_cmtFloat.contains(e.target)) closeCmtFloat();
+  });
+
   try{
     await load();
     await loadFiles();
+    await loadComments();
   }catch(err){
     showMsg(err.message || "Failed to load editor", true);
   }

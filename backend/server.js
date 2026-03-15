@@ -159,6 +159,7 @@ async function ensureSchema() {
     )
   `).catch(()=>{});
   await pool.query(`ALTER TABLE tp_section_comments ADD COLUMN IF NOT EXISTS anchor_id TEXT`).catch(()=>{});
+  await pool.query(`ALTER TABLE tp_section_comments ADD COLUMN IF NOT EXISTS parent_id INTEGER REFERENCES tp_section_comments(id) ON DELETE CASCADE`).catch(()=>{});
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_tsc_lookup ON tp_section_comments(event_id, country_id, section_id)`).catch(()=>{});
 }
 
@@ -2903,30 +2904,32 @@ app.get('/api/tp/comments', authRequired, attachUser, asyncRoute(async (req, res
   if (!event_id || !section_id) return res.status(400).json({ error: 'Missing event_id or section_id' });
   const countryId = await resolveCountryIdForEvent(event_id);
   if (!countryId) return res.status(404).json({ error: 'Country not found for event' });
+  const isAdmin = normalizeRoleKey(req.user.role_key) === 'admin';
   const rows = await pool.query(
-    `SELECT id, author_name, comment_text, anchor_id, created_at,
-            (user_id = $4) AS is_own
+    `SELECT id, author_name, comment_text, anchor_id, created_at, parent_id,
+            (user_id = $4)        AS is_own,
+            (user_id = $4 OR $5)  AS can_delete
      FROM tp_section_comments
      WHERE event_id=$1 AND country_id=$2 AND section_id=$3
-     ORDER BY created_at ASC`,
-    [event_id, countryId, section_id, req.user.id]
+     ORDER BY COALESCE(parent_id, id), id ASC`,
+    [event_id, countryId, section_id, req.user.id, isAdmin]
   );
   res.json({ comments: rows.rows });
 }));
 
 app.post('/api/tp/comments', authRequired, attachUser, asyncRoute(async (req, res) => {
-  const { eventId, sectionId, commentText, anchorId } = req.body || {};
+  const { eventId, sectionId, commentText, anchorId, parentId } = req.body || {};
   if (!eventId || !sectionId || !commentText?.trim())
     return res.status(400).json({ error: 'Missing required fields' });
   const countryId = await resolveCountryIdForEvent(eventId);
   if (!countryId) return res.status(404).json({ error: 'Country not found for event' });
   const authorName = req.user.full_name || req.user.username || 'Unknown';
   const row = await pool.query(
-    `INSERT INTO tp_section_comments (event_id, country_id, section_id, user_id, author_name, comment_text, anchor_id)
-     VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING id, author_name, comment_text, anchor_id, created_at`,
-    [eventId, countryId, sectionId, req.user.id, authorName, commentText.trim(), anchorId || null]
+    `INSERT INTO tp_section_comments (event_id, country_id, section_id, user_id, author_name, comment_text, anchor_id, parent_id)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id, author_name, comment_text, anchor_id, created_at, parent_id`,
+    [eventId, countryId, sectionId, req.user.id, authorName, commentText.trim(), anchorId || null, parentId || null]
   );
-  res.json({ comment: { ...row.rows[0], is_own: true } });
+  res.json({ comment: { ...row.rows[0], is_own: true, can_delete: true } });
 }));
 
 app.delete('/api/tp/comments/:id', authRequired, attachUser, asyncRoute(async (req, res) => {
