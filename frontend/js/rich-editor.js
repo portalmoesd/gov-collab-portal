@@ -503,13 +503,14 @@
     toolbar.appendChild(fontSizeSelect);
 
     // ── Colour palette helper ─────────────────────────────────────────────────
-    // 40-colour Word-style preset palette (5 rows × 8)
+    // 24-colour preset palette (3 rows × 8)
     const COLOUR_PALETTE = [
+      // Row 1: grayscale (unchanged)
       '#000000','#1f2937','#374151','#6b7280','#9ca3af','#d1d5db','#f3f4f6','#ffffff',
-      '#dc2626','#ea580c','#d97706','#16a34a','#0891b2','#2563eb','#7c3aed','#db2777',
-      '#fee2e2','#ffedd5','#fef9c3','#dcfce7','#cffafe','#dbeafe','#ede9fe','#fce7f3',
-      '#b91c1c','#c2410c','#b45309','#15803d','#0e7490','#1d4ed8','#6d28d9','#be185d',
-      '#7f1d1d','#7c2d12','#78350f','#14532d','#164e63','#1e3a8a','#4c1d95','#831843',
+      // Row 2: warm tones
+      '#5f0f40','#9a031e','#e05252','#f95738','#e36414','#fb8b24','#f4d35e','#ebebd3',
+      // Row 3: cool tones
+      '#def2f1','#b0d4db','#4878a0','#083d77','#3aafa9','#2b7a78','#0f4c5c','#17252a',
     ];
     let activePalette = null;
     function closePalette() { if (activePalette) { activePalette.remove(); activePalette = null; } }
