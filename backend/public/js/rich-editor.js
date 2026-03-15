@@ -170,6 +170,9 @@
     .gcp-re-balloon--cmt { border-left:3px solid #f59e0b; background:#fffdf5; }
     .gcp-re-balloon--tc-group { border-left:3px solid #64748b; background:#f8fafc; }
     .gcp-re-balloon-change-count { font-size:10px; color:#64748b; margin-top:1px; }
+    .gcp-re-snippet { font-size:10px; font-family:monospace; margin-top:2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .gcp-re-snippet-ins { color:#15803d; }
+    .gcp-re-snippet-del { color:#b91c1c; text-decoration:line-through; }
     .gcp-re-balloon-header { display:flex; align-items:center; gap:5px; margin-bottom:4px; }
     .gcp-re-balloon-author { font-weight:800; color:#0f172a; flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
     .gcp-re-balloon-time { color:#94a3b8; white-space:nowrap; flex-shrink:0; }
@@ -677,6 +680,7 @@
     }
 
     // Build and position all balloon cards in the margin column
+    let _positionBalloonRafId = 0;
     function positionBalloons() {
       marginEl.innerHTML = '';
       // Remove previous SVG overlay (lives on contentRow, not marginEl)
@@ -685,7 +689,8 @@
 
       const hasCmts = storedComments.length > 0;
       if (!tc.visible && !hasCmts) return;
-      requestAnimationFrame(() => {
+      cancelAnimationFrame(_positionBalloonRafId);
+      _positionBalloonRafId = requestAnimationFrame(() => {
         const crRect = contentRow.getBoundingClientRect();
         const mRect  = marginEl.getBoundingClientRect();
         const scrollTop  = contentRow.scrollTop;
@@ -723,18 +728,33 @@
           svg.appendChild(line);
         }
 
-        // TC change balloons — grouped by author + 60-second time window (Word-style)
+        // TC change balloons — grouped by author + 60-second window + same block element
         if (tc.visible) {
+          const BLOCK_TAGS = new Set(['p','li','h1','h2','h3','h4','h5','h6','div','blockquote']);
+          function entryBlock(entry) {
+            const isFmt = entry.kind === 'fmt';
+            const sel = isFmt ? `[data-tc-fmt-id="${CSS.escape(entry.id)}"]` : `[data-tc-id="${CSS.escape(entry.id)}"]`;
+            const el = body.querySelector(sel);
+            if (!el) return null;
+            let blk = el.parentElement;
+            while (blk && blk !== body) {
+              if (BLOCK_TAGS.has(blk.tagName.toLowerCase())) return blk;
+              blk = blk.parentElement;
+            }
+            return body;
+          }
+
           const groups = [];
           getChangeEntries().forEach(entry => {
             const t = entry.time ? new Date(entry.time).getTime() : 0;
+            const block = entryBlock(entry);
             const last = groups[groups.length - 1];
-            if (last && last.author === entry.author && Math.abs(t - last.lastT) < 60000) {
+            if (last && last.author === entry.author && Math.abs(t - last.lastT) < 60000 && last.blockEl === block) {
               last.ids.push(entry.id);
               last.entries.push(entry);
               last.lastT = t;
             } else {
-              groups.push({ author: entry.author, initials: entry.initials, color: entry.color, time: entry.time, ids: [entry.id], entries: [entry], lastT: t });
+              groups.push({ author: entry.author, initials: entry.initials, color: entry.color, time: entry.time, ids: [entry.id], entries: [entry], lastT: t, blockEl: block });
             }
           });
 
@@ -758,13 +778,24 @@
               countLabel = `Formatted · ${fmtLabels.join(', ')}`;
             else if (fmtLabels.length > 0)
               countLabel = `${n} changes · ${fmtLabels.join(', ')}`;
+            // Text snippets for ins/del entries (max 2)
+            const snippetLines = group.entries
+              .filter(e => e.kind === 'ins' || e.kind === 'del')
+              .slice(0, 2)
+              .map(e => {
+                const sign = e.kind === 'ins' ? '+' : '−';
+                const cls  = e.kind === 'ins' ? 'gcp-re-snippet-ins' : 'gcp-re-snippet-del';
+                const txt  = e.text.length > 38 ? e.text.slice(0, 38) + '…' : e.text;
+                return `<div class="gcp-re-snippet ${cls}">${sign} ${escHtml(txt)}</div>`;
+              })
+              .join('');
             b.innerHTML = `
               <div class="gcp-re-balloon-header">
                 <span class="gcp-re-balloon-avatar" style="background:${escHtml(group.color)}">${escHtml(group.initials)}</span>
                 <span class="gcp-re-balloon-author">${escHtml(group.author)}</span>
                 <span class="gcp-re-balloon-time">${escHtml(fmtTime(group.time))}</span>
               </div>
-              <div class="gcp-re-balloon-change-count">${escHtml(countLabel)}</div>
+              ${snippetLines || `<div class="gcp-re-balloon-change-count">${escHtml(countLabel)}</div>`}
               <div class="gcp-re-balloon-btns">
                 <button class="gcp-re-balloon-acc" type="button">✓ Accept</button>
                 <button class="gcp-re-balloon-rej" type="button">✗ Reject</button>
@@ -949,7 +980,7 @@
         while (el.firstChild) el.parentNode.insertBefore(el.firstChild, el);
         el.remove();
       });
-      body.normalize(); updateTcBar();
+      body.normalize(); tc.visible = false; updateTcBar();
     }
 
     function rejectAllChanges() {
@@ -959,7 +990,7 @@
         el.remove();
       });
       [...body.querySelectorAll('[data-tc-fmt-id]')].forEach(_unwrapFmtReject);
-      body.normalize(); updateTcBar();
+      body.normalize(); tc.visible = false; updateTcBar();
     }
 
     function hasTrackedChanges() {

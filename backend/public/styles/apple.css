@@ -1740,6 +1740,10 @@ body.gp-shell-ready .gp-sidebar__scrim{
   width:166px;
   box-shadow:none;
 }
+/* Save button: narrower expanded width — "SAVE" is a short label */
+.tp-actionbar .micro-action--save:hover,
+.tp-actionbar .micro-action--save:focus-visible,
+.tp-actionbar .micro-action--save.is-expanded { width:120px; }
 .editor-frame{ margin-top: 10px; }
 @media (max-width: 980px){
   .editor-page-title{ font-size:22px; padding: 16px 24px; }
