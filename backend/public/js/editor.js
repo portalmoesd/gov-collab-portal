@@ -1,4 +1,42 @@
 // editor.js
+
+// ── Comment float card styles ──────────────────────────────────────────────
+(function injectCmtFloatStyles() {
+  if (document.getElementById('gcp-cmt-float-style')) return;
+  const s = document.createElement('style');
+  s.id = 'gcp-cmt-float-style';
+  s.textContent = `
+    .gcp-cmt-float {
+      position: fixed;
+      z-index: 9995;
+      background: #fff;
+      border: 1px solid #e2e8f0;
+      border-radius: 12px;
+      padding: 12px 14px;
+      width: 280px;
+      box-shadow: 0 4px 24px rgba(15,23,42,.16);
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    [data-theme="dark"] .gcp-cmt-float { background:#1e212c; border-color:rgba(255,255,255,.10); }
+    .gcp-cmt-float-header { display:flex; align-items:center; gap:6px; }
+    .gcp-cmt-float-avatar { display:inline-flex; align-items:center; justify-content:center; width:22px; height:22px; border-radius:50%; font-size:9px; font-weight:800; color:#fff; flex-shrink:0; }
+    .gcp-cmt-float-author { font-size:12px; font-weight:700; color:#0f172a; }
+    [data-theme="dark"] .gcp-cmt-float-author { color:#f1f5f9; }
+    .gcp-cmt-float-input { width:100%; box-sizing:border-box; border:1px solid #e2e8f0; border-radius:8px; padding:7px 10px; font-size:13px; resize:vertical; outline:none; font-family:inherit; line-height:1.5; min-height:80px; }
+    .gcp-cmt-float-input:focus { border-color:#93c5fd; box-shadow:0 0 0 2px rgba(147,197,253,.25); }
+    [data-theme="dark"] .gcp-cmt-float-input { background:#2a2d3a; border-color:rgba(255,255,255,.12); color:#e8ecf4; }
+    .gcp-cmt-float-actions { display:flex; gap:6px; }
+    .gcp-cmt-float-save { padding:5px 14px; border-radius:7px; border:none; background:#0a84ff; color:#fff; font-size:12px; font-weight:700; cursor:pointer; }
+    .gcp-cmt-float-save:hover { background:#0071e3; }
+    .gcp-cmt-float-save:disabled { opacity:.5; cursor:default; }
+    .gcp-cmt-float-cancel { padding:5px 10px; border-radius:7px; border:1px solid #e2e8f0; background:transparent; color:#64748b; font-size:12px; font-weight:600; cursor:pointer; }
+    .gcp-cmt-float-cancel:hover { background:rgba(0,0,0,.05); }
+  `;
+  document.head.appendChild(s);
+})();
+
 (async function(){
   const me = await window.GCP.requireAuth();
   if (!me) return;
@@ -446,8 +484,11 @@
   async function handleDeleteComment(commentId, anchorId) {
     try {
       await window.GCP.apiFetch(`/tp/comments/${commentId}`, { method: 'DELETE' });
-      if (anchorId && richEditorInstance) richEditorInstance.removeCommentAnchor(anchorId);
+      // Refresh storedComments BEFORE removing the anchor from the DOM.
+      // Removing the anchor triggers the MutationObserver → checkOrphanedComments,
+      // which would fire a second delete call if storedComments still has this comment.
       await loadComments();
+      if (anchorId && richEditorInstance) richEditorInstance.removeCommentAnchor(anchorId);
     } catch(e) { showMsg(e.message || 'Could not delete comment', true); }
   }
 
@@ -506,17 +547,27 @@
     _cmtFloat = card;
     if (richEditorInstance) richEditorInstance.setCommentsActive(true);
 
-    // Position: to the right of the editor frame, near the anchor if possible
+    // Position: near the anchor text, clamped to viewport
     requestAnimationFrame(() => {
-      const editorFrame = document.getElementById('editorFrame');
-      const frameRect = editorFrame ? editorFrame.getBoundingClientRect() : null;
-      let top = 120, left = window.innerWidth - 320;
-      if (frameRect) left = Math.min(frameRect.right + 12, window.innerWidth - 320);
+      const CARD_W = 292, CARD_H = 200, PAD = 12;
+      let top = 120, left = window.innerWidth - CARD_W - PAD;
+
       if (anchorId && richEditorInstance) {
         const anchor = richEditorInstance.el.querySelector(`[data-cmt-anchor-id="${anchorId}"]`);
-        if (anchor) top = Math.min(Math.max(anchor.getBoundingClientRect().top, 60), window.innerHeight - 260);
-      } else if (frameRect) {
-        top = frameRect.top + 60;
+        if (anchor) {
+          const aRect = anchor.getBoundingClientRect();
+          // Prefer placing below the anchor; fall back to above if too close to bottom
+          top = aRect.bottom + 6;
+          if (top + CARD_H > window.innerHeight - PAD) top = Math.max(aRect.top - CARD_H - 6, PAD);
+          left = Math.min(Math.max(aRect.left, PAD), window.innerWidth - CARD_W - PAD);
+        }
+      } else {
+        const editorFrame = document.getElementById('editorFrame');
+        const frameRect = editorFrame ? editorFrame.getBoundingClientRect() : null;
+        if (frameRect) {
+          top  = frameRect.top + 60;
+          left = Math.min(frameRect.right + PAD, window.innerWidth - CARD_W - PAD);
+        }
       }
       card.style.top  = top  + 'px';
       card.style.left = left + 'px';
