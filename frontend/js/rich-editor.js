@@ -219,6 +219,13 @@
     .gcp-re-ctx-item { display:flex; align-items:center; gap:7px; padding:7px 12px; border-radius:6px; font-size:13px; font-weight:600; color:#0f172a; cursor:pointer; white-space:nowrap; transition:background .1s; }
     .gcp-re-ctx-item:hover { background:rgba(10,132,255,.09); color:#0a84ff; }
     .gcp-re-ctx-sep { height:1px; background:#e2e8f0; margin:3px 0; }
+    /* Compact table-formatting rows inside the context menu */
+    .gcp-re-ctx-tbl-row { display:flex; align-items:center; gap:3px; padding:3px 10px; }
+    .gcp-re-ctx-tbl-lbl { font-size:10px; font-weight:800; color:#64748b; flex:0 0 58px; }
+    .gcp-re-ctx-tbl-btn { font-size:10px; font-weight:700; padding:2px 6px; border:1px solid #e2e8f0; border-radius:3px; cursor:pointer; background:#f8fafc; color:#334155; line-height:1.4; white-space:nowrap; }
+    .gcp-re-ctx-tbl-btn:hover { background:#dbeafe; border-color:#93c5fd; color:#1d4ed8; }
+    [data-theme="dark"] .gcp-re-ctx-tbl-btn { background:#2a2d3e; border-color:#3d4155; color:#c0cce0; }
+    [data-theme="dark"] .gcp-re-ctx-tbl-btn:hover { background:rgba(29,78,216,.25); border-color:#4f87e8; color:#93c5fd; }
     [data-theme="dark"] .gcp-re-ctx { background:#1e212c; border-color:rgba(255,255,255,.10); }
     [data-theme="dark"] .gcp-re-ctx-item { color:#e8ecf4; }
     [data-theme="dark"] .gcp-re-ctx-item:hover { background:rgba(10,132,255,.15); color:#60a5fa; }
@@ -1440,50 +1447,66 @@
       });
       menu.appendChild(addCmt);
 
-      // Check if right-clicked on a table cell → offer fill colour + grid options
+      // Check if right-clicked on a table cell → compact fill + grid panel
       const tableCell = e.target.closest('td,th');
       if (tableCell) {
-        const tblS = document.createElement('div'); tblS.className = 'gcp-re-ctx-sep'; menu.appendChild(tblS);
-        const pos = { x: e.clientX, y: e.clientY }; // capture coords before menu is removed
+        const pos = { x: e.clientX, y: e.clientY };
         const table = tableCell.closest('table');
-        function allCells() { return [...table.querySelectorAll('td,th')]; }
+        const colIdx = [...tableCell.parentElement.children].indexOf(tableCell);
+        const rowCells  = () => [...tableCell.closest('tr').querySelectorAll('td,th')];
+        const colCells  = () => [...table.querySelectorAll('tr')].flatMap(r => r.children[colIdx] ? [r.children[colIdx]] : []);
+        const allCells  = () => [...table.querySelectorAll('td,th')];
 
-        // ── Cell fill colour ──
-        const cfItem = document.createElement('div'); cfItem.className = 'gcp-re-ctx-item';
-        cfItem.innerHTML = `<svg viewBox="0 0 14 14" width="12" height="12" fill="currentColor"><rect x="1" y="1" width="12" height="12" rx="1.5" opacity=".3"/><rect x="3" y="3" width="8" height="8" rx="1"/></svg> Cell fill colour`;
-        cfItem.addEventListener('click', () => { removeCtxMenu(); makePalettePopup(pos, hex => { tableCell.style.backgroundColor = hex; }); });
-        menu.appendChild(cfItem);
-
-        // ── All cells fill colour ──
-        const afItem = document.createElement('div'); afItem.className = 'gcp-re-ctx-item';
-        afItem.innerHTML = `<svg viewBox="0 0 14 14" width="12" height="12" fill="currentColor"><rect x="1" y="1" width="12" height="12" rx="1.5"/></svg> All cells fill colour`;
-        afItem.addEventListener('click', () => { removeCtxMenu(); makePalettePopup(pos, hex => { allCells().forEach(c => { c.style.backgroundColor = hex; }); }); });
-        menu.appendChild(afItem);
-
-        const tblS2 = document.createElement('div'); tblS2.className = 'gcp-re-ctx-sep'; menu.appendChild(tblS2);
-
-        // ── Grid line presets ──
-        const GRIDS = [
-          { label: 'Grid: none',   border: 'none' },
-          { label: 'Grid: thin',   border: '1px solid #d1d5db' },
-          { label: 'Grid: medium', border: '1.5px solid #64748b' },
-          { label: 'Grid: thick',  border: '2px solid #1e293b' },
-          { label: 'Grid: dashed', border: '1px dashed #94a3b8' },
+        const BORDERS = [
+          { t: 'None',   v: 'none' },
+          { t: 'Thin',   v: '1px solid #d1d5db' },
+          { t: 'Medium', v: '1.5px solid #64748b' },
+          { t: 'Thick',  v: '2px solid #1e293b' },
+          { t: 'Dashed', v: '1px dashed #94a3b8' },
         ];
-        GRIDS.forEach(({ label, border }) => {
-          const gi = document.createElement('div'); gi.className = 'gcp-re-ctx-item';
-          gi.textContent = label;
-          gi.addEventListener('click', () => { removeCtxMenu(); allCells().forEach(c => { c.style.border = border; }); });
-          menu.appendChild(gi);
+
+        // Build a compact inline row: label + action buttons
+        function makeRow(labelText, btns) {
+          const row = document.createElement('div');
+          row.className = 'gcp-re-ctx-tbl-row';
+          const lbl = document.createElement('span');
+          lbl.className = 'gcp-re-ctx-tbl-lbl'; lbl.textContent = labelText;
+          row.appendChild(lbl);
+          btns.forEach(({ text, title, action }) => {
+            const b = document.createElement('button');
+            b.type = 'button'; b.className = 'gcp-re-ctx-tbl-btn';
+            b.textContent = text; if (title) b.title = title;
+            b.addEventListener('mousedown', ev => ev.preventDefault());
+            b.addEventListener('click', () => { removeCtxMenu(); action(); });
+            row.appendChild(b);
+          });
+          return row;
+        }
+
+        // Fill colour row: Cell | Row | Column | All
+        const sep1 = document.createElement('div'); sep1.className = 'gcp-re-ctx-sep'; menu.appendChild(sep1);
+        menu.appendChild(makeRow('Fill:', [
+          { text: 'Cell',   action: () => makePalettePopup(pos, h => { tableCell.style.backgroundColor = h; }) },
+          { text: 'Row',    action: () => makePalettePopup(pos, h => { rowCells().forEach(c => { c.style.backgroundColor = h; }); }) },
+          { text: 'Column', action: () => makePalettePopup(pos, h => { colCells().forEach(c => { c.style.backgroundColor = h; }); }) },
+          { text: 'All',    action: () => makePalettePopup(pos, h => { allCells().forEach(c => { c.style.backgroundColor = h; }); }) },
+        ]));
+
+        // Grid line rows: one row per scope, each with border presets + colour picker
+        const sep2 = document.createElement('div'); sep2.className = 'gcp-re-ctx-sep'; menu.appendChild(sep2);
+        [
+          { label: 'Row grid:',  getCells: rowCells },
+          { label: 'Col grid:',  getCells: colCells },
+          { label: 'All grid:',  getCells: allCells },
+        ].forEach(({ label, getCells }) => {
+          menu.appendChild(makeRow(label, [
+            ...BORDERS.map(({ t, v }) => ({
+              text: t, title: t,
+              action: () => { getCells().forEach(c => { c.style.border = v; }); },
+            })),
+            { text: '🎨', title: 'Grid colour', action: () => makePalettePopup(pos, h => { getCells().forEach(c => { c.style.borderColor = h; }); }) },
+          ]));
         });
-
-        const tblS3 = document.createElement('div'); tblS3.className = 'gcp-re-ctx-sep'; menu.appendChild(tblS3);
-
-        // ── Grid line colour ──
-        const gcItem = document.createElement('div'); gcItem.className = 'gcp-re-ctx-item';
-        gcItem.innerHTML = `<svg viewBox="0 0 14 14" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1" y="1" width="12" height="12" rx="1"/><line x1="1" y1="7" x2="13" y2="7"/><line x1="7" y1="1" x2="7" y2="13"/></svg> Grid line colour`;
-        gcItem.addEventListener('click', () => { removeCtxMenu(); makePalettePopup(pos, hex => { allCells().forEach(c => { c.style.borderColor = hex; }); }); });
-        menu.appendChild(gcItem);
       }
 
       // Check if right-clicked on a TC element → offer Accept/Reject
