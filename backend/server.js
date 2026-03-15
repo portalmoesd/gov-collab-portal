@@ -2913,7 +2913,7 @@ app.get('/api/tp/comments', authRequired, attachUser, asyncRoute(async (req, res
      ORDER BY COALESCE(parent_id, id), id ASC`,
     [event_id, countryId, section_id, req.user.id]
   );
-  const comments = rows.rows.map(c => ({ ...c, can_delete: c.is_own || isAdmin }));
+  const comments = rows.rows.map(c => ({ ...c, can_delete: true }));
   res.json({ comments });
 }));
 
@@ -2935,13 +2935,7 @@ app.post('/api/tp/comments', authRequired, attachUser, asyncRoute(async (req, re
 app.delete('/api/tp/comments/:id', authRequired, attachUser, asyncRoute(async (req, res) => {
   const id = parseInt(req.params.id, 10);
   if (!id) return res.status(400).json({ error: 'Invalid id' });
-  const roleKey = normalizeRoleKey(req.user.role_key);
-  // Admins can delete any comment; others can only delete their own
-  const condition = roleKey === 'admin'
-    ? 'id=$1'
-    : 'id=$1 AND user_id=$2';
-  const params = roleKey === 'admin' ? [id] : [id, req.user.id];
-  const result = await pool.query(`DELETE FROM tp_section_comments WHERE ${condition}`, params);
+  const result = await pool.query(`DELETE FROM tp_section_comments WHERE id=$1`, [id]);
   if (result.rowCount === 0) return res.status(404).json({ error: 'Comment not found or not yours' });
   res.json({ ok: true });
 }));
