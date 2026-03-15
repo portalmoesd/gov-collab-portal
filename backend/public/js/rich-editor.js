@@ -46,9 +46,10 @@
     { cmd: 'insertUnorderedList', icon: '&#8226;&#8212;', title: 'Bullet list' },
     { cmd: 'insertOrderedList',   icon: '1.',            title: 'Numbered list' },
     { sep: true },
-    { cmd: 'justifyLeft',   icon: '&#8676;',           title: 'Align left' },
-    { cmd: 'justifyCenter', icon: '&#8596;',           title: 'Center' },
-    { cmd: 'justifyRight',  icon: '&#8677;',           title: 'Align right' },
+    { cmd: 'justifyLeft',   icon: '<svg viewBox="0 0 14 12" width="14" height="12" fill="currentColor" aria-hidden="true"><rect x="0" y="0" width="14" height="1.8" rx=".6"/><rect x="0" y="3.4" width="9" height="1.8" rx=".6"/><rect x="0" y="6.8" width="14" height="1.8" rx=".6"/><rect x="0" y="10.2" width="9" height="1.8" rx=".6"/></svg>', title: 'Align left' },
+    { cmd: 'justifyCenter', icon: '<svg viewBox="0 0 14 12" width="14" height="12" fill="currentColor" aria-hidden="true"><rect x="0" y="0" width="14" height="1.8" rx=".6"/><rect x="2.5" y="3.4" width="9" height="1.8" rx=".6"/><rect x="0" y="6.8" width="14" height="1.8" rx=".6"/><rect x="2.5" y="10.2" width="9" height="1.8" rx=".6"/></svg>', title: 'Center' },
+    { cmd: 'justifyRight',  icon: '<svg viewBox="0 0 14 12" width="14" height="12" fill="currentColor" aria-hidden="true"><rect x="0" y="0" width="14" height="1.8" rx=".6"/><rect x="5" y="3.4" width="9" height="1.8" rx=".6"/><rect x="0" y="6.8" width="14" height="1.8" rx=".6"/><rect x="5" y="10.2" width="9" height="1.8" rx=".6"/></svg>', title: 'Align right' },
+    { cmd: 'justifyFull',   icon: '<svg viewBox="0 0 14 12" width="14" height="12" fill="currentColor" aria-hidden="true"><rect x="0" y="0" width="14" height="1.8" rx=".6"/><rect x="0" y="3.4" width="14" height="1.8" rx=".6"/><rect x="0" y="6.8" width="14" height="1.8" rx=".6"/><rect x="0" y="10.2" width="14" height="1.8" rx=".6"/></svg>', title: 'Justify' },
     { sep: true },
     { cmd: 'removeFormat',  icon: '&#10005;',          title: 'Clear formatting' },
   ];
