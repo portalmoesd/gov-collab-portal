@@ -145,7 +145,7 @@
     .gcp-re-tc-pane { display:none; }
 
     /* ── Content row: body + right margin balloons ── */
-    .gcp-re-content-row { display:flex; overflow-y:auto; min-height:260px; align-items:flex-start; }
+    .gcp-re-content-row { display:flex; overflow-y:auto; min-height:260px; align-items:flex-start; position:relative; }
     .gcp-re-body { flex:1 1 0; min-width:0; min-height:260px; padding:14px 16px; outline:none; font-size:15px; line-height:1.65; color:var(--text,#1f2a37); overflow-y:visible; }
     .gcp-re-body:empty::before { content:attr(data-placeholder); color:var(--muted,#6b7280); pointer-events:none; }
     .gcp-re-body h2 { font-size:1.3em; font-weight:800; margin:.8em 0 .3em; }
@@ -168,6 +168,8 @@
     .gcp-re-balloon--del { border-left:3px solid #dc2626; background:#fff8f8; }
     .gcp-re-balloon--ins { border-left:3px solid var(--tc-bcolor,#1d4ed8); background:#f8faff; }
     .gcp-re-balloon--cmt { border-left:3px solid #f59e0b; background:#fffdf5; }
+    .gcp-re-balloon--tc-group { border-left:3px solid #64748b; background:#f8fafc; }
+    .gcp-re-balloon-change-count { font-size:10px; color:#64748b; margin-top:1px; }
     .gcp-re-balloon-header { display:flex; align-items:center; gap:5px; margin-bottom:4px; }
     .gcp-re-balloon-author { font-weight:800; color:#0f172a; flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
     .gcp-re-balloon-time { color:#94a3b8; white-space:nowrap; flex-shrink:0; }
@@ -185,13 +187,20 @@
     .gcp-re-balloon-del { background:rgba(185,28,28,.10); color:#b91c1c; }
     .gcp-re-balloon-del:hover { background:rgba(185,28,28,.22); }
     /* ── Fullscreen ── */
-    .gcp-re-wrap.gcp-fullscreen { position:fixed; inset:0; z-index:9990; border-radius:0; border:none; width:100vw; height:100dvh; display:flex; flex-direction:column; background:#ffffff !important; }
-    .gcp-re-wrap.gcp-fullscreen .gcp-re-content-row { flex:1 1 0; min-height:0; overflow-y:auto; }
-    .gcp-re-wrap.gcp-fullscreen .gcp-re-body { min-height:0; height:100%; }
+    .gcp-re-wrap.gcp-fullscreen { position:fixed; inset:0; z-index:9990; border-radius:0; border:none; width:100vw; height:100dvh; display:flex; flex-direction:column; background:#f1f5f9 !important; }
+    .gcp-re-wrap.gcp-fullscreen .gcp-re-content-row { flex:1 1 0; min-height:0; overflow-y:auto; padding:0 48px; }
+    .gcp-re-wrap.gcp-fullscreen .gcp-re-body { min-height:0; height:100%; background:#ffffff; box-shadow:0 1px 4px rgba(15,23,42,.08); border-radius:4px; padding:32px 48px; }
+    .gcp-re-fs-titlebar { display:none; align-items:center; gap:10px; padding:10px 56px; background:#ffffff; border-bottom:1px solid #e2e8f0; flex-shrink:0; }
+    .gcp-re-wrap.gcp-fullscreen .gcp-re-fs-titlebar { display:flex; }
+    .gcp-re-fs-title { font-size:14px; font-weight:700; color:#0f172a; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    [data-theme="dark"] .gcp-re-wrap.gcp-fullscreen { background:#161b27 !important; }
+    [data-theme="dark"] .gcp-re-wrap.gcp-fullscreen .gcp-re-body { background:#1e212c; box-shadow:0 1px 4px rgba(0,0,0,.25); }
+    [data-theme="dark"] .gcp-re-wrap.gcp-fullscreen .gcp-re-fs-titlebar { background:#1e212c; border-color:#2d3348; }
+    [data-theme="dark"] .gcp-re-fs-title { color:#f1f5f9; }
     .gcp-re-btn-fullscreen-icon-expand,.gcp-re-btn-fullscreen-icon-compress { pointer-events:none; }
     .gcp-re-wrap:not(.gcp-fullscreen) .gcp-re-btn-fullscreen-icon-compress { display:none; }
     .gcp-re-wrap.gcp-fullscreen .gcp-re-btn-fullscreen-icon-expand { display:none; }
-    [data-theme="dark"] .gcp-re-wrap.gcp-fullscreen { background:#1e212c !important; }
+    /* dark-mode fullscreen handled above */
     /* Right-click context menu */
     .gcp-re-ctx { position:fixed; z-index:9999; background:#fff; border:1px solid #e2e8f0; border-radius:9px; box-shadow:0 4px 20px rgba(15,23,42,.14); padding:4px; min-width:160px; }
     .gcp-re-ctx-item { display:flex; align-items:center; gap:7px; padding:7px 12px; border-radius:6px; font-size:13px; font-weight:600; color:#0f172a; cursor:pointer; white-space:nowrap; transition:background .1s; }
@@ -221,6 +230,16 @@
     }
     [data-theme="dark"] .gcp-re-wrap.tc-visible .gcp-re-body ins[data-tc-id] { background:color-mix(in srgb, var(--tc-color,#1d4ed8) 18%, transparent); }
     [data-theme="dark"] .gcp-re-wrap.tc-visible .gcp-re-body del[data-tc-id] { background:color-mix(in srgb, var(--tc-color,#b91c1c) 18%, transparent); }
+
+    /* ── Format-change markers (bold/italic/colour/etc.) ── */
+    .gcp-re-body [data-tc-fmt-id] { border-radius:2px; }
+    .gcp-re-wrap.tc-visible .gcp-re-body [data-tc-fmt-id] {
+      outline:1.5px dotted var(--tc-color,#7c3aed);
+      background:rgba(124,58,237,.07);
+      border-radius:2px; padding:0 1px; cursor:default;
+    }
+    [data-theme="dark"] .gcp-re-wrap.tc-visible .gcp-re-body [data-tc-fmt-id] { background:rgba(124,58,237,.15); }
+    .gcp-re-balloon-kind.fmt { background:rgba(124,58,237,.12); color:#7c3aed; }
     /* Comment thread (replies inside the same balloon) */
     .gcp-re-cmt-replies { margin-top:6px; padding-top:6px; border-top:1px solid rgba(0,0,0,.08); display:flex; flex-direction:column; gap:5px; }
     .gcp-re-cmt-reply { padding:0; }
@@ -265,7 +284,7 @@
 
   // ── RichEditor factory ─────────────────────────────────────────────────────
 
-  function RichEditor({ container, initialHtml, placeholder, authorName, onCommentsClick, onDeleteComment, onReplyComment }) {
+  function RichEditor({ container, initialHtml, placeholder, authorName, sectionTitle, onCommentsClick, onDeleteComment, onReplyComment }) {
     injectStyle();
 
     const wrap = document.createElement('div');
@@ -286,6 +305,50 @@
     // ── Track Changes state ──────────────────────────────────────────────────
     const tc = { visible: false, authorName: authorName || 'Unknown', counter: 0 };
     function newTcId() { return `tc${Date.now()}${++tc.counter}`; }
+
+    // Inline format commands whose state is boolean (toggle on/off)
+    const FMT_TOGGLE = new Set(['bold','italic','underline','strikeThrough','superscript','subscript']);
+    // Inline format commands whose state is a value string
+    const FMT_VALUE  = new Set(['fontName','fontSize','foreColor','backColor']);
+    const FMT_CMD_LABELS = {
+      bold:'Bold', italic:'Italic', underline:'Underline', strikeThrough:'Strikethrough',
+      superscript:'Superscript', subscript:'Subscript',
+      fontName:'Font', fontSize:'Font size', foreColor:'Colour', backColor:'Highlight',
+    };
+
+    // Wrap the current selection in a <span data-tc-fmt-id> marker, apply the
+    // format command, then record what changed.  Falls back silently for
+    // multi-block selections where surroundContents() would throw.
+    function trackFmtChange(cmd, value) {
+      const sel = window.getSelection();
+      const hasSelection = sel && sel.rangeCount > 0 && !sel.isCollapsed;
+      if (!hasSelection || (!FMT_TOGGLE.has(cmd) && !FMT_VALUE.has(cmd))) {
+        execCmd(cmd, value !== undefined ? value : null);
+        return;
+      }
+      const range = sel.getRangeAt(0).cloneRange();
+      const oldVal = FMT_TOGGLE.has(cmd)
+        ? String(document.queryCommandState(cmd))
+        : (document.queryCommandValue(cmd) || '');
+      execCmd(cmd, value !== undefined ? value : null);
+      try {
+        sel.removeAllRanges(); sel.addRange(range);
+        const id = newTcId();
+        const [color] = TC_PALETTE[authorColorIdx(tc.authorName)];
+        const mark = document.createElement('span');
+        mark.setAttribute('data-tc-fmt-id',  id);
+        mark.setAttribute('data-tc-fmt-cmd', cmd);
+        mark.setAttribute('data-tc-fmt-old', oldVal);
+        if (value !== undefined && value !== null) mark.setAttribute('data-tc-fmt-val', String(value));
+        mark.setAttribute('data-tc-author',   tc.authorName);
+        mark.setAttribute('data-tc-initials', getInitials(tc.authorName));
+        mark.setAttribute('data-tc-time',     new Date().toISOString());
+        mark.style.setProperty('--tc-color',  color);
+        range.surroundContents(mark);
+        sel.removeAllRanges();
+      } catch (_) { /* multi-block or partial-node selection — skip wrapping */ }
+      updateTcBar();
+    }
 
     // ── TC bar (header row) ──────────────────────────────────────────────────
     const tcBar = document.createElement('div');
@@ -347,7 +410,7 @@
     });
     fontFamilySelect.addEventListener('mousedown', saveSelection);
     fontFamilySelect.addEventListener('change', () => {
-      if (fontFamilySelect.value) { restoreSelection(); execCmd('fontName', fontFamilySelect.value); }
+      if (fontFamilySelect.value) { restoreSelection(); trackFmtChange('fontName', fontFamilySelect.value); }
       fontFamilySelect.value = ''; body.focus();
     });
     toolbar.appendChild(fontFamilySelect);
@@ -364,7 +427,7 @@
     });
     fontSizeSelect.addEventListener('mousedown', saveSelection);
     fontSizeSelect.addEventListener('change', () => {
-      if (fontSizeSelect.value) { restoreSelection(); execCmd('fontSize', fontSizeSelect.value); }
+      if (fontSizeSelect.value) { restoreSelection(); trackFmtChange('fontSize', fontSizeSelect.value); }
       fontSizeSelect.value = ''; body.focus();
     });
     toolbar.appendChild(fontSizeSelect);
@@ -385,7 +448,7 @@
     colorInput.addEventListener('mousedown', saveSelection);
     colorInput.addEventListener('change', () => {
       colorBar.style.background = colorInput.value;
-      restoreSelection(); execCmd('foreColor', colorInput.value); body.focus();
+      restoreSelection(); trackFmtChange('foreColor', colorInput.value); body.focus();
     });
     toolbar.appendChild(colorWrap);
 
@@ -408,7 +471,7 @@
       btn.addEventListener('mousedown', e => {
         e.preventDefault();
         if (tool.cmd === 'h2' || tool.cmd === 'h3') handleHeading(tool.cmd);
-        else execCmd(tool.cmd);
+        else trackFmtChange(tool.cmd);
         body.focus(); updateActive();
       });
       toolbar.appendChild(btn);
@@ -504,7 +567,15 @@
     contentRow.appendChild(marginEl);
     contentRow.addEventListener('scroll', positionBalloons);
 
+    const fsTitleBar = document.createElement('div');
+    fsTitleBar.className = 'gcp-re-fs-titlebar';
+    const fsTitleEl = document.createElement('span');
+    fsTitleEl.className = 'gcp-re-fs-title';
+    fsTitleEl.textContent = sectionTitle || '';
+    fsTitleBar.appendChild(fsTitleEl);
+
     wrap.appendChild(toolbar);
+    wrap.appendChild(fsTitleBar);
     wrap.appendChild(tcBar);
     wrap.appendChild(contentRow);
     container.innerHTML = '';
@@ -516,28 +587,35 @@
     function getChangeEntries() {
       const seen = new Set();
       const entries = [];
-      body.querySelectorAll('[data-tc-id]').forEach(el => {
-        const id = el.getAttribute('data-tc-id');
+      body.querySelectorAll('[data-tc-id], [data-tc-fmt-id]').forEach(el => {
+        const isFmt = el.hasAttribute('data-tc-fmt-id');
+        const id = isFmt ? el.getAttribute('data-tc-fmt-id') : el.getAttribute('data-tc-id');
         if (seen.has(id)) return;
         seen.add(id);
         entries.push({
           id,
-          kind:     el.tagName.toLowerCase(),   // 'ins' | 'del'
-          author:   el.getAttribute('data-tc-author')   || 'Unknown',
-          initials: el.getAttribute('data-tc-initials') || '?',
-          time:     el.getAttribute('data-tc-time')     || '',
-          color:    el.style.getPropertyValue('--tc-color') || '#1d4ed8',
-          text:     el.textContent || '',
+          kind:    isFmt ? 'fmt' : el.tagName.toLowerCase(),
+          fmtCmd:  isFmt ? (el.getAttribute('data-tc-fmt-cmd') || '') : '',
+          author:  el.getAttribute('data-tc-author')   || 'Unknown',
+          initials:el.getAttribute('data-tc-initials') || '?',
+          time:    el.getAttribute('data-tc-time')     || '',
+          color:   el.style.getPropertyValue('--tc-color') || '#1d4ed8',
+          text:    el.textContent || '',
         });
       });
       return entries;
     }
 
-    function countChanges()  { return new Set([...body.querySelectorAll('[data-tc-id]')].map(e => e.getAttribute('data-tc-id'))).size; }
+    function countChanges() {
+      const ids = new Set();
+      body.querySelectorAll('[data-tc-id]').forEach(e => ids.add(e.getAttribute('data-tc-id')));
+      body.querySelectorAll('[data-tc-fmt-id]').forEach(e => ids.add(e.getAttribute('data-tc-fmt-id')));
+      return ids.size;
+    }
 
     function getAuthors() {
       const map = new Map();
-      body.querySelectorAll('[data-tc-id]').forEach(el => {
+      body.querySelectorAll('[data-tc-id], [data-tc-fmt-id]').forEach(el => {
         const a = el.getAttribute('data-tc-author') || 'Unknown';
         map.set(a, (map.get(a) || 0) + 1);
       });
@@ -577,7 +655,7 @@
     function updateChangeMarkers() {
       body.querySelectorAll('.gcp-tc-changed').forEach(el => el.classList.remove('gcp-tc-changed'));
       if (!tc.visible) return;
-      body.querySelectorAll('[data-tc-id]').forEach(el => {
+      body.querySelectorAll('[data-tc-id], [data-tc-fmt-id]').forEach(el => {
         let block = el.parentElement;
         while (block && block !== body) {
           const tag = block.tagName.toLowerCase();
@@ -601,25 +679,40 @@
     // Build and position all balloon cards in the margin column
     function positionBalloons() {
       marginEl.innerHTML = '';
+      // Remove previous SVG overlay (lives on contentRow, not marginEl)
+      const oldSvg = contentRow.querySelector('.gcp-re-connectors');
+      if (oldSvg) oldSvg.remove();
+
       const hasCmts = storedComments.length > 0;
       if (!tc.visible && !hasCmts) return;
       requestAnimationFrame(() => {
-        const mRect = marginEl.getBoundingClientRect();
+        const crRect = contentRow.getBoundingClientRect();
+        const mRect  = marginEl.getBoundingClientRect();
+        const scrollTop  = contentRow.scrollTop;
+        const scrollLeft = contentRow.scrollLeft;
         const slots = [];
 
-        // SVG overlay for Word-style dashed connecting lines
-        // (overflow:visible lets lines extend leftward over the body area)
+        // SVG overlay anchored to contentRow's scroll-space so lines span
+        // from body text all the way to the right-margin balloon cards.
         const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
         svg.setAttribute('class', 'gcp-re-connectors');
-        marginEl.appendChild(svg);
+        svg.setAttribute('width',  String(contentRow.scrollWidth));
+        svg.setAttribute('height', String(contentRow.scrollHeight));
+        svg.style.cssText = 'position:absolute;top:0;left:0;pointer-events:none;overflow:visible;';
+        contentRow.appendChild(svg);
+
+        // mRect offsets from the scroll-content origin
+        const mOffLeft = mRect.left - crRect.left + scrollLeft;
+        const mOffTop  = mRect.top  - crRect.top  + scrollTop;
 
         function drawConnector(anchorEl, balloonTop, balloonH, color) {
           if (!anchorEl) return;
           const aRect = anchorEl.getBoundingClientRect();
-          const x1 = aRect.right  - mRect.left;
-          const y1 = aRect.top + aRect.height / 2 - mRect.top;
-          const x2 = 2;
-          const y2 = balloonTop + Math.min(balloonH, 26) / 2;
+          // All coords in contentRow scroll-space
+          const x1 = aRect.right  - crRect.left + scrollLeft;
+          const y1 = aRect.top + aRect.height / 2 - crRect.top + scrollTop;
+          const x2 = mOffLeft + 2;
+          const y2 = mOffTop + balloonTop + Math.min(balloonH, 26) / 2;
           const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
           line.setAttribute('x1', String(x1)); line.setAttribute('y1', String(y1));
           line.setAttribute('x2', String(x2)); line.setAttribute('y2', String(y2));
@@ -630,37 +723,58 @@
           svg.appendChild(line);
         }
 
-        // TC change balloons (only when Changes panel is open)
+        // TC change balloons — grouped by author + 60-second time window (Word-style)
         if (tc.visible) {
+          const groups = [];
           getChangeEntries().forEach(entry => {
-            const anchor = body.querySelector(`[data-tc-id="${CSS.escape(entry.id)}"]`);
+            const t = entry.time ? new Date(entry.time).getTime() : 0;
+            const last = groups[groups.length - 1];
+            if (last && last.author === entry.author && Math.abs(t - last.lastT) < 60000) {
+              last.ids.push(entry.id);
+              last.entries.push(entry);
+              last.lastT = t;
+            } else {
+              groups.push({ author: entry.author, initials: entry.initials, color: entry.color, time: entry.time, ids: [entry.id], entries: [entry], lastT: t });
+            }
+          });
+
+          groups.forEach(group => {
+            const anchor = body.querySelector(`[data-tc-id="${CSS.escape(group.ids[0])}"]`);
             const ideal = anchor ? anchor.getBoundingClientRect().top - mRect.top : 0;
             const top = noOverlap(ideal, slots);
 
             const b = document.createElement('div');
-            const kindClass = entry.kind === 'ins' ? 'ins' : 'del';
-            b.className = `gcp-re-balloon gcp-re-balloon--${kindClass}`;
+            b.className = 'gcp-re-balloon gcp-re-balloon--tc-group';
             b.style.top = top + 'px';
-            const kindLabel = entry.kind === 'ins' ? 'Added' : 'Deleted';
-            const initials = (entry.initials || (entry.author || '?').split(/\s+/).filter(Boolean).slice(0, 2).map(s => s[0] && s[0].toUpperCase()).join('')) || '?';
-            const excerpt = entry.text.length > 42 ? entry.text.slice(0, 42) + '…' : (entry.text || '(empty)');
+            const n = group.ids.length;
+            // Build a readable summary e.g. "2 edits · Bold, Italic"
+            const fmtLabels = group.entries
+              .filter(e => e.kind === 'fmt' && e.fmtCmd)
+              .map(e => FMT_CMD_LABELS[e.fmtCmd] || e.fmtCmd)
+              .filter((v, i, a) => a.indexOf(v) === i); // unique
+            const txtCount = group.entries.filter(e => e.kind !== 'fmt').length;
+            let countLabel = `${n} change${n === 1 ? '' : 's'}`;
+            if (fmtLabels.length > 0 && txtCount === 0)
+              countLabel = `Formatted · ${fmtLabels.join(', ')}`;
+            else if (fmtLabels.length > 0)
+              countLabel = `${n} changes · ${fmtLabels.join(', ')}`;
             b.innerHTML = `
               <div class="gcp-re-balloon-header">
-                <span class="gcp-re-balloon-avatar" style="background:${escHtml(entry.color)}">${escHtml(initials)}</span>
-                <span class="gcp-re-balloon-author">${escHtml(entry.author)}</span>
-                <span class="gcp-re-balloon-time">${escHtml(fmtTime(entry.time))}</span>
+                <span class="gcp-re-balloon-avatar" style="background:${escHtml(group.color)}">${escHtml(group.initials)}</span>
+                <span class="gcp-re-balloon-author">${escHtml(group.author)}</span>
+                <span class="gcp-re-balloon-time">${escHtml(fmtTime(group.time))}</span>
               </div>
-              <div class="gcp-re-balloon-body"><span class="gcp-re-balloon-kind ${kindClass}">${kindLabel}</span>${escHtml(excerpt)}</div>
+              <div class="gcp-re-balloon-change-count">${escHtml(countLabel)}</div>
               <div class="gcp-re-balloon-btns">
-                <button class="gcp-re-balloon-acc" type="button" title="Accept">✓ Accept</button>
-                <button class="gcp-re-balloon-rej" type="button" title="Reject">✗ Reject</button>
+                <button class="gcp-re-balloon-acc" type="button">✓ Accept</button>
+                <button class="gcp-re-balloon-rej" type="button">✗ Reject</button>
               </div>`;
-            b.querySelector('.gcp-re-balloon-acc').addEventListener('click', () => acceptChange(entry.id));
-            b.querySelector('.gcp-re-balloon-rej').addEventListener('click', () => rejectChange(entry.id));
+            b.querySelector('.gcp-re-balloon-acc').addEventListener('click', () => { group.ids.forEach(id => acceptChange(id)); });
+            b.querySelector('.gcp-re-balloon-rej').addEventListener('click', () => { group.ids.forEach(id => rejectChange(id)); });
             marginEl.appendChild(b);
             const h = b.offsetHeight || 72;
             slots.push({ top, h });
-            drawConnector(anchor, top, h, entry.color);
+            drawConnector(anchor, top, h, group.color);
           });
         }
 
@@ -782,9 +896,32 @@
       });
     }
 
+    function _unwrapFmtReject(el) {
+      // Restore the old format state, then unwrap the marker span.
+      const cmd    = el.getAttribute('data-tc-fmt-cmd') || '';
+      const oldVal = el.getAttribute('data-tc-fmt-old') || '';
+      const range  = document.createRange();
+      range.selectNodeContents(el);
+      const sel = window.getSelection();
+      sel.removeAllRanges(); sel.addRange(range);
+      if (FMT_TOGGLE.has(cmd)) {
+        if (String(document.queryCommandState(cmd)) !== oldVal) execCmd(cmd);
+      } else if (FMT_VALUE.has(cmd)) {
+        if (oldVal) execCmd(cmd, oldVal);
+      }
+      sel.removeAllRanges();
+      while (el.firstChild) el.parentNode.insertBefore(el.firstChild, el);
+      el.remove();
+    }
+
     function acceptChange(id) {
       body.querySelectorAll(`del[data-tc-id="${CSS.escape(id)}"]`).forEach(el => el.remove());
       body.querySelectorAll(`ins[data-tc-id="${CSS.escape(id)}"]`).forEach(el => {
+        while (el.firstChild) el.parentNode.insertBefore(el.firstChild, el);
+        el.remove();
+      });
+      // Format change: keep new formatting, just remove the marker span
+      body.querySelectorAll(`[data-tc-fmt-id="${CSS.escape(id)}"]`).forEach(el => {
         while (el.firstChild) el.parentNode.insertBefore(el.firstChild, el);
         el.remove();
       });
@@ -797,12 +934,18 @@
         while (el.firstChild) el.parentNode.insertBefore(el.firstChild, el);
         el.remove();
       });
+      // Format change: restore old format then remove marker span
+      body.querySelectorAll(`[data-tc-fmt-id="${CSS.escape(id)}"]`).forEach(_unwrapFmtReject);
       body.normalize(); updateTcBar();
     }
 
     function acceptAllChanges() {
       body.querySelectorAll('del[data-tc-id]').forEach(el => el.remove());
       body.querySelectorAll('ins[data-tc-id]').forEach(el => {
+        while (el.firstChild) el.parentNode.insertBefore(el.firstChild, el);
+        el.remove();
+      });
+      body.querySelectorAll('[data-tc-fmt-id]').forEach(el => {
         while (el.firstChild) el.parentNode.insertBefore(el.firstChild, el);
         el.remove();
       });
@@ -815,15 +958,23 @@
         while (el.firstChild) el.parentNode.insertBefore(el.firstChild, el);
         el.remove();
       });
+      [...body.querySelectorAll('[data-tc-fmt-id]')].forEach(_unwrapFmtReject);
       body.normalize(); updateTcBar();
     }
 
-    function hasTrackedChanges() { return !!body.querySelector('[data-tc-id]'); }
+    function hasTrackedChanges() {
+      return !!(body.querySelector('[data-tc-id]') || body.querySelector('[data-tc-fmt-id]'));
+    }
 
     function getCleanHtml() {
       const clone = body.cloneNode(true);
       clone.querySelectorAll('del[data-tc-id]').forEach(el => el.remove());
       clone.querySelectorAll('ins[data-tc-id]').forEach(el => {
+        while (el.firstChild) el.parentNode.insertBefore(el.firstChild, el);
+        el.remove();
+      });
+      // Format change markers: unwrap (keep new formatting in clean output)
+      clone.querySelectorAll('[data-tc-fmt-id]').forEach(el => {
         while (el.firstChild) el.parentNode.insertBefore(el.firstChild, el);
         el.remove();
       });
@@ -1113,9 +1264,9 @@
 
     body.addEventListener('keydown', e => {
       if ((e.ctrlKey || e.metaKey) && !e.shiftKey) {
-        if (e.key === 'b') { e.preventDefault(); execCmd('bold');      updateActive(); }
-        if (e.key === 'i') { e.preventDefault(); execCmd('italic');    updateActive(); }
-        if (e.key === 'u') { e.preventDefault(); execCmd('underline'); updateActive(); }
+        if (e.key === 'b') { e.preventDefault(); trackFmtChange('bold');      updateActive(); }
+        if (e.key === 'i') { e.preventDefault(); trackFmtChange('italic');    updateActive(); }
+        if (e.key === 'u') { e.preventDefault(); trackFmtChange('underline'); updateActive(); }
       }
       if (e.key === 'Escape' && fsActive) { e.preventDefault(); toggleFullscreen(false); }
     });

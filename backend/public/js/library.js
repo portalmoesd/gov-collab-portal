@@ -31,22 +31,16 @@
 
   async function loadCountries(){
     const countries = await window.GCP.apiFetch("/countries", { method:"GET" });
-    if (!countrySelect) return;
     countrySelect.innerHTML = `<option value="">Select country</option>` + countries.map(c => `<option value="${c.id}">${window.GCP.escapeHtml(c.name_en)}</option>`).join("");
-    // Auto-select first country to avoid an empty library view.
-    if (countries.length) {
-      countrySelect.value = String(countries[0].id);
-      await loadDocs();
-    }
   }
 
   function fmtDate(s){
     if (!s) return "—";
-    try{ return window.GCP.formatDate(s); }catch{ return String(s); }
+    try{ return new Date(s).toLocaleDateString(); }catch{ return String(s); }
   }
   function fmtDateTime(s){
     if (!s) return "—";
-    try{ return window.GCP.formatDateTime(s); }catch{ return String(s); }
+    try{ return new Date(s).toLocaleString(); }catch{ return String(s); }
   }
 
   async function loadDocs(){
@@ -92,7 +86,7 @@
           <h2 style="margin:0 0 6px;">${window.GCP.escapeHtml(doc.event.title)}</h2>
           <div class="small muted">${window.GCP.escapeHtml(doc.event.countryName)}</div>
         </div>
-        <div class="small muted">Last updated: ${doc.documentStatus?.updatedAt ? window.GCP.escapeHtml(fmtDateTime(doc.documentStatus.updatedAt)) : '—'}</div>
+        <div class="small muted">Last updated: ${doc.documentStatus?.updatedAt ? window.GCP.escapeHtml(new Date(doc.documentStatus.updatedAt).toLocaleString()) : '—'}</div>
       </div>
       <hr style="margin:12px 0; border:none; border-top:1px solid var(--border);" />`);
 
@@ -199,9 +193,7 @@
     }
   }
 
-  if (countrySelect) {
-    countrySelect.addEventListener("change", loadDocs);
-  }
+  countrySelect.addEventListener("change", loadDocs);
 
   try{
     await loadCountries();

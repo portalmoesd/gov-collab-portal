@@ -4,9 +4,7 @@
     const token = localStorage.getItem("gcp_token");
     const headers = Object.assign(
       {"Content-Type":"application/json"},
-      options && options.headers ? options.headers: {
-      'Cache-Control': 'no-store',
-      'Pragma': 'no-cache',}
+      options && options.headers ? options.headers : {}
     );
     if (token) headers["Authorization"] = "Bearer " + token;
 
