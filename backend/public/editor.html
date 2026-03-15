@@ -60,27 +60,16 @@
     </div>
   </div>
 
-  <!-- Editor body: frame + optional comments panel side-by-side -->
+  <!-- Editor body: text area + inline comment bubbles column -->
   <div class="editor-body-row" id="editorBodyRow">
     <div class="editor-body-main">
       <div class="editor-frame" id="editorFrame"></div>
       <div id="filesSection" class="editor-files-list" style="display:none;"></div>
     </div>
-
-    <!-- Comments panel -->
-    <aside class="editor-comments-panel" id="commentsPanel" aria-label="Comments" style="display:none;">
-      <div class="ecp-header">
-        <span class="ecp-title">Comments</span>
-        <button class="ecp-close" id="closePanelBtn" type="button" aria-label="Close comments panel">&#10005;</button>
-      </div>
-      <div class="ecp-list" id="commentsList">
-        <div class="ecp-empty">No comments yet.</div>
-      </div>
-      <div class="ecp-compose">
-        <textarea id="commentInput" class="ecp-input" placeholder="Add a comment…" rows="3"></textarea>
-        <button id="addCommentBtn" class="ecp-submit" type="button">Post</button>
-      </div>
-    </aside>
+    <!-- Comment bubbles column (Word-style right margin) -->
+    <div class="gcp-cmt-col" id="cmtCol">
+      <div class="gcp-cmt-overlay" id="cmtOverlay"></div>
+    </div>
   </div>
 
   <div class="editor-foot">
