@@ -14,11 +14,12 @@
   };
   if (role !== 'collaborator_3'){ location.href = roleHome[role] || 'login.html'; return; }
 
-  const eventSelect        = document.getElementById('eventSelect');
-  const sectionsTbody      = document.getElementById('sectionsTbody');
-  const sectionsCards      = document.getElementById('sectionsCards');
-  const sectionsEmpty      = document.getElementById('sectionsEmpty');
-  const previewFullBtn     = document.getElementById('previewFullBtn');
+  const eventSelect           = document.getElementById('eventSelect');
+  const sectionsTbody         = document.getElementById('sectionsTbody');
+  const sectionsCards         = document.getElementById('sectionsCards');
+  const sectionsEmpty         = document.getElementById('sectionsEmpty');
+  const requiredSectionsPanel = document.getElementById('requiredSectionsPanel');
+  const previewFullBtn        = document.getElementById('previewFullBtn');
   const modalBackdrop      = document.getElementById('modalBackdrop');
   const modalContent       = document.getElementById('modalContent');
   const modalCloseBtn      = document.getElementById('modalCloseBtn');
@@ -319,8 +320,10 @@
       if(sectionsCards) sectionsCards.innerHTML='';
       if(sectionsEmpty) sectionsEmpty.hidden=false;
       if(docStatusBox) docStatusBox.innerHTML='';
+      if(requiredSectionsPanel) requiredSectionsPanel.hidden=true;
       return;
     }
+    if(requiredSectionsPanel) requiredSectionsPanel.hidden=false;
     try{ await refreshStatusGrid(); }
     catch(e){ setMsg(e.message||'Failed to load sections',true); }
   });

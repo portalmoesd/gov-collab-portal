@@ -14,11 +14,12 @@
   };
   if (role !== 'collaborator_1'){ location.href = roleHome[role] || 'login.html'; return; }
 
-  const eventSelect        = document.getElementById('eventSelect');
-  const msg                = document.getElementById('msg');
-  const sectionsTbody      = document.getElementById('sectionsTbody');
-  const sectionsCards      = document.getElementById('sectionsCards');
-  const sectionsEmpty      = document.getElementById('sectionsEmpty');
+  const eventSelect           = document.getElementById('eventSelect');
+  const msg                   = document.getElementById('msg');
+  const sectionsTbody         = document.getElementById('sectionsTbody');
+  const sectionsCards         = document.getElementById('sectionsCards');
+  const sectionsEmpty         = document.getElementById('sectionsEmpty');
+  const requiredSectionsPanel = document.getElementById('requiredSectionsPanel');
 
   let eventMeta = {};
   let currentEventId = null;
@@ -282,8 +283,10 @@
       if(sectionsTbody) sectionsTbody.innerHTML='';
       if(sectionsCards) sectionsCards.innerHTML='';
       if(sectionsEmpty) sectionsEmpty.hidden=false;
+      if(requiredSectionsPanel) requiredSectionsPanel.hidden=true;
       return;
     }
+    if(requiredSectionsPanel) requiredSectionsPanel.hidden=false;
     try{ await refreshStatusGrid(); }
     catch(e){ setMsg(e.message||'Failed to load sections',true); }
   });

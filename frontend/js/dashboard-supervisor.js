@@ -11,6 +11,7 @@
   const sectionsTbody         = document.getElementById('sectionsTbody');
   const sectionsCards         = document.getElementById('sectionsCards');
   const sectionsEmpty         = document.getElementById('sectionsEmpty');
+  const requiredSectionsPanel = document.getElementById('requiredSectionsPanel');
   const submitDocBtn          = document.getElementById('submitDocBtn');
   const approveAllSectionsBtn = document.getElementById('approveAllSectionsBtn');
   const previewFullBtn        = document.getElementById('previewFullBtn');
@@ -308,8 +309,10 @@
       if (sectionsEmpty) sectionsEmpty.hidden = false;
       if (submitDocBtn) submitDocBtn.disabled = true;
       if (docStatusBox) docStatusBox.innerHTML = '';
+      if (requiredSectionsPanel) requiredSectionsPanel.hidden = true;
       return;
     }
+    if (requiredSectionsPanel) requiredSectionsPanel.hidden = false;
 
     // Adjust submit button label based on configured submitter role
     const selectedOpt = eventSelect.options[eventSelect.selectedIndex];

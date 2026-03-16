@@ -17,7 +17,8 @@
     </div>
     
 <div class="grid">
-  <section class="card col-12 supervisor-control-panel chairman-control-panel minister-control-panel" id="ministerControlPanel">
+  <div class="event-required-wrapper col-12">
+  <section class="card supervisor-control-panel chairman-control-panel minister-control-panel" id="ministerControlPanel">
     <div class="supervisor-panel-head">
       <div>
         <div class="supervisor-panel-title">Event</div>
@@ -47,7 +48,7 @@
     <div id="msg" class="small" style="color:var(--danger); font-weight:800; margin-top:10px;"></div>
   </section>
 
-  <section class="card col-12 required-sections-panel chairman-required-sections-panel minister-required-sections-panel">
+  <section class="card required-sections-panel chairman-required-sections-panel minister-required-sections-panel" id="requiredSectionsPanel" hidden>
     <div class="required-sections-head">
       <div>
         <div class="required-sections-title">Required sections</div>
@@ -66,6 +67,7 @@
     <div id="sectionsCards" class="required-sections-cards"></div>
     <div id="sectionsEmpty" class="required-sections-empty" hidden>No required sections yet.</div>
   </section>
+  </div>
 
   <section class="card col-12 upcoming-events-panel">
     <div class="upcoming-events-title">Upcoming events</div>

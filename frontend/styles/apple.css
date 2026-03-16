@@ -3988,3 +3988,21 @@ body.gp-shell-ready .gp-sidebar__scrim{
 .tp-actionbar .micro-action--ask-to-return.is-expanded{
   width:210px;
 }
+
+/* === Event + Required Sections merged wrapper === */
+.event-required-wrapper {
+  display: flex;
+  flex-direction: column;
+}
+/* When required sections is visible, stitch the two cards together visually */
+.event-required-wrapper:has(> .required-sections-panel:not([hidden])) > .card:first-child {
+  border-bottom-left-radius: 0 !important;
+  border-bottom-right-radius: 0 !important;
+  border-bottom-color: transparent;
+  box-shadow: 0 4px 12px rgba(0,0,0,.06);
+}
+.event-required-wrapper > .required-sections-panel:not([hidden]) {
+  border-top-left-radius: 0 !important;
+  border-top-right-radius: 0 !important;
+  border-top: none;
+}
