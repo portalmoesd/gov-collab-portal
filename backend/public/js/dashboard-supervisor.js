@@ -187,10 +187,10 @@
       window.open(`editor.html?event_id=${currentEventId}&section_id=${section.sectionId}`, '_blank');
     }));
 
-    // Supervisor can approve/return at any stage before their approval level
-    const beyondSupervisor = ['approved_by_supervisor','submitted_to_deputy','returned_by_deputy',
-      'approved_by_deputy','submitted_to_minister','returned_by_minister','approved_by_minister','approved','locked'];
-    const canApprove = s && !beyondSupervisor.includes(s);
+    // Supervisor can approve/return at any stage before (and including) their own stage in the chain
+    const afterSupervisorStatuses = ['submitted_to_deputy', 'returned_by_deputy', 'approved_by_deputy', 'approved_by_minister', 'locked', 'approved'];
+    const notStarted = ['draft', 'in_progress', ''];
+    const canApprove = !afterSupervisorStatuses.includes(s) && !notStarted.includes(s);
 
     if (canApprove){
       wrap.appendChild(createMicroAction('Approve', 'approve', async () => {
@@ -225,6 +225,7 @@
         <div class="required-section-name">${esc(s.sectionLabel)}</div>
         <div class="required-section-meta">${esc(last || '—')} · ${esc(updatedBy)}</div>
         ${note ? `<div class="required-section-note"><b>Comment:</b> ${esc(note)}</div>` : ''}
+        ${s.returnRequest ? `<div class="section-return-request-notice"><strong>Return requested</strong> by ${esc(s.returnRequest.from)}: ${esc(s.returnRequest.note || '(no comment)')}</div>` : ''}
       </td>
       <td class="required-progress-cell"><div class="lower-progress-inline">${progressHtml}</div><div class="section-history-toggle-mount"></div></td>
       <td class="required-actions-cell"></td>
