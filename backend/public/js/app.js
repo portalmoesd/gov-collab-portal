@@ -374,13 +374,13 @@
     if (['submitted_to_collaborator', 'returned_by_collaborator', 'approved_by_collaborator_3'].includes(s)) return 3;
     if (['submitted_to_super_collaborator', 'returned_by_super_collaborator', 'approved_by_collaborator'].includes(s)) return 4;
     if (full) {
-      if (['approved_by_super_collaborator', 'submitted_to_supervisor', 'returned_by_supervisor', 'approved_by_supervisor'].includes(s)) return 5;
-      if (['submitted_to_chairman', 'returned_by_chairman', 'approved_by_chairman', 'submitted_to_minister', 'approved_by_minister'].includes(s)) return 6;
-      if (['approved', 'locked'].includes(s)) return 7;
+      if (['approved_by_super_collaborator', 'submitted_to_supervisor', 'returned_by_supervisor'].includes(s)) return 5;
+      if (['approved_by_supervisor', 'submitted_to_chairman', 'returned_by_chairman'].includes(s)) return 6;
+      if (['approved_by_chairman', 'submitted_to_minister', 'returned_by_minister', 'approved_by_minister', 'approved', 'locked'].includes(s)) return 7;
     } else {
       if (['approved_by_super_collaborator', 'submitted_to_supervisor', 'returned_by_supervisor',
-           'approved_by_supervisor', 'submitted_to_chairman', 'approved_by_chairman',
-           'submitted_to_minister', 'approved_by_minister', 'approved', 'locked'].includes(s)) return lastIdx;
+           'approved_by_supervisor', 'submitted_to_chairman', 'returned_by_chairman', 'approved_by_chairman',
+           'submitted_to_minister', 'returned_by_minister', 'approved_by_minister', 'approved', 'locked'].includes(s)) return lastIdx;
     }
     return 0;
   }
@@ -462,14 +462,14 @@
     const r = dsr === 'chairman' ? 'deputy' : dsr;
     // Supervisor step (index 0)
     if (['approved_by_super_collaborator', 'submitted_to_supervisor',
-         'returned_by_supervisor', 'approved_by_supervisor'].includes(s)) return 0;
+         'returned_by_supervisor'].includes(s)) return 0;
     if (r === 'supervisor') return 1; // Approved
     // Deputy step (index 1 for deputy/minister)
-    if (['submitted_to_chairman', 'returned_by_chairman', 'approved_by_chairman'].includes(s)) return 1;
+    if (['approved_by_supervisor', 'submitted_to_chairman', 'returned_by_chairman'].includes(s)) return 1;
     if (r === 'deputy') return 2; // Approved
     // Minister step (index 2 for minister)
-    if (['submitted_to_minister', 'approved_by_minister'].includes(s)) return 2;
-    return 3; // Approved
+    if (['approved_by_chairman', 'submitted_to_minister', 'returned_by_minister'].includes(s)) return 2;
+    return 3; // Approved (approved_by_minister reaches here)
   }
 
   window.GCP.collabSimpleStepIndex = function(status, lsr, returnTargetRole, documentSubmitterRole) {
@@ -592,9 +592,13 @@
     // for statuses that collabSimpleStepIndex would still show at Collaborator.
     const _s = String(status || '').toLowerCase();
     const _superIdx = skipCurator ? 3 : 4;
+    const _simpleIdx = window.GCP.collabSimpleStepIndex(status, lsr, returnTargetRole, documentSubmitterRole);
+    // collabSimpleStepIndex uses lowerStepCount equal to the simple bar's lower step count (3 or 4),
+    // but the upper-tier bar has one extra explicit lower step (Super-Collaborator), so any index
+    // at or above _superIdx is off by 1 — correct by adding 1.
     const activeAbs = (['submitted_to_super_collaborator', 'approved_by_collaborator'].includes(_s))
       ? _superIdx
-      : window.GCP.collabSimpleStepIndex(status, lsr, returnTargetRole, documentSubmitterRole);
+      : (_simpleIdx >= _superIdx ? _simpleIdx + 1 : _simpleIdx);
     const active = Math.max(0, activeAbs - startStep);
     const fillPercent = visibleSteps.length > 1 ? (active / (visibleSteps.length - 1)) * 100 : 100;
     const stepHtml = visibleSteps.map((step, idx) => {

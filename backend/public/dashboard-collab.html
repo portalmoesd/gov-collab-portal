@@ -4,8 +4,8 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>GOV COLLAB PORTAL • Collaborator I Dashboard</title>
-  <link rel="stylesheet" href="styles.css?v=20260316b" />
-  <link rel="stylesheet" href="styles/apple.css?v=20260316b" />
+  <link rel="stylesheet" href="styles.css?v=20260316a" />
+  <link rel="stylesheet" href="styles/apple.css?v=20260316a" />
 </head>
 <body>
 
@@ -17,7 +17,8 @@
     </div>
     
 <div class="grid">
-  <section class="card col-12" id="openEditorSection">
+  <div class="event-required-wrapper col-12">
+  <section class="card" id="openEditorSection">
     <div class="row">
       <div class="field">
         <label>Event</label>
@@ -27,7 +28,7 @@
     <div id="msg" class="small" style="color:var(--danger); font-weight:800; margin-top:10px;"></div>
   </section>
 
-  <section class="card col-12 required-sections-panel" id="requiredSectionsPanel">
+  <section class="card required-sections-panel" id="requiredSectionsPanel" hidden>
     <div class="required-sections-head">
       <div>
         <div class="required-sections-title">Required sections</div>
@@ -43,6 +44,7 @@
     <div id="sectionsCards" class="required-sections-cards"></div>
     <div id="sectionsEmpty" class="required-sections-empty" hidden>Select an event to see your sections.</div>
   </section>
+  </div>
 
   <section class="card col-12">
     <div style="font-weight:900; margin-bottom:10px;">Upcoming events</div>
@@ -55,11 +57,11 @@
 
   </main>
 </div>
-  <script src="js/config.js?v=20260316b"></script>
-  <script src="js/api.js?v=20260316b"></script>
-  <script src="js/app.js?v=20260316b"></script>
-  <script src="js/dashboard-collab.js?v=20260316b"></script>
-  <script src="js/dashboard-collab-upcoming.js?v=20260316b"></script>
-  <script src="js/calendar-collab.js?v=20260316b"></script>
+  <script src="js/config.js?v=20260316a"></script>
+  <script src="js/api.js?v=20260316a"></script>
+  <script src="js/app.js?v=20260316a"></script>
+  <script src="js/dashboard-collab.js?v=20260316a"></script>
+  <script src="js/dashboard-collab-upcoming.js?v=20260316a"></script>
+  <script src="js/calendar-collab.js?v=20260316a"></script>
 </body>
 </html>
