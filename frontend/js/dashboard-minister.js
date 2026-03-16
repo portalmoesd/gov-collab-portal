@@ -5,11 +5,12 @@
 
   const role = String(me.role || '').toLowerCase();
 
-  const eventSelect = document.getElementById('eventSelect');
-  const docStatusBox = document.getElementById('docStatusBox');
-  const sectionsTbody = document.getElementById('sectionsTbody');
-  const sectionsCards = document.getElementById('sectionsCards');
-  const sectionsEmpty = document.getElementById('sectionsEmpty');
+  const eventSelect           = document.getElementById('eventSelect');
+  const docStatusBox          = document.getElementById('docStatusBox');
+  const sectionsTbody         = document.getElementById('sectionsTbody');
+  const sectionsCards         = document.getElementById('sectionsCards');
+  const sectionsEmpty         = document.getElementById('sectionsEmpty');
+  const requiredSectionsPanel = document.getElementById('requiredSectionsPanel');
   const approveAllSectionsBtn = document.getElementById('approveAllSectionsBtn');
   const approveDocBtn = document.getElementById('approveDocBtn');
   const returnDocBtn = document.getElementById('returnDocBtn');
@@ -309,8 +310,10 @@
       if (approveAllSectionsBtn) approveAllSectionsBtn.disabled = true;
       if (sectionsEmpty) sectionsEmpty.hidden = false;
       sectionsTbody.innerHTML = `<tr class="required-sections-empty-row"><td colspan="5">Choose an event to review required sections.</td></tr>`;
+      if (requiredSectionsPanel) requiredSectionsPanel.hidden = true;
       return;
     }
+    if (requiredSectionsPanel) requiredSectionsPanel.hidden = false;
     currentEventId = evId;
 
     const ds = await window.GCP.apiFetch(`/tp/document-status?event_id=${encodeURIComponent(currentEventId)}`, { method:'GET' });

@@ -592,9 +592,13 @@
     // for statuses that collabSimpleStepIndex would still show at Collaborator.
     const _s = String(status || '').toLowerCase();
     const _superIdx = skipCurator ? 3 : 4;
+    const _simpleIdx = window.GCP.collabSimpleStepIndex(status, lsr, returnTargetRole, documentSubmitterRole);
+    // collabSimpleStepIndex uses lowerStepCount equal to the simple bar's lower step count (3 or 4),
+    // but the upper-tier bar has one extra explicit lower step (Super-Collaborator), so any index
+    // at or above _superIdx is off by 1 — correct by adding 1.
     const activeAbs = (['submitted_to_super_collaborator', 'approved_by_collaborator'].includes(_s))
       ? _superIdx
-      : window.GCP.collabSimpleStepIndex(status, lsr, returnTargetRole, documentSubmitterRole);
+      : (_simpleIdx >= _superIdx ? _simpleIdx + 1 : _simpleIdx);
     const active = Math.max(0, activeAbs - startStep);
     const fillPercent = visibleSteps.length > 1 ? (active / (visibleSteps.length - 1)) * 100 : 100;
     const stepHtml = visibleSteps.map((step, idx) => {

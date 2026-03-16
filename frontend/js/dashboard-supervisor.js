@@ -11,6 +11,7 @@
   const sectionsTbody         = document.getElementById('sectionsTbody');
   const sectionsCards         = document.getElementById('sectionsCards');
   const sectionsEmpty         = document.getElementById('sectionsEmpty');
+  const requiredSectionsPanel = document.getElementById('requiredSectionsPanel');
   const submitDocBtn          = document.getElementById('submitDocBtn');
   const approveAllSectionsBtn = document.getElementById('approveAllSectionsBtn');
   const previewFullBtn        = document.getElementById('previewFullBtn');
@@ -186,8 +187,8 @@
       window.open(`editor.html?event_id=${currentEventId}&section_id=${section.sectionId}`, '_blank');
     }));
 
-    // Supervisor can approve/return any section not yet finalized
-    const canApprove = !['approved_by_chairman', 'approved_by_minister', 'approved', 'locked'].includes(s);
+    // Supervisor can approve/return when it's their turn: section reached supervisor stage
+    const canApprove = ['approved_by_super_collaborator', 'submitted_to_supervisor', 'returned_by_supervisor'].includes(s);
 
     if (canApprove){
       wrap.appendChild(createMicroAction('Approve', 'approve', async () => {
@@ -308,8 +309,10 @@
       if (sectionsEmpty) sectionsEmpty.hidden = false;
       if (submitDocBtn) submitDocBtn.disabled = true;
       if (docStatusBox) docStatusBox.innerHTML = '';
+      if (requiredSectionsPanel) requiredSectionsPanel.hidden = true;
       return;
     }
+    if (requiredSectionsPanel) requiredSectionsPanel.hidden = false;
 
     // Adjust submit button label based on configured submitter role
     const selectedOpt = eventSelect.options[eventSelect.selectedIndex];
