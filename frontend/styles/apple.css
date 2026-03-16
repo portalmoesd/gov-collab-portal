@@ -1913,12 +1913,6 @@ body.gp-shell-ready .gp-sidebar__scrim{
 #openEditorSection .field input{
   width:100%;
 }
-#openEditorSection .row > div:last-child{
-  flex:0 0 auto;
-}
-#openEditorSection #openEditorBtn{
-  min-width:140px;
-}
 #openEditorSection .statusbox{
   margin-top:14px;
 }
@@ -1964,10 +1958,6 @@ body.gp-shell-ready .gp-sidebar__scrim{
   #openEditorSection .field{
     width:100%;
     flex:1 1 auto;
-  }
-  #openEditorSection .row > div:last-child,
-  #openEditorSection #openEditorBtn{
-    width:100%;
   }
   .statusbox{
     padding: 14px 14px 12px;
