@@ -420,6 +420,7 @@ textarea{min-height:120px; resize:vertical}
 }
 .lower-progress-inline .wf-step__label {
   font-size: 10px;
+  word-break: normal;
 }
 .lower-progress-inline .wf-step__circle {
   width: 20px;
