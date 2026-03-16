@@ -52,6 +52,9 @@
       card.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' '){ e.preventDefault(); selectEvent(ev); } });
       mount.appendChild(card);
     }
+    if (!(events || []).length) {
+      mount.innerHTML = '<div class="muted">No upcoming events.</div>';
+    }
   }catch(e){
     mount.innerHTML = '<div class="muted">Failed to load upcoming events.</div>';
   }

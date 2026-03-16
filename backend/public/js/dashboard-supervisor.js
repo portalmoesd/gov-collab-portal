@@ -11,6 +11,7 @@
   const sectionsTbody         = document.getElementById('sectionsTbody');
   const sectionsCards         = document.getElementById('sectionsCards');
   const sectionsEmpty         = document.getElementById('sectionsEmpty');
+  const requiredSectionsPanel = document.getElementById('requiredSectionsPanel');
   const submitDocBtn          = document.getElementById('submitDocBtn');
   const approveAllSectionsBtn = document.getElementById('approveAllSectionsBtn');
   const previewFullBtn        = document.getElementById('previewFullBtn');
@@ -186,11 +187,8 @@
       window.open(`editor.html?event_id=${currentEventId}&section_id=${section.sectionId}`, '_blank');
     }));
 
-    // Approve/Return — supervisor can act on sections at or ready for their level
-    const isAtMe = [
-      'submitted_to_supervisor', 'returned_by_supervisor', 'approved_by_super_collaborator',
-    ].includes(s) || rtr === 'supervisor';
-    const canApprove = isAtMe;
+    // Supervisor can approve/return when it's their turn: section reached supervisor stage
+    const canApprove = ['approved_by_super_collaborator', 'submitted_to_supervisor', 'returned_by_supervisor'].includes(s);
 
     if (canApprove){
       wrap.appendChild(createMicroAction('Approve', 'approve', async () => {
@@ -208,18 +206,6 @@
           await window.GCP.apiFetch('/tp/return', { method: 'POST', body: JSON.stringify({ eventId: currentEventId, sectionId: section.sectionId, note }) });
           setMsg('Section returned.'); await refreshStatusGrid();
         }catch(e){ setMsg(e.message || 'Return failed', true); }
-      }));
-    }
-
-    // Ask to Return — for sections above supervisor level (at deputy / minister)
-    if (!canApprove){
-      wrap.appendChild(createMicroAction('Ask to Return', 'ask-to-return', async (e) => {
-        const note = await window.GCP.showCommentDropdown(e.currentTarget, { title: 'Ask to Return', placeholder: 'Why do you need it back? (optional)…', sendLabel: 'Send Request' });
-        if (note === null) return;
-        try{
-          await window.GCP.apiFetch('/tp/ask-to-return', { method: 'POST', body: JSON.stringify({ eventId: currentEventId, sectionId: section.sectionId, note }) });
-          setMsg('Return request sent.');
-        }catch(e){ setMsg(e.message || 'Request failed', true); }
       }));
     }
 
@@ -323,8 +309,10 @@
       if (sectionsEmpty) sectionsEmpty.hidden = false;
       if (submitDocBtn) submitDocBtn.disabled = true;
       if (docStatusBox) docStatusBox.innerHTML = '';
+      if (requiredSectionsPanel) requiredSectionsPanel.hidden = true;
       return;
     }
+    if (requiredSectionsPanel) requiredSectionsPanel.hidden = false;
 
     // Adjust submit button label based on configured submitter role
     const selectedOpt = eventSelect.options[eventSelect.selectedIndex];
