@@ -186,11 +186,13 @@
       window.open(`editor.html?event_id=${currentEventId}&section_id=${section.sectionId}`, '_blank');
     }));
 
-    // Approve/Return — supervisor can act on sections at or ready for their level
-    const isAtMe = [
-      'submitted_to_supervisor', 'returned_by_supervisor', 'approved_by_super_collaborator',
-    ].includes(s) || rtr === 'supervisor';
-    const canApprove = isAtMe;
+    // Supervisor can approve/return any section not yet approved at supervisor level or beyond
+    const beyondSupervisor = [
+      'approved_by_supervisor', 'submitted_to_chairman', 'returned_by_chairman',
+      'approved_by_chairman', 'submitted_to_minister', 'returned_by_minister',
+      'approved_by_minister', 'approved', 'locked',
+    ];
+    const canApprove = !beyondSupervisor.includes(s);
 
     if (canApprove){
       wrap.appendChild(createMicroAction('Approve', 'approve', async () => {

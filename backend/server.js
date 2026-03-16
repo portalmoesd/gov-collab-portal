@@ -1983,7 +1983,16 @@ app.post('/api/tp/return', requireRole('collaborator_2','collaborator_3','collab
     [eventId, countryId, sectionId]
   );
   const isReturnTarget = retTargetRow?.return_target_role === roleKey;
-  if (allowedStatuses.length && !allowedStatuses.includes(currentStatus) && !isReturnTarget) {
+  // Upper-tier roles can return sections at any stage before their approval level
+  const upperTierBeyond = {
+    supervisor: ['approved_by_supervisor','submitted_to_chairman','returned_by_chairman',
+      'approved_by_chairman','submitted_to_minister','returned_by_minister','approved_by_minister','approved','locked'],
+    chairman:   ['approved_by_chairman','submitted_to_minister','returned_by_minister',
+      'approved_by_minister','approved','locked'],
+    minister:   ['approved_by_minister','approved','locked'],
+  };
+  const upperTierPreReturn = upperTierBeyond[roleKey] && !upperTierBeyond[roleKey].includes(currentStatus);
+  if (!upperTierPreReturn && allowedStatuses.length && !allowedStatuses.includes(currentStatus) && !isReturnTarget) {
     return res.status(400).json({ error: 'Section is not at your review stage' });
   }
 
@@ -2042,11 +2051,19 @@ app.post('/api/tp/approve-section', requireRole('super_collaborator','supervisor
   const allowedStatuses = decisionStatusesForRole(roleKey);
   // super_collaborator can act as lowest: approve sections at draft state
   const canActAsLowest = roleKey === 'super_collaborator' && currentStatus === 'draft';
-  if (allowedStatuses.length && !allowedStatuses.includes(currentStatus) && !canActAsLowest) {
+  // Supervisor can approve sections at any stage before their approval level
+  const supervisorPreApproval = roleKey === 'supervisor' && !['approved_by_supervisor',
+    'submitted_to_chairman','returned_by_chairman','approved_by_chairman',
+    'submitted_to_minister','returned_by_minister','approved_by_minister','approved','locked',
+  ].includes(currentStatus);
+  if (!supervisorPreApproval && allowedStatuses.length && !allowedStatuses.includes(currentStatus) && !canActAsLowest) {
     return res.status(400).json({ error: 'Section is not at your review stage' });
   }
 
-  if (canActAsLowest) {
+  // Set original_submitter_role when acting outside the normal pipeline entry point
+  const setOriginalRole = canActAsLowest ||
+    (supervisorPreApproval && !contentRowApp?.original_submitter_role);
+  if (setOriginalRole) {
     // Acting as lowest: set original_submitter_role
     await pool.query(
       `UPDATE tp_content
