@@ -340,14 +340,7 @@
       const submitterRole = (ds.submitterRole || ev?.submitter_role || 'deputy');
       const task = ((ev?.task ?? ev?.occasion) || '').trim();
       if (docStatusBox){
-        docStatusBox.innerHTML = `
-          <div style="display:flex; align-items:baseline; justify-content:space-between; gap:12px; flex-wrap:wrap;">
-            <div><b>Status:</b> ${esc(humanStatus(ds.status) || '')}</div>
-            ${last ? `<div class="muted">${esc(last)}</div>` : ''}
-          </div>
-          <div class="supervisor-progress-wrap">${window.GCP.renderWorkflowProgress(ds.status, submitterRole)}</div>
-          ${task ? `<div style="margin-top:10px;"><b>Task:</b> ${esc(task)}</div>` : ''}
-        `;
+        docStatusBox.innerHTML = '';
       }
     }catch(e){
       setMsg(e.message || 'Failed to load sections', true);
