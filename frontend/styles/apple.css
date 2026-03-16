@@ -3770,6 +3770,10 @@ body.gp-shell-ready .gp-sidebar__scrim{
 /* Required sections: 3-column redesign (Collab I & II) */
 .required-progress-cell { vertical-align: middle; padding: 12px 14px; }
 .lower-progress-inline { max-width: 100%; overflow: hidden; }
+.lower-progress-inline .wf-step__circle { width: 26px; height: 26px; font-size: 13px; }
+.lower-progress-inline .wf-step__label { font-size: 11px; margin-top: 6px; }
+.lower-progress-inline .wf-step__sublabel { font-size: 9px; }
+.lower-progress-inline .wf-progress__track { margin-top: 12px; }
 .required-section-card__head { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
 .required-section-card__head .required-section-meta { margin-top: 0; }
 
