@@ -16,7 +16,7 @@
       submitted: 'Submitted',
       returned: 'Returned',
       approved_by_supervisor: 'Approved (Supervisor)',
-      approved_by_chairman: 'Approved (Deputy)'
+      approved_by_deputy: 'Approved (Deputy)'
     };
     return map[s] || (s || '');
   }

@@ -49,8 +49,8 @@ function formatTbilisiDate(value) {
       { href: "library.html", label: "Library" },
       { href: "statistics.html", label: "Statistics" },
     ],
-    chairman: [ // displayed as Deputy
-      { href: "dashboard-chairman.html", label: "Dashboard" },
+    deputy: [ // displayed as Deputy
+      { href: "dashboard-deputy.html", label: "Dashboard" },
       { href: "calendar.html", label: "Calendar" },
       { href: "library.html", label: "Library" },
       { href: "statistics.html", label: "Statistics" },
@@ -94,7 +94,7 @@ function formatTbilisiDate(value) {
   function roleToTitle(r){
     const map = {
       admin:"Admin",
-      chairman:"Deputy",
+      deputy:"Deputy",
       minister:"Minister",
       supervisor:"Supervisor",
       protocol:"Protocol",

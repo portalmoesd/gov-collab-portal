@@ -61,7 +61,7 @@
         if (newFull === null) return;
         const newEmail = prompt("Email:", u.email || "");
         if (newEmail === null) return;
-        const newRole = prompt("Role (admin/minister/chairman/supervisor/protocol/super_collaborator/collaborator/collaborator_3/collaborator_2/collaborator_1/viewer):", u.role);
+        const newRole = prompt("Role (admin/minister/deputy/supervisor/protocol/super_collaborator/collaborator/collaborator_3/collaborator_2/collaborator_1/viewer):", u.role);
         if (newRole === null) return;
         const pw = prompt("New password (leave blank to keep):", "");
         try{

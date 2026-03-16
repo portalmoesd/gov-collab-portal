@@ -4,8 +4,8 @@
   if (!me) return;
 
   const role = String(me.role).toLowerCase();
-  const canManage = ['admin','chairman','supervisor','protocol','super_collaborator'].includes(role);
-  const canEnd = ['admin','chairman','supervisor','protocol'].includes(role);
+  const canManage = ['admin','deputy','supervisor','protocol','super_collaborator'].includes(role);
+  const canEnd = ['admin','deputy','supervisor','protocol'].includes(role);
 
   const msg = document.getElementById("msg");
   const eventsTbody = document.getElementById("eventsTbody");
@@ -52,7 +52,7 @@
   }
 
   function submitterLabel(role){
-    const key = String(role || 'chairman').toLowerCase();
+    const key = String(role || 'deputy').toLowerCase();
     if (key === 'supervisor') return 'Supervisor';
     if (key === 'super_collaborator') return 'Super-collaborator';
     if (key === 'minister') return 'Minister';
@@ -67,9 +67,9 @@
       in_progress: ['in_review','In review','is-review'],
       submitted_to_supervisor: ['in_review','In review','is-review'],
       approved_by_supervisor: ['in_review','In review','is-review'],
-      submitted_to_chairman: ['submitted_to_deputy','Submitted to Deputy','is-submitted'],
       submitted_to_deputy: ['submitted_to_deputy','Submitted to Deputy','is-submitted'],
-      approved_by_chairman: ['submitted_to_deputy','Submitted to Deputy','is-submitted'],
+      submitted_to_deputy: ['submitted_to_deputy','Submitted to Deputy','is-submitted'],
+      approved_by_deputy: ['submitted_to_deputy','Submitted to Deputy','is-submitted'],
       submitted_to_minister: ['submitted_to_minister','Submitted to Minister','is-submitted'],
       approved_by_minister: ['submitted_to_minister','Submitted to Minister','is-submitted'],
       returned: ['returned','Returned','is-returned'],
@@ -123,7 +123,7 @@
     titleInput.value = details.title || "";
     occasionInput.value = details.occasion || "";
     deadlineInput.value = formatDate(details.deadline_date);
-    if (submitterSelect) submitterSelect.value = String(details.submitterRole || details.submitter_role || "chairman");
+    if (submitterSelect) submitterSelect.value = String(details.submitterRole || details.submitter_role || "deputy");
     if (lowerSubmitterSelect) lowerSubmitterSelect.value = String(details.lowerSubmitterRole || details.lower_submitter_role || "collaborator_2");
     const req = (details.required_sections || details.requiredSections || []);
     const reqIds = new Set((Array.isArray(req) ? req : []).map(s => String(s.id)));
@@ -249,7 +249,7 @@
   function resetForm(){
     editEventId = null;
     form.reset();
-    if (submitterSelect) submitterSelect.value = "chairman";
+    if (submitterSelect) submitterSelect.value = "deputy";
     if (lowerSubmitterSelect) lowerSubmitterSelect.value = "collaborator_2";
     saveBtn.textContent = "Create event";
     msg.style.color = "var(--danger)";
@@ -272,7 +272,7 @@
     const title = (titleInput.value || "").trim();
     const occasion = (occasionInput.value || "").trim();
     const deadlineDate = (deadlineInput.value || "").trim();
-    const submitterRole = submitterSelect ? String(submitterSelect.value || "chairman") : "chairman";
+    const submitterRole = submitterSelect ? String(submitterSelect.value || "deputy") : "deputy";
     const lowerSubmitterRole = lowerSubmitterSelect ? String(lowerSubmitterSelect.value || "collaborator_2") : "collaborator_2";
     const requiredSectionIds = Array.from(requiredBox.querySelectorAll('input[type=checkbox]:checked')).map(cb => Number(cb.value)).filter(Number.isFinite);
 

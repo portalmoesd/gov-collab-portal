@@ -99,9 +99,9 @@
       submitted_to_supervisor: 'Submitted to Supervisor',
       returned_by_supervisor: 'Returned by Supervisor',
       approved_by_supervisor: 'Approved by Supervisor',
-      submitted_to_chairman: 'Submitted to Deputy',
-      returned_by_chairman: 'Returned by Deputy',
-      approved_by_chairman: 'Approved by Deputy',
+      submitted_to_deputy: 'Submitted to Deputy',
+      returned_by_deputy: 'Returned by Deputy',
+      approved_by_deputy: 'Approved by Deputy',
       submitted_to_minister: 'Submitted to Minister',
       returned_by_minister: 'Returned by Minister',
       approved_by_minister: 'Approved by Minister',
@@ -149,7 +149,7 @@
       'submitted_to_collaborator_2','returned_by_collaborator_2','approved_by_collaborator_2',
       'submitted_to_collaborator_3','returned_by_collaborator_3',
     ].includes(s) || rtr === 'super_collaborator' || s === 'draft';
-    return true; // supervisor / chairman / minister / admin always active
+    return true; // supervisor / deputy / minister / admin always active
   }
 
   function applyButtonRules(tp){
@@ -196,7 +196,7 @@
       if (btnSave)    btnSave.style.display    = "";
       if (btnApprove) btnApprove.style.display = "";
       if (btnReturn)  btnReturn.style.display  = "";
-    } else if (['supervisor','chairman','minister','admin'].includes(role)) {
+    } else if (['supervisor','deputy','minister','admin'].includes(role)) {
       if (btnSave)    btnSave.style.display    = "";
       if (btnApprove) btnApprove.style.display = "";
       if (btnReturn)  btnReturn.style.display  = "";
@@ -314,7 +314,7 @@
         submitted_to_collaborator: "Submitted to Collaborator.",
         submitted_to_super_collaborator: "Submitted to Super-collaborator.",
         submitted_to_supervisor: "Submitted to Supervisor.",
-        submitted_to_chairman: "Submitted to Deputy.",
+        submitted_to_deputy: "Submitted to Deputy.",
         submitted_to_minister: "Submitted to Minister.",
       };
       showMsg(submitMsgMap[String(tp.status || '').toLowerCase()] || "Submitted.");
@@ -328,8 +328,8 @@
   if (btnApprove) btnApprove.addEventListener("click", async () => {
     setActionLoading(btnApprove, true);
     try{
-      if (role === "chairman" || role === "minister"){
-        await window.GCP.apiFetch("/tp/approve-section-chairman", {
+      if (role === "deputy" || role === "minister"){
+        await window.GCP.apiFetch("/tp/approve-section-deputy", {
           method:"POST",
           body: JSON.stringify({ eventId, sectionId })
         });

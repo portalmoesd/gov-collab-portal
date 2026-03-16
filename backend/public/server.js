@@ -79,7 +79,7 @@ async function ensureSchema() {
   await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS department TEXT`);
   await pool.query(`ALTER TABLE events ADD COLUMN IF NOT EXISTS ended_at TIMESTAMP`);
   await pool.query(`ALTER TABLE events ADD COLUMN IF NOT EXISTS ended_by_user_id INTEGER`);
-  await pool.query(`ALTER TABLE events ADD COLUMN IF NOT EXISTS submitter_role TEXT NOT NULL DEFAULT 'chairman'`).catch(()=>{});
+  await pool.query(`ALTER TABLE events ADD COLUMN IF NOT EXISTS submitter_role TEXT NOT NULL DEFAULT 'deputy'`).catch(()=>{});
 
   // Ensure enum value exists for minister approvals (legacy DBs)
   await pool.query(`ALTER TYPE tp_section_status ADD VALUE IF NOT EXISTS 'approved_by_minister'`).catch(async ()=>{
@@ -102,7 +102,7 @@ async function ensureSchema() {
 
   // Document status: avoid enum mismatch and keep audit columns consistent
   await pool.query(`ALTER TABLE document_status ADD COLUMN IF NOT EXISTS last_updated_by_user_id INTEGER`).catch(()=>{});
-  await pool.query(`ALTER TABLE document_status ADD COLUMN IF NOT EXISTS chairman_comment TEXT`).catch(()=>{});
+  await pool.query(`ALTER TABLE document_status ADD COLUMN IF NOT EXISTS deputy_comment TEXT`).catch(()=>{});
   await pool.query(`ALTER TABLE document_status ALTER COLUMN status TYPE TEXT USING status::text`).catch(()=>{});
 }
 
@@ -110,7 +110,7 @@ async function ensureRolesExist() {
   const roles = [
     ['admin','Admin'],
     ['minister','Minister'],
-    ['chairman','Deputy'],
+    ['deputy','Deputy'],
     ['supervisor','Supervisor'],
     ['protocol','Protocol'],
     ['super_collaborator','Super-collaborator'],
@@ -280,7 +280,7 @@ function returnSectionStatus(roleKey) {
 function approveSectionStatus(roleKey) {
   const rk = normalizeRoleKey(roleKey);
   if (rk === 'supervisor') return 'approved_by_supervisor';
-  if (rk === 'chairman') return 'approved_by_chairman';
+  if (rk === 'deputy') return 'approved_by_deputy';
   if (rk === 'minister') return 'approved_by_minister';
   return null;
 }
@@ -289,12 +289,12 @@ function decisionStatusesForRole(roleKey) {
   const rk = normalizeRoleKey(roleKey);
   if (rk === 'collaborator_2') return ['submitted_to_collaborator_2', 'returned_by_collaborator_2'];
   if (rk === 'supervisor') return ['submitted_to_supervisor', 'returned_by_supervisor'];
-  if (rk === 'chairman') return ['submitted_to_chairman', 'returned_by_chairman'];
+  if (rk === 'deputy') return ['submitted_to_deputy', 'returned_by_deputy'];
   if (rk === 'minister') return ['submitted_to_minister', 'returned_by_minister'];
   if (rk === 'admin') return [
     'submitted_to_collaborator_2', 'returned_by_collaborator_2',
     'submitted_to_supervisor', 'returned_by_supervisor',
-    'submitted_to_chairman', 'returned_by_chairman',
+    'submitted_to_deputy', 'returned_by_deputy',
     'submitted_to_minister', 'returned_by_minister'
   ];
   return [];
@@ -312,8 +312,8 @@ async function getCurrentSectionStatus(eventId, countryId, sectionId) {
 async function userCanSeeEvent(user, event){
   const roleKey = normalizeRoleKey(user.role_key);
   // Submitter visibility rules
-  const submitterRole = String(event.submitter_role || 'chairman').toLowerCase();
-  if (roleKey === 'chairman' && submitterRole === 'supervisor') return false;
+  const submitterRole = String(event.submitter_role || 'deputy').toLowerCase();
+  if (roleKey === 'deputy' && submitterRole === 'supervisor') return false;
   if (roleKey === 'minister' && submitterRole !== 'minister') return false;
 
   if (!isSectionPipelineRole(roleKey)) return true;
@@ -351,7 +351,7 @@ async function assertUserCanAccessEventSection(user, eventId, sectionId){
 function normalizeRoleKey(roleKey) {
   const k0 = String(roleKey || '').trim().toLowerCase();
   const k = k0.replace(/-/g, '_');
-  return k === 'deputy' ? 'chairman' : k;
+  return k === 'deputy' ? 'deputy' : k;
 }
 
 async function queryOne(text, params) {
@@ -409,7 +409,7 @@ async function attachUser(req, res, next) {
 
   if (!user || !user.is_active || user.deleted_at) return res.status(401).json({ error: 'User inactive or not found' });
 
-  // Normalize deputy display role to chairman key
+  // Normalize deputy display role to deputy key
   user.role_key = normalizeRoleKey(user.role_key);
 
   req.user = user;
@@ -447,7 +447,7 @@ async function getDocumentStatusSchema() {
   const byCol = set.has('last_updated_by_user_id') ? 'last_updated_by_user_id'
               : (set.has('updated_by_user_id') ? 'updated_by_user_id'
               : (set.has('updated_by') ? 'updated_by' : null));
-  const commentCol = set.has('chairman_comment') ? 'chairman_comment'
+  const commentCol = set.has('deputy_comment') ? 'deputy_comment'
                  : (set.has('comment') ? 'comment'
                  : (set.has('return_comment') ? 'return_comment' : null));
 
@@ -1124,29 +1124,29 @@ app.get('/api/events', authRequired, attachUser, async (req, res) => {
   // - If submitter is Supervisor, Deputy and Minister should not see the event.
   // - If submitter is Deputy, Minister should not see the event.
   // - If submitter is Minister, only Minister sees it at final stage.
-  if (roleKey === 'chairman') {
-    where.push(`COALESCE(e.submitter_role,'chairman') <> 'supervisor'`);
+  if (roleKey === 'deputy') {
+    where.push(`COALESCE(e.submitter_role,'deputy') <> 'supervisor'`);
   }
   if (roleKey === 'minister') {
-    where.push(`COALESCE(e.submitter_role,'chairman') = 'minister'`);
+    where.push(`COALESCE(e.submitter_role,'deputy') = 'minister'`);
   }
 
-  if (roleKey === 'chairman') {
-    where.push(`COALESCE(e.submitter_role,'chairman') <> 'supervisor'`);
+  if (roleKey === 'deputy') {
+    where.push(`COALESCE(e.submitter_role,'deputy') <> 'supervisor'`);
   }
   if (roleKey === 'minister') {
-    where.push(`COALESCE(e.submitter_role,'chairman') = 'minister'`);
+    where.push(`COALESCE(e.submitter_role,'deputy') = 'minister'`);
   }
 
   // Document submitter visibility rules:
   // - If submitter is Supervisor, Deputy and Minister should not see the event.
   // - If submitter is Deputy, Minister should not see the event.
   // - If submitter is Minister, everyone can see (normal workflow).
-  if (roleKey === 'chairman') {
-    where.push(`COALESCE(e.submitter_role,'chairman') <> 'supervisor'`);
+  if (roleKey === 'deputy') {
+    where.push(`COALESCE(e.submitter_role,'deputy') <> 'supervisor'`);
   }
   if (roleKey === 'minister') {
-    where.push(`COALESCE(e.submitter_role,'chairman') = 'minister'`);
+    where.push(`COALESCE(e.submitter_role,'deputy') = 'minister'`);
   }
 
   const rows = await queryAll(
@@ -1186,11 +1186,11 @@ app.get('/api/events/upcoming', authRequired, attachUser, async (req, res) => {
   // - If submitter is Supervisor, Deputy and Minister should not see the event.
   // - If submitter is Deputy, Minister should not see the event.
   // - If submitter is Minister, Minister should see it (Deputy still participates).
-  if (roleKey === 'chairman') {
-    where.push(`COALESCE(e.submitter_role,'chairman') <> 'supervisor'`);
+  if (roleKey === 'deputy') {
+    where.push(`COALESCE(e.submitter_role,'deputy') <> 'supervisor'`);
   }
   if (roleKey === 'minister') {
-    where.push(`COALESCE(e.submitter_role,'chairman') = 'minister'`);
+    where.push(`COALESCE(e.submitter_role,'deputy') = 'minister'`);
   }
 
   const rows = await queryAll(
@@ -1370,13 +1370,13 @@ app.get('/api/my/sections', authRequired, attachUser, async (req, res) => {
 });
 
 // Super-collaborators can also create/update events (they still cannot end events)
-app.post('/api/events', requireRole('admin', 'chairman', 'minister', 'supervisor', 'protocol', 'super_collaborator', 'collaborator'), async (req, res) => {
+app.post('/api/events', requireRole('admin', 'deputy', 'minister', 'supervisor', 'protocol', 'super_collaborator', 'collaborator'), async (req, res) => {
   const { countryId, title, occasion, deadlineDate, requiredSectionIds, submitterRole } = req.body || {};
   if (!countryId || !title) return res.status(400).json({ error: 'countryId and title required' });
 
-  const normalizedSubmitterRole = ['supervisor','chairman','minister'].includes(String(submitterRole||'').toLowerCase())
+  const normalizedSubmitterRole = ['supervisor','deputy','minister'].includes(String(submitterRole||'').toLowerCase())
     ? String(submitterRole).toLowerCase()
-    : 'chairman';
+    : 'deputy';
 
   const client = await pool.connect();
   try {
@@ -1424,7 +1424,7 @@ app.post('/api/events', requireRole('admin', 'chairman', 'minister', 'supervisor
   }
 });
 
-app.put('/api/events/:id', requireRole('admin', 'chairman', 'minister', 'supervisor', 'protocol', 'super_collaborator', 'collaborator'), async (req, res) => {
+app.put('/api/events/:id', requireRole('admin', 'deputy', 'minister', 'supervisor', 'protocol', 'super_collaborator', 'collaborator'), async (req, res) => {
   const eventId = Number(req.params.id);
   if (!Number.isFinite(eventId)) return res.status(400).json({ error: 'Invalid id' });
 
@@ -1442,9 +1442,9 @@ app.put('/api/events/:id', requireRole('admin', 'chairman', 'minister', 'supervi
     if (title !== undefined) { fields.push(`title=$${idx++}`); vals.push(String(title)); }
     if (occasion !== undefined) { fields.push(`occasion=$${idx++}`); vals.push(occasion ? String(occasion) : null); }
     if (submitterRole !== undefined) {
-      const nsr = ['supervisor','chairman','minister'].includes(String(submitterRole||'').toLowerCase())
+      const nsr = ['supervisor','deputy','minister'].includes(String(submitterRole||'').toLowerCase())
         ? String(submitterRole).toLowerCase()
-        : 'chairman';
+        : 'deputy';
       fields.push(`submitter_role=$${idx++}`);
       vals.push(nsr);
     }
@@ -1488,7 +1488,7 @@ app.put('/api/events/:id', requireRole('admin', 'chairman', 'minister', 'supervi
 });
 
 // End Event (Spec v2)
-app.post('/api/events/:id/end', requireRole('admin','supervisor','chairman','protocol'), async (req, res) => {
+app.post('/api/events/:id/end', requireRole('admin','supervisor','deputy','protocol'), async (req, res) => {
   const eventId = Number(req.params.id);
   if (!Number.isFinite(eventId)) return res.status(400).json({ error: 'Invalid id' });
 
@@ -1513,7 +1513,7 @@ app.get('/api/tp', authRequired, async (req, res) => {
 
   const roleKey = normalizeRoleKey(req.user.role_key);
   const isCollab = isSectionPipelineRole(roleKey);
-  const isElevated = ['admin','supervisor','chairman','minister','protocol','viewer'].includes(roleKey);
+  const isElevated = ['admin','supervisor','deputy','minister','protocol','viewer'].includes(roleKey);
   if (!isCollab && !isElevated) return res.status(403).json({ error: 'Forbidden' });
 
   // Pipeline roles may access assigned sections and, for collaborator/super-collaborator,
@@ -1589,7 +1589,7 @@ app.post('/api/tp/save', authRequired, async (req, res) => {
 
   const roleKey = normalizeRoleKey(req.user.role_key);
   const isCollab = isSectionPipelineRole(roleKey);
-  const canEdit = ['collaborator_1','collaborator_2','collaborator','super_collaborator','supervisor','chairman','minister','admin'].includes(roleKey);
+  const canEdit = ['collaborator_1','collaborator_2','collaborator','super_collaborator','supervisor','deputy','minister','admin'].includes(roleKey);
   if (!canEdit) return res.status(403).json({ error: 'Forbidden' });
 
   // Pipeline roles may edit assigned sections and, for collaborator/super-collaborator,
@@ -1684,7 +1684,7 @@ app.post('/api/tp/submit', authRequired, attachUser, async (req, res) => {
   return res.json({ success:true, status: targetStatus });
 });
 
-app.post('/api/tp/return', requireRole('collaborator_2','supervisor','chairman','admin'), async (req, res) => {
+app.post('/api/tp/return', requireRole('collaborator_2','supervisor','deputy','admin'), async (req, res) => {
   const eventId = Number(req.body?.eventId);
   const sectionId = Number(req.body?.sectionId);
   const note = String((req.body?.note ?? req.body?.comment) || '');
@@ -1764,7 +1764,7 @@ app.post('/api/tp/approve-section', requireRole('supervisor','admin'), async (re
   return res.json({ success:true, status: targetStatus });
 });
 
-app.post('/api/tp/approve-all-sections', requireRole('supervisor','chairman','minister','admin'), async (req, res) => {
+app.post('/api/tp/approve-all-sections', requireRole('supervisor','deputy','minister','admin'), async (req, res) => {
   try {
     const eventId = Number(req.body?.eventId);
     if (!Number.isFinite(eventId)) return res.status(400).json({ error: 'eventId required' });
@@ -1934,7 +1934,7 @@ app.post('/api/tp/submit-approved-to-supervisor', requireRole('super_collaborato
   return res.json({ success:true, submitted: rows.length, status: 'submitted_to_supervisor' });
 });
 
-app.post('/api/tp/approve-section-chairman', requireRole('chairman','minister','admin'), async (req, res) => {
+app.post('/api/tp/approve-section-deputy', requireRole('deputy','minister','admin'), async (req, res) => {
   const eventId = Number(req.body?.eventId);
   const sectionId = Number(req.body?.sectionId);
   if (!Number.isFinite(eventId) || !Number.isFinite(sectionId)) {
@@ -1948,7 +1948,7 @@ app.post('/api/tp/approve-section-chairman', requireRole('chairman','minister','
   await ensureTpRow(eventId, countryId, sectionId, req.user.id);
 
   const roleKey = normalizeRoleKey(req.user.role_key);
-  const targetStatus = (roleKey === 'minister') ? 'approved_by_minister' : 'approved_by_chairman';
+  const targetStatus = (roleKey === 'minister') ? 'approved_by_minister' : 'approved_by_deputy';
 
   await pool.query(
     `
@@ -1983,7 +1983,7 @@ app.get('/api/document-status', async (req, res) => {
     eventId: row.event_id,
     countryId: row.country_id,
     status: row.status,
-    chairmanComment: row.chairman_comment,
+    deputyComment: row.deputy_comment,
     updatedAt: row.updated_at,
   });
 });
@@ -1998,7 +1998,7 @@ app.get('/api/tp/document-status', async (req, res) => {
 
   // Provide the event's chosen submitter role so the frontend can render the correct workflow steps.
   const evMeta = await queryOne(`SELECT submitter_role FROM events WHERE id=$1`, [eventId]);
-  const submitterRole = String(evMeta?.submitter_role || 'chairman').toLowerCase();
+  const submitterRole = String(evMeta?.submitter_role || 'deputy').toLowerCase();
 
   await ensureDocumentStatus(eventId, countryId);
   const row = await queryOne(`SELECT * FROM document_status WHERE event_id=$1 AND country_id=$2`, [eventId, countryId]);
@@ -2006,7 +2006,7 @@ app.get('/api/tp/document-status', async (req, res) => {
   return res.json({
     eventId: row.event_id,
     status: row.status,
-    chairmanComment: row.chairman_comment,
+    deputyComment: row.deputy_comment,
     updatedAt: row.updated_at,
     submitterRole,
   });
@@ -2128,7 +2128,7 @@ app.get('/api/tp/status-grid', authRequired, async (req, res) => {
 });
 
 
-app.post('/api/document/submit-to-supervisor', requireRole('chairman','admin'), asyncRoute(async (req, res) => {
+app.post('/api/document/submit-to-supervisor', requireRole('deputy','admin'), asyncRoute(async (req, res) => {
   const eventId = Number(req.body?.eventId);
   if (!Number.isFinite(eventId)) return res.status(400).json({ error: 'eventId required' });
 
@@ -2159,12 +2159,12 @@ app.post('/api/document/submit-to-supervisor', requireRole('chairman','admin'), 
   return res.json({ success:true });
 }));
 
-app.post('/api/document/submit-to-chairman', requireRole('supervisor','admin'), asyncRoute(async (req, res) => {
+app.post('/api/document/submit-to-deputy', requireRole('supervisor','admin'), asyncRoute(async (req, res) => {
   const eventId = Number(req.body?.eventId);
   if (!Number.isFinite(eventId)) return res.status(400).json({ error: 'eventId required' });
 
   const evMeta = await queryOne(`SELECT submitter_role FROM events WHERE id=$1`, [eventId]);
-  const submitterRole = String(evMeta?.submitter_role || 'chairman').toLowerCase();
+  const submitterRole = String(evMeta?.submitter_role || 'deputy').toLowerCase();
 
   const countryId = await resolveCountryIdForEvent(eventId);
   if (!countryId) return res.status(404).json({ error: 'Event not found' });
@@ -2176,7 +2176,7 @@ app.post('/api/document/submit-to-chairman', requireRole('supervisor','admin'), 
   const byCol = schema.byCol || 'updated_by_user_id';
 
   // If the chosen submitter is Supervisor, we finalize at Supervisor stage.
-  const nextStatus = submitterRole === 'supervisor' ? 'approved' : 'submitted_to_chairman';
+  const nextStatus = submitterRole === 'supervisor' ? 'approved' : 'submitted_to_deputy';
 
   if (schema.hasCountryId) {
     await pool.query(
@@ -2196,12 +2196,12 @@ app.post('/api/document/submit-to-chairman', requireRole('supervisor','admin'), 
   return res.json({ success:true });
 }));
 
-app.post('/api/document/approve', requireRole('chairman','admin'), asyncRoute(async (req, res) => {
+app.post('/api/document/approve', requireRole('deputy','admin'), asyncRoute(async (req, res) => {
   const eventId = Number(req.body?.eventId);
   if (!Number.isFinite(eventId)) return res.status(400).json({ error: 'eventId required' });
 
   const evMeta = await queryOne(`SELECT submitter_role FROM events WHERE id=$1`, [eventId]);
-  const submitterRole = String(evMeta?.submitter_role || 'chairman').toLowerCase();
+  const submitterRole = String(evMeta?.submitter_role || 'deputy').toLowerCase();
 
   const countryId = await resolveCountryIdForEvent(eventId);
   if (!countryId) return res.status(404).json({ error: 'Event not found' });
@@ -2241,7 +2241,7 @@ app.post('/api/document/approve-minister', requireRole('minister','admin'), asyn
   if (!countryId) return res.status(404).json({ error: 'Event not found' });
 
   const evMeta = await queryOne(`SELECT submitter_role FROM events WHERE id=$1`, [eventId]);
-  const submitterRole = String(evMeta?.submitter_role || 'chairman').toLowerCase();
+  const submitterRole = String(evMeta?.submitter_role || 'deputy').toLowerCase();
   if (submitterRole !== 'minister') return res.status(400).json({ error: 'This event is not configured for Minister submission' });
 
   const schema = await getDocumentStatusSchema();
@@ -2268,7 +2268,7 @@ app.post('/api/document/approve-minister', requireRole('minister','admin'), asyn
   return res.json({ success:true });
 }));
 
-app.post('/api/document/return', requireRole('chairman','minister','admin'), asyncRoute(async (req, res) => {
+app.post('/api/document/return', requireRole('deputy','minister','admin'), asyncRoute(async (req, res) => {
   const eventId = Number(req.body?.eventId);
   const comment = (req.body?.comment ?? '').toString();
   if (!Number.isFinite(eventId)) return res.status(400).json({ error: 'eventId required' });
@@ -2319,7 +2319,7 @@ app.post('/api/document/return', requireRole('chairman','minister','admin'), asy
   return res.json({ success:true });
 }));
 
-app.get('/api/library', requireRole('admin','chairman','minister','supervisor','super_collaborator','protocol'), async (req, res) => {
+app.get('/api/library', requireRole('admin','deputy','minister','supervisor','super_collaborator','protocol'), async (req, res) => {
   // List approved documents for a country
   const countryId = Number(req.query.country_id);
   if (!Number.isFinite(countryId)) return res.status(400).json({ error: 'country_id required' });
@@ -2341,7 +2341,7 @@ app.get('/api/library', requireRole('admin','chairman','minister','supervisor','
   return res.json(rows);
 });
 
-app.get('/api/library/document', requireRole('admin','chairman','minister','supervisor','super_collaborator','protocol'), async (req, res) => {
+app.get('/api/library/document', requireRole('admin','deputy','minister','supervisor','super_collaborator','protocol'), async (req, res) => {
   const eventId = Number(req.query.event_id);
   const countryId = Number(req.query.country_id);
   if (!Number.isFinite(eventId) || !Number.isFinite(countryId)) return res.status(400).json({ error: 'event_id and country_id required' });
@@ -2371,7 +2371,7 @@ app.get('/api/library/document', requireRole('admin','chairman','minister','supe
 
   const doc = await queryOne(
     `
-    SELECT status, chairman_comment, updated_at
+    SELECT status, deputy_comment, updated_at
     FROM document_status
     WHERE event_id=$1 AND country_id=$2
     `,
@@ -2382,7 +2382,7 @@ app.get('/api/library/document', requireRole('admin','chairman','minister','supe
     event,
     documentStatus: doc ? {
       status: doc.status,
-      chairmanComment: doc.chairman_comment,
+      deputyComment: doc.deputy_comment,
       updatedAt: doc.updated_at
     } : null,
     sections: sections.map(r => ({

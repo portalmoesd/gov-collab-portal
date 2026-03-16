@@ -4,7 +4,7 @@
   if (!me) return;
 
   const role = String(me.role || "").toLowerCase();
-  const allowed = ["admin","chairman","minister","supervisor","protocol","super_collaborator"];
+  const allowed = ["admin","deputy","minister","supervisor","protocol","super_collaborator"];
   if (!allowed.includes(role)){
     document.querySelector(".main").innerHTML = "<div class='card'>Access denied.</div>";
     return;

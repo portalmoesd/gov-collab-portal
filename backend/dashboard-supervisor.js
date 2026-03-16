@@ -28,7 +28,7 @@
 function redirectByRole(role){
     const r = String(role||"").toLowerCase();
     if (r === "admin") location.href = "admin.html";
-    else if (r === "chairman") location.href = "dashboard-chairman.html"; // Deputy
+    else if (r === "deputy") location.href = "dashboard-deputy.html"; // Deputy
     else if (r === "supervisor") location.href = "dashboard-supervisor.html";
     else if (r === "super_collaborator") location.href = "dashboard-collab.html";
     else if (r === "collaborator") location.href = "dashboard-collab.html";

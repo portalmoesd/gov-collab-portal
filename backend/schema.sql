@@ -9,7 +9,7 @@ CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
 -- Enums
 DO $$ BEGIN
-  CREATE TYPE tp_section_status AS ENUM ('draft', 'submitted', 'returned', 'submitted_to_collaborator_2', 'returned_by_collaborator_2', 'approved_by_collaborator_2', 'submitted_to_collaborator', 'returned_by_collaborator', 'approved_by_collaborator', 'submitted_to_super_collaborator', 'returned_by_super_collaborator', 'approved_by_super_collaborator', 'submitted_to_supervisor', 'returned_by_supervisor', 'approved_by_supervisor', 'approved_by_chairman', 'approved_by_minister');
+  CREATE TYPE tp_section_status AS ENUM ('draft', 'submitted', 'returned', 'submitted_to_collaborator_2', 'returned_by_collaborator_2', 'approved_by_collaborator_2', 'submitted_to_collaborator', 'returned_by_collaborator', 'approved_by_collaborator', 'submitted_to_super_collaborator', 'returned_by_super_collaborator', 'approved_by_super_collaborator', 'submitted_to_supervisor', 'returned_by_supervisor', 'approved_by_supervisor', 'approved_by_deputy', 'approved_by_minister');
 EXCEPTION
   WHEN duplicate_object THEN NULL;
 END $$;
@@ -134,7 +134,7 @@ CREATE TABLE IF NOT EXISTS document_status (
   event_id          INTEGER NOT NULL REFERENCES events(id) ON DELETE CASCADE,
   country_id        INTEGER NOT NULL REFERENCES countries(id),
   status            TEXT NOT NULL DEFAULT 'in_progress',
-  chairman_comment  TEXT,
+  deputy_comment  TEXT,
   updated_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   CONSTRAINT uq_document_status_event_country UNIQUE (event_id, country_id)
 );

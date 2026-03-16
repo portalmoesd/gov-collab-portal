@@ -1,4 +1,4 @@
-// dashboard-chairman.js
+// dashboard-deputy.js
 (async function(){
   const me = await window.GCP.requireAuth();
   if (!me) return;
@@ -51,8 +51,8 @@
       submitted: 'Submitted',
       submitted_to_supervisor: 'Submitted to Supervisor',
       approved_by_supervisor: 'Approved by Supervisor',
-      submitted_to_chairman: 'Submitted to Deputy',
-      approved_by_chairman: 'Approved by Deputy',
+      submitted_to_deputy: 'Submitted to Deputy',
+      approved_by_deputy: 'Approved by Deputy',
       approved: 'Approved',
       returned: 'Returned'
     };
@@ -93,7 +93,7 @@
     const last = ds.updatedAt ? window.GCP.formatDateTime(ds.updatedAt) : '';
     docStatusBox.innerHTML = `
       <div><b>Document status:</b> ${pill(ds.status)} ${last ? `<span class="muted">(${window.GCP.escapeHtml(last)})</span>` : ''}</div>
-      ${ds.chairmanComment ? `<div class="muted" style="margin-top:6px;"><b>Comment:</b> ${window.GCP.escapeHtml(ds.chairmanComment)}</div>` : ''}
+      ${ds.deputyComment ? `<div class="muted" style="margin-top:6px;"><b>Comment:</b> ${window.GCP.escapeHtml(ds.deputyComment)}</div>` : ''}
     `;
 
     // Per-section status grid
@@ -126,7 +126,7 @@
       approveBtn.style.marginLeft = '8px';
       approveBtn.addEventListener('click', async () => {
         try{
-          await window.GCP.apiFetch('/tp/approve-section-chairman', {
+          await window.GCP.apiFetch('/tp/approve-section-deputy', {
             method:'POST',
             body: JSON.stringify({ eventId: currentEventId, sectionId: s.sectionId })
           });

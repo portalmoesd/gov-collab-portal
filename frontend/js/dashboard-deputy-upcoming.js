@@ -1,4 +1,4 @@
-// dashboard-chairman-upcoming.js
+// dashboard-deputy-upcoming.js
 (async function(){
   const mount = document.getElementById('eventsGrid');
   const eventSelect = document.getElementById('eventSelect');

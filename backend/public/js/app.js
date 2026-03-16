@@ -8,8 +8,8 @@
       { href: "library.html", label: "Library" },
       { href: "statistics.html", label: "Statistics" },
     ],
-    chairman: [ // displayed as Deputy
-      { href: "dashboard-chairman.html", label: "Dashboard" },
+    deputy: [ // displayed as Deputy
+      { href: "dashboard-deputy.html", label: "Dashboard" },
       { href: "calendar.html", label: "Calendar" },
       { href: "library.html", label: "Library" },
       { href: "statistics.html", label: "Statistics" },
@@ -68,7 +68,7 @@
   function roleToTitle(r){
     const map = {
       admin:"Admin",
-      chairman:"Deputy",
+      deputy:"Deputy",
       minister:"Minister",
       supervisor:"Supervisor",
       protocol:"Protocol",
@@ -271,7 +271,7 @@
   // submitterRole: 'supervisor' | 'deputy' | 'minister' (or undefined)
   window.GCP.getStatusSteps = function(submitterRole){
     const raw = String(submitterRole || '').toLowerCase();
-    const r = raw === 'chairman' ? 'deputy' : raw;
+    const r = raw === 'deputy' ? 'deputy' : raw;
     if (r === 'supervisor') return ['Draft','Supervisor','Approved'];
     if (r === 'minister') return ['Draft','Supervisor','Deputy','Minister','Approved'];
     return ['Draft','Supervisor','Deputy','Approved'];
@@ -280,11 +280,11 @@
   window.GCP.statusToStepIndex = function(status, submitterRole){
     const s = String(status || '').toLowerCase();
     const rawRole = String(submitterRole || '').toLowerCase();
-    const r = rawRole === 'chairman' ? 'deputy' : rawRole;
+    const r = rawRole === 'deputy' ? 'deputy' : rawRole;
 
     if (!s || s === 'draft' || s === 'returned' || s === 'in_progress') return 0;
     if (s === 'submitted_to_supervisor' || s === 'approved_by_supervisor') return 1;
-    if (s === 'submitted_to_chairman' || s === 'submitted_to_deputy' || s === 'approved_by_chairman') {
+    if (s === 'submitted_to_deputy' || s === 'submitted_to_deputy' || s === 'approved_by_deputy') {
       return r === 'supervisor' ? 1 : 2;
     }
     if (s === 'submitted_to_minister' || s === 'approved_by_minister') {
@@ -375,11 +375,11 @@
     if (['submitted_to_super_collaborator', 'returned_by_super_collaborator', 'approved_by_collaborator'].includes(s)) return 4;
     if (full) {
       if (['approved_by_super_collaborator', 'submitted_to_supervisor', 'returned_by_supervisor'].includes(s)) return 5;
-      if (['approved_by_supervisor', 'submitted_to_chairman', 'returned_by_chairman'].includes(s)) return 6;
-      if (['approved_by_chairman', 'submitted_to_minister', 'returned_by_minister', 'approved_by_minister', 'approved', 'locked'].includes(s)) return 7;
+      if (['approved_by_supervisor', 'submitted_to_deputy', 'returned_by_deputy'].includes(s)) return 6;
+      if (['approved_by_deputy', 'submitted_to_minister', 'returned_by_minister', 'approved_by_minister', 'approved', 'locked'].includes(s)) return 7;
     } else {
       if (['approved_by_super_collaborator', 'submitted_to_supervisor', 'returned_by_supervisor',
-           'approved_by_supervisor', 'submitted_to_chairman', 'returned_by_chairman', 'approved_by_chairman',
+           'approved_by_supervisor', 'submitted_to_deputy', 'returned_by_deputy', 'approved_by_deputy',
            'submitted_to_minister', 'returned_by_minister', 'approved_by_minister', 'approved', 'locked'].includes(s)) return lastIdx;
     }
     return 0;
@@ -449,7 +449,7 @@
   // Returns upper-tier step labels (after Super-Collaborator) based on document submitter role.
   function getUpperTierSteps(documentSubmitterRole) {
     const dsr = String(documentSubmitterRole || '').toLowerCase();
-    const r = dsr === 'chairman' ? 'deputy' : dsr;
+    const r = dsr === 'deputy' ? 'deputy' : dsr;
     if (r === 'supervisor') return ['Supervisor', 'Approved'];
     if (r === 'minister')   return ['Supervisor', 'Deputy', 'Minister', 'Approved'];
     return ['Supervisor', 'Deputy', 'Approved'];
@@ -459,16 +459,16 @@
   function upperTierStepIdx(status, documentSubmitterRole) {
     const s = String(status || '').toLowerCase();
     const dsr = String(documentSubmitterRole || '').toLowerCase();
-    const r = dsr === 'chairman' ? 'deputy' : dsr;
+    const r = dsr === 'deputy' ? 'deputy' : dsr;
     // Supervisor step (index 0)
     if (['approved_by_super_collaborator', 'submitted_to_supervisor',
          'returned_by_supervisor'].includes(s)) return 0;
     if (r === 'supervisor') return 1; // Approved
     // Deputy step (index 1 for deputy/minister)
-    if (['approved_by_supervisor', 'submitted_to_chairman', 'returned_by_chairman'].includes(s)) return 1;
+    if (['approved_by_supervisor', 'submitted_to_deputy', 'returned_by_deputy'].includes(s)) return 1;
     if (r === 'deputy') return 2; // Approved
     // Minister step (index 2 for minister)
-    if (['approved_by_chairman', 'submitted_to_minister', 'returned_by_minister'].includes(s)) return 2;
+    if (['approved_by_deputy', 'submitted_to_minister', 'returned_by_minister'].includes(s)) return 2;
     return 3; // Approved (approved_by_minister reaches here)
   }
 
@@ -627,7 +627,7 @@
     { role: 'collaborator',      label: 'Collaborator' },
     { role: 'super_collaborator',label: 'Super-collaborator' },
     { role: 'supervisor',        label: 'Supervisor' },
-    { role: 'chairman',          label: 'Deputy' },
+    { role: 'deputy',          label: 'Deputy' },
     { role: 'minister',          label: 'Minister' },
   ];
 
@@ -641,7 +641,7 @@
     if (['submitted_to_collaborator','returned_by_collaborator','approved_by_collaborator'].includes(s)) return collabIdx;
     if (['submitted_to_super_collaborator','returned_by_super_collaborator','approved_by_super_collaborator'].includes(s)) return collabIdx + 1;
     if (['submitted_to_supervisor','returned_by_supervisor','approved_by_supervisor'].includes(s)) return collabIdx + 2;
-    if (['submitted_to_chairman','returned_by_chairman','approved_by_chairman'].includes(s)) return collabIdx + 3;
+    if (['submitted_to_deputy','returned_by_deputy','approved_by_deputy'].includes(s)) return collabIdx + 3;
     if (['submitted_to_minister','approved_by_minister','approved','locked'].includes(s)) return collabIdx + 4;
     return 0; // draft / in_progress / returned_by_collaborator_1
   }
@@ -669,16 +669,16 @@
 
     // Determine which upper-tier stages to show (mirrors getUpperTierSteps logic)
     const dsr = String(documentSubmitterRole || '').toLowerCase();
-    const dsrNorm = dsr === 'chairman' ? 'deputy' : dsr;
+    const dsrNorm = dsr === 'deputy' ? 'deputy' : dsr;
     const upperRolesToShow = new Set(['supervisor']);
-    if (dsrNorm !== 'supervisor') upperRolesToShow.add('chairman');
+    if (dsrNorm !== 'supervisor') upperRolesToShow.add('deputy');
     if (dsrNorm === 'minister')   upperRolesToShow.add('minister');
 
     const stages = (skipCurator ? HISTORY_STAGES.filter(s => s.role !== 'collaborator_3') : HISTORY_STAGES)
       .map((s, i) => ({ ...s, _idx: i }))
       // Include upper-tier stages based on documentSubmitterRole; drop lower-tier non-participants
       .filter(s => {
-        if (['supervisor','chairman','minister'].includes(s.role)) return upperRolesToShow.has(s.role);
+        if (['supervisor','deputy','minister'].includes(s.role)) return upperRolesToShow.has(s.role);
         return lowerRoleOrder.indexOf(s.role) < 0 || lowerRoleOrder.indexOf(s.role) >= startRoleIdx;
       });
     // Group history events by role
