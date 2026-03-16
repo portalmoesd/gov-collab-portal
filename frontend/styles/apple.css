@@ -3998,16 +3998,22 @@ body.gp-shell-ready .gp-sidebar__scrim{
 .event-required-wrapper {
   display: flex;
   flex-direction: column;
+  gap: 0;
 }
 /* When required sections is visible, stitch the two cards together visually */
+.event-required-wrapper:has(> .required-sections-panel:not([hidden])) {
+  box-shadow: var(--shadow);
+  border-radius: var(--radius);
+}
 .event-required-wrapper:has(> .required-sections-panel:not([hidden])) > .card:first-child {
   border-bottom-left-radius: 0 !important;
   border-bottom-right-radius: 0 !important;
   border-bottom-color: transparent;
-  box-shadow: 0 4px 12px rgba(0,0,0,.06);
+  box-shadow: none !important;
 }
 .event-required-wrapper > .required-sections-panel:not([hidden]) {
   border-top-left-radius: 0 !important;
   border-top-right-radius: 0 !important;
   border-top: none;
+  box-shadow: none !important;
 }
