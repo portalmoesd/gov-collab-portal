@@ -323,12 +323,6 @@
     const task = ((ev?.task ?? ev?.occasion) || '').trim();
 
     docStatusBox.innerHTML = `
-      <div style="display:flex; align-items:baseline; justify-content:space-between; gap:12px; flex-wrap:wrap;">
-        <div><b>Status:</b> ${escape(humanStatus(ds.status) || '')}</div>
-        ${last ? `<div class="muted">${escape(last)}</div>` : ''}
-      </div>
-      <div class="supervisor-progress-wrap">${window.GCP.renderWorkflowProgress(ds.status, submitterRole)}</div>
-      ${task ? `<div style="margin-top:10px;"><b>Task:</b> ${escape(task)}</div>` : ''}
       ${ds.chairmanComment ? `<div class="muted" style="margin-top:8px;"><b>Comment:</b> ${escape(ds.chairmanComment)}</div>` : ''}
     `;
 
