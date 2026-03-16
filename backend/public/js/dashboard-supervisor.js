@@ -187,8 +187,10 @@
       window.open(`editor.html?event_id=${currentEventId}&section_id=${section.sectionId}`, '_blank');
     }));
 
-    // Supervisor can approve/return when it's their turn: section reached supervisor stage
-    const canApprove = ['approved_by_super_collaborator', 'submitted_to_supervisor', 'returned_by_supervisor'].includes(s);
+    // Supervisor can approve/return at any stage before their approval level
+    const beyondSupervisor = ['approved_by_supervisor','submitted_to_chairman','returned_by_chairman',
+      'approved_by_chairman','submitted_to_minister','returned_by_minister','approved_by_minister','approved','locked'];
+    const canApprove = s && !beyondSupervisor.includes(s);
 
     if (canApprove){
       wrap.appendChild(createMicroAction('Approve', 'approve', async () => {
