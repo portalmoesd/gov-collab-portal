@@ -326,10 +326,6 @@
   });
 
   if (btnApprove) btnApprove.addEventListener("click", async () => {
-    if (richEditorInstance && richEditorInstance.hasTrackedChanges()) {
-      showMsg("Accept or reject all tracked changes before approving.", true);
-      return;
-    }
     setActionLoading(btnApprove, true);
     try{
       if (role === "chairman" || role === "minister"){
