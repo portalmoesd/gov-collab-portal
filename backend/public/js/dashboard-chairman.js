@@ -261,36 +261,62 @@
     const wrap = document.createElement('div');
     wrap.className = 'required-actions';
 
+    // Open — chairman opens in new tab
     wrap.appendChild(createMicroAction('Open', 'open', () => {
       window.open(`editor.html?event_id=${currentEventId}&section_id=${section.sectionId}`, '_blank');
     }));
 
-    const sectionStatus = String(section.status || '').toLowerCase();
-    const canDecision = !['approved_by_chairman', 'approved_by_minister', 'locked'].includes(sectionStatus);
-    if (canDecision) {
+    const s = String(section.status || '').toLowerCase();
+    const rtr = String(section.returnTargetRole || '').toLowerCase();
+
+    // Approve/Return — chairman can act only when section is at their level
+    const isAtMe = [
+      'submitted_to_chairman', 'returned_by_chairman', 'approved_by_supervisor',
+    ].includes(s) || rtr === 'chairman';
+    const canApprove = isAtMe;
+
+    if (canApprove){
       wrap.appendChild(createMicroAction('Approve', 'approve', async () => {
+        if (!confirm('Approve this section?')) return;
         try{
           await window.GCP.apiFetch('/tp/approve-section-chairman', {
-            method:'POST',
+            method: 'POST',
             body: JSON.stringify({ eventId: currentEventId, sectionId: section.sectionId })
           });
-          await refresh();
+          setMsg('Section approved.'); await refresh();
         }catch(e){
           setMsg(e.message || 'Failed to approve section', true);
         }
       }));
 
       wrap.appendChild(createMicroAction('Return', 'return', async (e) => {
-        const note = await window.GCP.showCommentDropdown(e.currentTarget, { title: 'Return section', placeholder: 'Add a comment (optional)…', sendLabel: 'Return' }) || '';
+        const note = await window.GCP.showCommentDropdown(e.currentTarget, { title: 'Return section', placeholder: 'Add a comment (optional)…', sendLabel: 'Return' });
         if (note === null) return;
         try{
           await window.GCP.apiFetch('/tp/return', {
-            method:'POST',
+            method: 'POST',
             body: JSON.stringify({ eventId: currentEventId, sectionId: section.sectionId, note })
           });
-          await refresh();
+          setMsg('Section returned.'); await refresh();
         }catch(e){
           setMsg(e.message || 'Failed to return section', true);
+        }
+      }));
+    }
+
+    // Ask to Return — for sections above chairman level (at minister or beyond)
+    if (!canApprove){
+      wrap.appendChild(createMicroAction('Ask to Return', 'ask-to-return', async (e) => {
+        const note = await window.GCP.showCommentDropdown(e.currentTarget, { title: 'Ask to Return', placeholder: 'Why do you need it back? (optional)…', sendLabel: 'Send Request' });
+        if (note === null) return;
+        try{
+          await window.GCP.apiFetch('/tp/ask-to-return', {
+            method: 'POST',
+            body: JSON.stringify({ eventId: currentEventId, sectionId: section.sectionId, note })
+          });
+          setMsg('Return request sent.');
+        }catch(e){
+          setMsg(e.message || 'Request failed', true);
         }
       }));
     }
