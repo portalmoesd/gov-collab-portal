@@ -187,8 +187,8 @@
       window.open(`editor.html?event_id=${currentEventId}&section_id=${section.sectionId}`, '_blank');
     }));
 
-    // Supervisor can approve/return any section not yet finalized
-    const canApprove = !['approved_by_chairman', 'approved_by_minister', 'approved', 'locked'].includes(s);
+    // Supervisor can approve/return when it's their turn: section reached supervisor stage
+    const canApprove = ['approved_by_super_collaborator', 'submitted_to_supervisor', 'returned_by_supervisor'].includes(s);
 
     if (canApprove){
       wrap.appendChild(createMicroAction('Approve', 'approve', async () => {

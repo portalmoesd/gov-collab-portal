@@ -2466,8 +2466,8 @@ app.get('/api/tp/status-grid', authRequired, async (req, res) => {
         s.order_index,
         COALESCE(t.status::text, 'draft') AS status,
         t.status_comment,
-        t.last_updated_at,
-        u.full_name AS last_updated_by,
+        t.last_content_edited_at AS last_updated_at,
+        ue.full_name AS last_updated_by,
         t.original_submitter_role,
         t.return_target_role
       FROM event_required_sections ers
@@ -2476,7 +2476,7 @@ app.get('/api/tp/status-grid', authRequired, async (req, res) => {
         ON t.event_id = ers.event_id
        AND t.country_id = $2
        AND t.section_id = ers.section_id
-      LEFT JOIN users u ON u.id = t.last_updated_by_user_id
+      LEFT JOIN users ue ON ue.id = t.last_content_edited_by_user_id
       WHERE ers.event_id = $1
     `;
     const params = [eventId, countryId];
