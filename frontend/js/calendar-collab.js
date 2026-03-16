@@ -128,8 +128,7 @@
 
   // Wait until eventsGrid is populated; non-invasive observer.
   const obs = new MutationObserver(() => {
-    const hasCards = grid.querySelector('.event-card');
-    if (hasCards){
+    if (grid.hasChildNodes()){
       obs.disconnect();
       const now = new Date();
       render(now.getFullYear(), now.getMonth());
@@ -137,8 +136,8 @@
   });
   obs.observe(grid, {childList:true, subtree:true});
 
-  // Fallback: in case cards already exist
-  if (grid.querySelector('.event-card')){
+  // Fallback: in case grid is already populated
+  if (grid.hasChildNodes()){
     const now = new Date();
     render(now.getFullYear(), now.getMonth());
   }
