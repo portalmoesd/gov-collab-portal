@@ -184,8 +184,11 @@
     .gcp-re-balloon--tc-group { border-left:3px solid #64748b; background:#f8fafc; }
     .gcp-re-balloon-change-count { font-size:10px; color:#64748b; margin-top:1px; }
     .gcp-re-snippet { font-size:10px; font-family:monospace; margin-top:2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .gcp-re-snippet--wrap { white-space:pre-wrap; overflow:visible; text-overflow:unset; }
     .gcp-re-snippet-ins { color:#15803d; }
     .gcp-re-snippet-del { color:#b91c1c; text-decoration:line-through; }
+    .gcp-re-balloon-expand { margin-top:4px; background:none; border:none; padding:0; font-size:10px; font-weight:700; color:#0a84ff; cursor:pointer; line-height:1.4; }
+    .gcp-re-balloon-expand:hover { text-decoration:underline; }
     .gcp-re-balloon-header { display:flex; align-items:center; gap:5px; margin-bottom:4px; }
     .gcp-re-balloon-author { font-weight:800; color:#0f172a; flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
     .gcp-re-balloon-time { color:#94a3b8; white-space:nowrap; flex-shrink:0; }
@@ -1013,9 +1016,10 @@
               countLabel = `Formatted · ${fmtLabels.join(', ')}`;
             else if (fmtLabels.length > 0)
               countLabel = `${n} changes · ${fmtLabels.join(', ')}`;
-            // Text snippets for ins/del entries (max 2)
-            const snippetLines = group.entries
-              .filter(e => e.kind === 'ins' || e.kind === 'del')
+            // Text snippets for ins/del entries
+            const allTextEntries = group.entries.filter(e => e.kind === 'ins' || e.kind === 'del');
+            const needsExpand = allTextEntries.length > 2 || allTextEntries.some(e => e.text.length > 38);
+            const snippetLines = allTextEntries
               .slice(0, 2)
               .map(e => {
                 const sign = e.kind === 'ins' ? '+' : '−';
@@ -1024,19 +1028,39 @@
                 return `<div class="gcp-re-snippet ${cls}">${sign} ${escHtml(txt)}</div>`;
               })
               .join('');
+            const snippetLinesExpanded = allTextEntries
+              .map(e => {
+                const sign = e.kind === 'ins' ? '+' : '−';
+                const cls  = e.kind === 'ins' ? 'gcp-re-snippet-ins' : 'gcp-re-snippet-del';
+                return `<div class="gcp-re-snippet gcp-re-snippet--wrap ${cls}">${sign} ${escHtml(e.text)}</div>`;
+              })
+              .join('');
             b.innerHTML = `
               <div class="gcp-re-balloon-header">
                 <span class="gcp-re-balloon-avatar" style="background:${escHtml(group.color)}">${escHtml(group.initials)}</span>
                 <span class="gcp-re-balloon-author">${escHtml(group.author)}</span>
                 <span class="gcp-re-balloon-time">${escHtml(fmtTime(group.time))}</span>
               </div>
-              ${snippetLines || `<div class="gcp-re-balloon-change-count">${escHtml(countLabel)}</div>`}
+              <div class="gcp-re-snippets-collapsed">${snippetLines || `<div class="gcp-re-balloon-change-count">${escHtml(countLabel)}</div>`}</div>
+              ${needsExpand ? `<div class="gcp-re-snippets-expanded" style="display:none">${snippetLinesExpanded}</div>` : ''}
+              ${needsExpand ? `<button class="gcp-re-balloon-expand" type="button">Show more</button>` : ''}
               <div class="gcp-re-balloon-btns">
                 <button class="gcp-re-balloon-acc" type="button">✓ Accept</button>
                 <button class="gcp-re-balloon-rej" type="button">✗ Reject</button>
               </div>`;
             b.querySelector('.gcp-re-balloon-acc').addEventListener('click', () => { group.ids.forEach(id => acceptChange(id)); });
             b.querySelector('.gcp-re-balloon-rej').addEventListener('click', () => { group.ids.forEach(id => rejectChange(id)); });
+            if (needsExpand) {
+              const expandBtn      = b.querySelector('.gcp-re-balloon-expand');
+              const collapsedView  = b.querySelector('.gcp-re-snippets-collapsed');
+              const expandedView   = b.querySelector('.gcp-re-snippets-expanded');
+              expandBtn.addEventListener('click', () => {
+                const isExpanded = expandedView.style.display !== 'none';
+                collapsedView.style.display = isExpanded ? '' : 'none';
+                expandedView.style.display  = isExpanded ? 'none' : '';
+                expandBtn.textContent = isExpanded ? 'Show more' : 'Show less';
+              });
+            }
             marginEl.appendChild(b);
             const h = Math.max(b.offsetHeight, 72);
             slots.push({ top, h });
