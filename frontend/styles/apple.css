@@ -1905,8 +1905,9 @@ body.gp-shell-ready .gp-sidebar__scrim{
   gap:14px;
 }
 #openEditorSection .field{
-  flex:1 1 220px;
-  min-width:0;
+  width:min(520px, 100%);
+  min-width:min(520px, 100%);
+  max-width:100%;
 }
 #openEditorSection .field select,
 #openEditorSection .field .input,
@@ -1957,7 +1958,7 @@ body.gp-shell-ready .gp-sidebar__scrim{
   }
   #openEditorSection .field{
     width:100%;
-    flex:1 1 auto;
+    min-width:0;
   }
   .statusbox{
     padding: 14px 14px 12px;
