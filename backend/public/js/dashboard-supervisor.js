@@ -159,9 +159,9 @@
       submitted_to_supervisor: 'At Supervisor',
       returned_by_supervisor: 'Returned by Supervisor',
       approved_by_supervisor: 'Approved (Supervisor)',
-      submitted_to_chairman: 'Submitted to Deputy',
-      returned_by_chairman: 'Returned (Deputy)',
-      approved_by_chairman: 'Approved (Deputy)',
+      submitted_to_deputy: 'Submitted to Deputy',
+      returned_by_deputy: 'Returned (Deputy)',
+      approved_by_deputy: 'Approved (Deputy)',
       approved_by_minister: 'Approved (Minister)',
       locked: 'Locked'
     };
@@ -188,8 +188,8 @@
     }));
 
     // Supervisor can approve/return at any stage before their approval level
-    const beyondSupervisor = ['approved_by_supervisor','submitted_to_chairman','returned_by_chairman',
-      'approved_by_chairman','submitted_to_minister','returned_by_minister','approved_by_minister','approved','locked'];
+    const beyondSupervisor = ['approved_by_supervisor','submitted_to_deputy','returned_by_deputy',
+      'approved_by_deputy','submitted_to_minister','returned_by_minister','approved_by_minister','approved','locked'];
     const canApprove = s && !beyondSupervisor.includes(s);
 
     if (canApprove){
@@ -279,8 +279,8 @@
     // Enable submit to Deputy when all sections are approved_by_supervisor or beyond
     const allApproved = currentSections.length > 0 && currentSections.every(s => {
       const st = String(s.status || '').toLowerCase();
-      return ['approved_by_supervisor', 'submitted_to_chairman', 'returned_by_chairman',
-              'approved_by_chairman', 'submitted_to_minister', 'approved_by_minister',
+      return ['approved_by_supervisor', 'submitted_to_deputy', 'returned_by_deputy',
+              'approved_by_deputy', 'submitted_to_minister', 'approved_by_minister',
               'approved', 'locked'].includes(st);
     });
     if (submitDocBtn){ submitDocBtn.disabled = !allApproved; submitDocBtn.style.display = ''; }
@@ -327,7 +327,7 @@
     }
     if (submitDocBtn){
       submitDocBtn.textContent = sr === 'supervisor' ? 'Send to Library' : (sr === 'minister' ? 'Submit to Deputy' : 'Submit document to Deputy');
-      submitDocBtn.dataset.submitterRole = sr || 'chairman';
+      submitDocBtn.dataset.submitterRole = sr || 'deputy';
     }
 
     try{
@@ -389,7 +389,7 @@
     try{
       const selectedOpt = eventSelect.options[eventSelect.selectedIndex];
       const sr = String(selectedOpt?.dataset?.submitterRole || '').toLowerCase();
-      await window.GCP.apiFetch('/document/submit-to-chairman', { method: 'POST', body: JSON.stringify({ eventId: currentEventId }) });
+      await window.GCP.apiFetch('/document/submit-to-deputy', { method: 'POST', body: JSON.stringify({ eventId: currentEventId }) });
       setMsg(sr === 'supervisor' ? 'Document finalized and sent to Library.' : 'Submitted to Deputy.');
       await refreshStatusGrid();
     }catch(e){ setMsg(e.message || 'Submit failed', true); }

@@ -4,8 +4,8 @@
   if (!me) return;
 
   const role = String(me.role).toLowerCase();
-  const canManage = ['admin','chairman','supervisor','protocol'].includes(role);
-  const canEnd = ['admin','chairman','supervisor','protocol'].includes(role);
+  const canManage = ['admin','deputy','supervisor','protocol'].includes(role);
+  const canEnd = ['admin','deputy','supervisor','protocol'].includes(role);
 
   const msg = document.getElementById("msg");
   const eventsTbody = document.getElementById("eventsTbody");

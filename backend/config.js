@@ -202,7 +202,7 @@ textarea{min-height:120px; resize:vertical}
 .pill.submitted{background:#e0f2fe;}
 .pill.returned{background:#fee2e2; border-color:#fecaca;}
 .pill.approved_by_supervisor{background:#dcfce7; border-color:#bbf7d0;}
-.pill.approved_by_chairman{background:#d1fae5; border-color:#a7f3d0;}
+.pill.approved_by_deputy{background:#d1fae5; border-color:#a7f3d0;}
 
 .muted{color:var(--muted)}
 .small{font-size:12px}

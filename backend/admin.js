@@ -32,9 +32,9 @@
       submitted_to_supervisor: 'Submitted',
       returned_by_supervisor: 'Returned',
       approved_by_supervisor: 'Approved (Supervisor)',
-      submitted_to_chairman: 'Submitted to Deputy',
-      returned_by_chairman: 'Returned (Deputy)',
-      approved_by_chairman: 'Approved (Deputy)',
+      submitted_to_deputy: 'Submitted to Deputy',
+      returned_by_deputy: 'Returned (Deputy)',
+      approved_by_deputy: 'Approved (Deputy)',
       locked: 'Locked'
     };
     return map[s] || (s || '');
@@ -110,7 +110,7 @@
     }
 
     // Enable submit to deputy when all sections approved by supervisor
-    const ok = currentSections.length > 0 && currentSections.every(s => ['approved_by_supervisor','approved_by_chairman'].includes(s.status));
+    const ok = currentSections.length > 0 && currentSections.every(s => ['approved_by_supervisor','approved_by_deputy'].includes(s.status));
     submitDocBtn.disabled = !ok;
   }
 
@@ -179,7 +179,7 @@ modalBackdrop.addEventListener('click', (e) => {
     if (!currentEventId) return;
     setMsg('');
     try{
-      await window.GCP.apiFetch('/document/submit-to-chairman', {
+      await window.GCP.apiFetch('/document/submit-to-deputy', {
         method:'POST',
         body: JSON.stringify({ eventId: currentEventId })
       });

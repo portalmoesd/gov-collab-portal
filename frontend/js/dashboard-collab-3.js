@@ -165,8 +165,8 @@
       submitted_to_supervisor:'At Supervisor',
       returned_by_supervisor:'Returned by Supervisor',
       approved_by_supervisor:'Approved (Supervisor)',
-      submitted_to_chairman:'Submitted to Deputy',
-      approved_by_chairman:'Approved (Deputy)',
+      submitted_to_deputy:'Submitted to Deputy',
+      approved_by_deputy:'Approved (Deputy)',
       approved_by_minister:'Approved (Minister)',
     };
     return map[s]||(s||'');

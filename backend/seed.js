@@ -26,7 +26,7 @@ const pool = new Pool({
 const ROLES = [
   ['admin', 'Admin'],
   ['minister', 'Minister'],
-  ['chairman', 'Deputy'],
+  ['deputy', 'Deputy'],
   ['supervisor', 'Supervisor'],
   ['protocol', 'Protocol'],
   ['super_collaborator', 'Super-collaborator'],
@@ -303,7 +303,7 @@ const COUNTRIES = [
 const INITIAL_USERS = [
   // username, full_name, email, role_key
   ['admin', 'System Admin', null, 'admin'],
-  // ['chairman1', 'Chairman Name', 'chairman@example.com', 'chairman'],
+  // ['deputy1', 'Deputy Name', 'deputy@example.com', 'deputy'],
   // ['supervisor1', 'Supervisor Name', 'supervisor@example.com', 'supervisor'],
   // ['protocol1', 'Protocol Name', 'protocol@example.com', 'protocol'],
   // ['collab1', 'Collaborator Name', 'collab@example.com', 'collaborator'],

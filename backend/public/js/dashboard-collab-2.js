@@ -166,8 +166,8 @@
       submitted_to_supervisor:'At Supervisor',
       returned_by_supervisor:'Returned by Supervisor',
       approved_by_supervisor:'Approved (Supervisor)',
-      submitted_to_chairman:'Submitted to Deputy',
-      approved_by_chairman:'Approved (Deputy)',
+      submitted_to_deputy:'Submitted to Deputy',
+      approved_by_deputy:'Approved (Deputy)',
       approved_by_minister:'Approved (Minister)',
     };
     return map[s]||(s||'');
@@ -177,7 +177,7 @@
     const s=String(status||'').toLowerCase();
     if(['draft','in_progress','locked'].includes(s)) return 'is-draft';
     if(['submitted_to_collaborator_2','submitted_to_collaborator','submitted_to_super_collaborator'].includes(s)) return 'is-review';
-    if(['submitted_to_supervisor','submitted_to_chairman'].includes(s)) return 'is-submitted';
+    if(['submitted_to_supervisor','submitted_to_deputy'].includes(s)) return 'is-submitted';
     if(s.startsWith('approved_')) return 'is-approved';
     if(s.startsWith('returned_')) return 'is-returned';
     return 'is-draft';

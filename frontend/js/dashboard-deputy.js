@@ -1,4 +1,4 @@
-// dashboard-chairman.js
+// dashboard-deputy.js
 (async function(){
   const me = await window.GCP.requireAuth();
   if (!me) return;
@@ -16,7 +16,7 @@
   const returnDocBtn = document.getElementById('returnDocBtn');
   const previewBtn = document.getElementById('previewBtn');
   const msg = document.getElementById('msg');
-  const chairmanControlPanel = document.getElementById('chairmanControlPanel');
+  const deputyControlPanel = document.getElementById('deputyControlPanel');
 
   const modalBackdrop = document.getElementById('modalBackdrop');
   const modalContent = document.getElementById('modalContent');
@@ -33,9 +33,9 @@
   }
 
   function syncDropdownOpenState(){
-    if (!chairmanControlPanel) return;
+    if (!deputyControlPanel) return;
     const hasOpen = Array.from(dropdownRegistry.values()).some(entry => entry && entry.isOpen && entry.isOpen());
-    chairmanControlPanel.classList.toggle('dropdown-open', hasOpen);
+    deputyControlPanel.classList.toggle('dropdown-open', hasOpen);
   }
 
   function closeAllCustomDropdowns(exceptSelect = null){
@@ -221,9 +221,9 @@
       submitted_to_supervisor: 'Submitted',
       returned_by_supervisor: 'Returned',
       approved_by_supervisor: 'Approved (Supervisor)',
-      submitted_to_chairman: 'Submitted to Deputy',
-      returned_by_chairman: 'Returned (Deputy)',
-      approved_by_chairman: 'Approved (Deputy)',
+      submitted_to_deputy: 'Submitted to Deputy',
+      returned_by_deputy: 'Returned (Deputy)',
+      approved_by_deputy: 'Approved (Deputy)',
       locked: 'Locked'
     };
     return map[s] || (s || '');
@@ -267,11 +267,11 @@
     }));
 
     const sectionStatus = String(section.status || '').toLowerCase();
-    const canDecision = !['approved_by_chairman', 'approved_by_minister', 'locked'].includes(sectionStatus);
+    const canDecision = !['approved_by_deputy', 'approved_by_minister', 'locked'].includes(sectionStatus);
     if (canDecision) {
       wrap.appendChild(createMicroAction('Approve', 'approve', async () => {
         try{
-          await window.GCP.apiFetch('/tp/approve-section-chairman', {
+          await window.GCP.apiFetch('/tp/approve-section-deputy', {
             method:'POST',
             body: JSON.stringify({ eventId: currentEventId, sectionId: section.sectionId })
           });
@@ -347,7 +347,7 @@
     const task = ((ev?.task ?? ev?.occasion) || '').trim();
 
     docStatusBox.innerHTML = `
-      ${ds.chairmanComment ? `<div class="muted" style="margin-top:8px;"><b>Comment:</b> ${escape(ds.chairmanComment)}</div>` : ''}
+      ${ds.deputyComment ? `<div class="muted" style="margin-top:8px;"><b>Comment:</b> ${escape(ds.deputyComment)}</div>` : ''}
     `;
 
     const grid = await window.GCP.apiFetch(`/tp/status-grid?event_id=${encodeURIComponent(currentEventId)}`, { method:'GET' });

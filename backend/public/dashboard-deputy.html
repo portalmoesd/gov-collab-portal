@@ -18,7 +18,7 @@
     
 <div class="grid">
   <div class="event-required-wrapper col-12">
-  <section class="card supervisor-control-panel chairman-control-panel" id="chairmanControlPanel">
+  <section class="card supervisor-control-panel deputy-control-panel" id="deputyControlPanel">
     <div class="supervisor-panel-head">
       <div>
         <div class="supervisor-panel-title">Event</div>
@@ -32,14 +32,14 @@
           <select id="eventSelect" class="portal-select"></select>
         </div>
       </div>
-      <div class="row chairman-event-actions" role="group" aria-label="Event actions">
-        <button class="micro-action chairman-event-action chairman-event-action--preview" id="previewBtn" type="button" aria-label="Preview full TPs">
+      <div class="row deputy-event-actions" role="group" aria-label="Event actions">
+        <button class="micro-action deputy-event-action deputy-event-action--preview" id="previewBtn" type="button" aria-label="Preview full TPs">
           <span class="micro-action__icon"></span><span class="micro-action__label">Preview</span>
         </button>
-        <button class="micro-action chairman-event-action chairman-event-action--return" id="returnDocBtn" type="button" aria-label="Return document">
+        <button class="micro-action deputy-event-action deputy-event-action--return" id="returnDocBtn" type="button" aria-label="Return document">
           <span class="micro-action__icon"></span><span class="micro-action__label">Return</span>
         </button>
-        <button class="micro-action chairman-event-action chairman-event-action--approve" id="approveDocBtn" type="button" aria-label="Approve document">
+        <button class="micro-action deputy-event-action deputy-event-action--approve" id="approveDocBtn" type="button" aria-label="Approve document">
           <span class="micro-action__icon"></span><span class="micro-action__label">Approve</span>
         </button>
       </div>
@@ -48,7 +48,7 @@
     <div id="msg" class="small" style="color:var(--danger); font-weight:800; margin-top:10px;"></div>
   </section>
 
-  <section class="card required-sections-panel chairman-required-sections-panel" id="requiredSectionsPanel" hidden>
+  <section class="card required-sections-panel deputy-required-sections-panel" id="requiredSectionsPanel" hidden>
     <div class="required-sections-head">
       <div>
         <div class="required-sections-title">Required sections</div>
@@ -90,8 +90,8 @@
   <script src="js/config.js"></script>
   <script src="js/api.js"></script>
   <script src="js/app.js?v=47"></script>
-  <script src="js/dashboard-chairman.js?v=47"></script>
-  <script src="js/dashboard-chairman-upcoming.js?v=1"></script>
+  <script src="js/dashboard-deputy.js?v=47"></script>
+  <script src="js/dashboard-deputy-upcoming.js?v=1"></script>
   <script src="js/calendar-collab.js?v=2"></script>
 </body>
 </html>

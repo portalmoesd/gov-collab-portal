@@ -201,9 +201,9 @@
       submitted_to_supervisor: 'Submitted',
       returned_by_supervisor: 'Returned',
       approved_by_supervisor: 'Approved (Supervisor)',
-      submitted_to_chairman: 'Submitted to Deputy',
-      returned_by_chairman: 'Returned (Deputy)',
-      approved_by_chairman: 'Approved (Deputy)',
+      submitted_to_deputy: 'Submitted to Deputy',
+      returned_by_deputy: 'Returned (Deputy)',
+      approved_by_deputy: 'Approved (Deputy)',
       submitted_to_minister: 'Submitted to Minister',
       returned_by_minister: 'Returned (Minister)',
       approved_by_minister: 'Approved (Minister)',
@@ -249,7 +249,7 @@
     if (canDecision) {
       wrap.appendChild(createMicroAction('Approve', 'approve', async () => {
         try {
-          await window.GCP.apiFetch('/tp/approve-section-chairman', {
+          await window.GCP.apiFetch('/tp/approve-section-deputy', {
             method:'POST',
             body: JSON.stringify({ eventId: currentEventId, sectionId: section.sectionId })
           });
@@ -323,7 +323,7 @@
     const task = ((ev?.task ?? ev?.occasion) || '').trim();
 
     docStatusBox.innerHTML = `
-      ${ds.chairmanComment ? `<div class="muted" style="margin-top:8px;"><b>Comment:</b> ${escape(ds.chairmanComment)}</div>` : ''}
+      ${ds.deputyComment ? `<div class="muted" style="margin-top:8px;"><b>Comment:</b> ${escape(ds.deputyComment)}</div>` : ''}
     `;
 
     const grid = await window.GCP.apiFetch(`/tp/status-grid?event_id=${encodeURIComponent(currentEventId)}`, { method:'GET' });
