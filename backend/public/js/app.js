@@ -642,7 +642,7 @@
     return 0; // draft / in_progress / returned_by_collaborator_1
   }
 
-  function renderHistoryTimeline(history, currentStatus, lsr, originalSubmitterRole) {
+  function renderHistoryTimeline(history, currentStatus, lsr, originalSubmitterRole, documentSubmitterRole) {
     const historyArr = history || [];
     const s = String(currentStatus || 'draft').toLowerCase();
 
@@ -663,12 +663,20 @@
     const osr = String(effectiveOsr).toLowerCase();
     const startRoleIdx = Math.max(0, lowerRoleOrder.indexOf(osr));
 
+    // Determine which upper-tier stages to show (mirrors getUpperTierSteps logic)
+    const dsr = String(documentSubmitterRole || '').toLowerCase();
+    const dsrNorm = dsr === 'chairman' ? 'deputy' : dsr;
+    const upperRolesToShow = new Set(['supervisor']);
+    if (dsrNorm !== 'supervisor') upperRolesToShow.add('chairman');
+    if (dsrNorm === 'minister')   upperRolesToShow.add('minister');
+
     const stages = (skipCurator ? HISTORY_STAGES.filter(s => s.role !== 'collaborator_3') : HISTORY_STAGES)
       .map((s, i) => ({ ...s, _idx: i }))
-      // Drop Supervisor / Deputy / Minister — section history never contains their actions
-      .filter(s => !['supervisor','chairman','minister'].includes(s.role))
-      // Drop lower-tier roles that did not participate for this specific section
-      .filter(s => lowerRoleOrder.indexOf(s.role) < 0 || lowerRoleOrder.indexOf(s.role) >= startRoleIdx);
+      // Include upper-tier stages based on documentSubmitterRole; drop lower-tier non-participants
+      .filter(s => {
+        if (['supervisor','chairman','minister'].includes(s.role)) return upperRolesToShow.has(s.role);
+        return lowerRoleOrder.indexOf(s.role) < 0 || lowerRoleOrder.indexOf(s.role) >= startRoleIdx;
+      });
     // Group history events by role
     const byRole = {};
     for (const ev of historyArr) {
@@ -773,7 +781,7 @@
           panel.innerHTML = '<div class="sh-no-action">Loading…</div>';
           try {
             const data = await window.GCP.apiFetch(`/tp/section-history?event_id=${encodeURIComponent(eventId)}&section_id=${encodeURIComponent(section.sectionId)}`, { method:'GET' });
-            panel.innerHTML = renderHistoryTimeline(data.history || [], section.status, section.lowerSubmitterRole, section.originalSubmitterRole);
+            panel.innerHTML = renderHistoryTimeline(data.history || [], section.status, section.lowerSubmitterRole, section.originalSubmitterRole, section.documentSubmitterRole);
           } catch (e) {
             panel.innerHTML = `<div class="sh-no-action">Could not load history: ${escapeHtml(e.message||'error')}</div>`;
           }
@@ -800,7 +808,7 @@
           panel.innerHTML = '<div class="sh-no-action">Loading…</div>';
           try {
             const data = await window.GCP.apiFetch(`/tp/section-history?event_id=${encodeURIComponent(eventId)}&section_id=${encodeURIComponent(section.sectionId)}`, { method:'GET' });
-            panel.innerHTML = renderHistoryTimeline(data.history || [], section.status, section.lowerSubmitterRole, section.originalSubmitterRole);
+            panel.innerHTML = renderHistoryTimeline(data.history || [], section.status, section.lowerSubmitterRole, section.originalSubmitterRole, section.documentSubmitterRole);
           } catch (e) {
             panel.innerHTML = `<div class="sh-no-action">Could not load history: ${escapeHtml(e.message||'error')}</div>`;
           }
