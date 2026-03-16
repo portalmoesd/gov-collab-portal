@@ -186,13 +186,8 @@
       window.open(`editor.html?event_id=${currentEventId}&section_id=${section.sectionId}`, '_blank');
     }));
 
-    // Supervisor can approve/return any section not yet approved at supervisor level or beyond
-    const beyondSupervisor = [
-      'approved_by_supervisor', 'submitted_to_chairman', 'returned_by_chairman',
-      'approved_by_chairman', 'submitted_to_minister', 'returned_by_minister',
-      'approved_by_minister', 'approved', 'locked',
-    ];
-    const canApprove = !beyondSupervisor.includes(s);
+    // Supervisor can approve/return any section not yet finalized
+    const canApprove = !['approved_by_chairman', 'approved_by_minister', 'approved', 'locked'].includes(s);
 
     if (canApprove){
       wrap.appendChild(createMicroAction('Approve', 'approve', async () => {
@@ -210,18 +205,6 @@
           await window.GCP.apiFetch('/tp/return', { method: 'POST', body: JSON.stringify({ eventId: currentEventId, sectionId: section.sectionId, note }) });
           setMsg('Section returned.'); await refreshStatusGrid();
         }catch(e){ setMsg(e.message || 'Return failed', true); }
-      }));
-    }
-
-    // Ask to Return — for sections above supervisor level (at deputy / minister)
-    if (!canApprove){
-      wrap.appendChild(createMicroAction('Ask to Return', 'ask-to-return', async (e) => {
-        const note = await window.GCP.showCommentDropdown(e.currentTarget, { title: 'Ask to Return', placeholder: 'Why do you need it back? (optional)…', sendLabel: 'Send Request' });
-        if (note === null) return;
-        try{
-          await window.GCP.apiFetch('/tp/ask-to-return', { method: 'POST', body: JSON.stringify({ eventId: currentEventId, sectionId: section.sectionId, note }) });
-          setMsg('Return request sent.');
-        }catch(e){ setMsg(e.message || 'Request failed', true); }
       }));
     }
 
