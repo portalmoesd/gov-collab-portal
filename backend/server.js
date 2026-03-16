@@ -2433,8 +2433,9 @@ app.get('/api/tp/status-grid', authRequired, async (req, res) => {
     const countryId = await resolveCountryIdForEvent(eventId);
     if (!countryId) return res.status(404).json({ error: 'event not found' });
 
-    const evMetaGrid = await queryOne(`SELECT lower_submitter_role FROM events WHERE id=$1`, [eventId]);
+    const evMetaGrid = await queryOne(`SELECT lower_submitter_role, submitter_role FROM events WHERE id=$1`, [eventId]);
     const lowerSubmitterRole = String(evMetaGrid?.lower_submitter_role || 'collaborator_2').toLowerCase();
+    const documentSubmitterRole = String(evMetaGrid?.submitter_role || 'chairman').toLowerCase();
 
     // Curator only participates when the event pipeline includes Curator
     if (roleKey === 'collaborator_3' && lowerSubmitterRole !== 'collaborator_3') {
@@ -2535,6 +2536,7 @@ app.get('/api/tp/status-grid', authRequired, async (req, res) => {
       event_id: eventId,
       country_id: countryId,
       lowerSubmitterRole,
+      documentSubmitterRole,
       sections: rows.map(r => ({
         sectionId: r.id,
         sectionLabel: r.label,
@@ -2544,6 +2546,7 @@ app.get('/api/tp/status-grid', authRequired, async (req, res) => {
         lastUpdatedBy: r.last_updated_by || null,
         isAssigned: assignedSet.has(Number(r.id)),
         lowerSubmitterRole,
+        documentSubmitterRole,
         originalSubmitterRole: r.original_submitter_role || null,
         returnTargetRole: r.return_target_role || null,
         returnRequest: returnRequestsBySection[Number(r.id)] || null,

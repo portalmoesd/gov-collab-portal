@@ -439,43 +439,63 @@
     if (r === 'collaborator_1') return 0;
     if (r === 'collaborator_2') return 1;
     if (r === 'collaborator_3') return skipCurator ? 1 : 2;
-    const base = skipCurator ? 2 : 3;
+    const base = skipCurator ? 2 : 3; // index of "Waiting for Approval"
     if (r === 'collaborator') return base;
-    if (r === 'super_collaborator') return base + 1;
-    if (r === 'supervisor') return base + 2;
+    if (r === 'super_collaborator') return base; // same "Waiting for Approval" step
+    if (r === 'supervisor') return base + 1; // Supervisor step
     return -1;
   }
 
-  window.GCP.collabSimpleStepIndex = function(status, lsr, returnTargetRole) {
+  // Returns upper-tier step labels (after Super-Collaborator) based on document submitter role.
+  function getUpperTierSteps(documentSubmitterRole) {
+    const dsr = String(documentSubmitterRole || '').toLowerCase();
+    const r = dsr === 'chairman' ? 'deputy' : dsr;
+    if (r === 'supervisor') return ['Supervisor', 'Approved'];
+    if (r === 'minister')   return ['Supervisor', 'Deputy', 'Minister', 'Approved'];
+    return ['Supervisor', 'Deputy', 'Approved'];
+  }
+
+  // Returns 0-based index within the upper-tier steps for a given status.
+  function upperTierStepIdx(status, documentSubmitterRole) {
+    const s = String(status || '').toLowerCase();
+    const dsr = String(documentSubmitterRole || '').toLowerCase();
+    const r = dsr === 'chairman' ? 'deputy' : dsr;
+    // Supervisor step (index 0)
+    if (['approved_by_super_collaborator', 'submitted_to_supervisor',
+         'returned_by_supervisor', 'approved_by_supervisor'].includes(s)) return 0;
+    if (r === 'supervisor') return 1; // Approved
+    // Deputy step (index 1 for deputy/minister)
+    if (['submitted_to_chairman', 'returned_by_chairman', 'approved_by_chairman'].includes(s)) return 1;
+    if (r === 'deputy') return 2; // Approved
+    // Minister step (index 2 for minister)
+    if (['submitted_to_minister', 'approved_by_minister'].includes(s)) return 2;
+    return 3; // Approved
+  }
+
+  window.GCP.collabSimpleStepIndex = function(status, lsr, returnTargetRole, documentSubmitterRole) {
     const s = String(status || 'draft').toLowerCase();
     const skipCurator = String(lsr || 'collaborator_2').toLowerCase() !== 'collaborator_3';
+    const lowerStepCount = skipCurator ? 3 : 4; // number of lower-tier steps (excluding upper tier)
     // When section is returned and we know the explicit target, use it for the active step
     if (s.startsWith('returned_by') && returnTargetRole) {
       const rtiIdx = returnTargetStepIndex(returnTargetRole, skipCurator);
       if (rtiIdx >= 0) return rtiIdx;
     }
     if (skipCurator) {
-      // 4-step: Collab I → Head Collab → Waiting for Approval → Approved
       if (['draft', 'returned', 'returned_by_collaborator_2'].includes(s)) return 0;
       if (['submitted_to_collaborator_2', 'approved_by_collaborator_2'].includes(s)) return 1;
       if (['submitted_to_collaborator', 'returned_by_collaborator',
            'submitted_to_super_collaborator', 'returned_by_super_collaborator', 'approved_by_collaborator',
            'approved_by_collaborator_3'].includes(s)) return 2;
-      if (['approved_by_super_collaborator', 'submitted_to_supervisor', 'returned_by_supervisor',
-           'approved_by_supervisor', 'submitted_to_chairman', 'approved_by_chairman',
-           'submitted_to_minister', 'approved_by_minister', 'approved', 'locked'].includes(s)) return 3;
-      return 0;
+    } else {
+      if (['draft', 'returned', 'returned_by_collaborator_2'].includes(s)) return 0;
+      if (['submitted_to_collaborator_2'].includes(s)) return 1;
+      if (['submitted_to_collaborator_3', 'approved_by_collaborator_2', 'returned_by_collaborator_3'].includes(s)) return 2;
+      if (['submitted_to_collaborator', 'approved_by_collaborator_3', 'returned_by_collaborator',
+           'submitted_to_super_collaborator', 'returned_by_super_collaborator', 'approved_by_collaborator'].includes(s)) return 3;
     }
-    // 5-step: Collab I → Head Collab → Curator → Waiting for Approval → Approved
-    if (['draft', 'returned', 'returned_by_collaborator_2'].includes(s)) return 0;
-    if (['submitted_to_collaborator_2'].includes(s)) return 1;
-    if (['submitted_to_collaborator_3', 'approved_by_collaborator_2', 'returned_by_collaborator_3'].includes(s)) return 2;
-    if (['submitted_to_collaborator', 'approved_by_collaborator_3', 'returned_by_collaborator',
-         'submitted_to_super_collaborator', 'returned_by_super_collaborator', 'approved_by_collaborator'].includes(s)) return 3;
-    if (['approved_by_super_collaborator', 'submitted_to_supervisor', 'returned_by_supervisor',
-         'approved_by_supervisor', 'submitted_to_chairman', 'approved_by_chairman',
-         'submitted_to_minister', 'approved_by_minister', 'approved', 'locked'].includes(s)) return 4;
-    return 0;
+    // Upper tier: offset by number of lower steps
+    return lowerStepCount + upperTierStepIdx(s, documentSubmitterRole);
   };
 
   // Returns true when a section has never been acted on:
@@ -492,16 +512,18 @@
     </div>`;
   }
 
-  window.GCP.renderCollabSimpleProgress = function(status, stepNames, lsr, originalSubmitterRole, returnTargetRole) {
+  window.GCP.renderCollabSimpleProgress = function(status, stepNames, lsr, originalSubmitterRole, returnTargetRole, documentSubmitterRole) {
     if (isAwaitingFirstAction(status, stepNames)) return awaitingProgressHtml();
     const skipCurator = String(lsr || 'collaborator_2').toLowerCase() !== 'collaborator_3';
-    const steps = skipCurator
-      ? ['Collaborator I', 'Head Collaborator', 'Waiting for Approval', 'Approved']
-      : ['Collaborator I', 'Head Collaborator', 'Curator', 'Waiting for Approval', 'Approved'];
+    const lowerSteps = skipCurator
+      ? ['Collaborator I', 'Head Collaborator', 'Waiting for Approval']
+      : ['Collaborator I', 'Head Collaborator', 'Curator', 'Waiting for Approval'];
+    const steps = lowerSteps.concat(getUpperTierSteps(documentSubmitterRole));
     const names = stepNames && typeof stepNames === 'object'
       ? (skipCurator
-          ? [stepNames.collabI || null, stepNames.collabII || null, stepNames.collaborator || null, stepNames.superCollab || null]
-          : [stepNames.collabI || null, stepNames.collabII || null, stepNames.collabIII || null, stepNames.collaborator || null, stepNames.superCollab || null])
+          ? [stepNames.collabI || null, stepNames.collabII || null, null]
+          : [stepNames.collabI || null, stepNames.collabII || null, stepNames.collabIII || null, null])
+        .concat(getUpperTierSteps(documentSubmitterRole).map(() => null))
       : steps.map(() => null);
     // Determine the first participating step based on originalSubmitterRole
     let startStep = 0;
@@ -510,15 +532,14 @@
       if (osr === 'collaborator_2') startStep = 1;
       else if (osr === 'collaborator_3') startStep = skipCurator ? 1 : 2;
       else if (osr === 'collaborator') startStep = skipCurator ? 2 : 3;
-      else if (osr === 'super_collaborator') startStep = skipCurator ? 3 : 4;
+      else if (osr === 'super_collaborator') startStep = skipCurator ? 2 : 3;
     }
-    const active = window.GCP.collabSimpleStepIndex(status, lsr, returnTargetRole);
+    const active = window.GCP.collabSimpleStepIndex(status, lsr, returnTargetRole, documentSubmitterRole);
     const fillPercent = (active / (steps.length - 1)) * 100;
     const stepHtml = steps.map((label, idx) => {
       const notParticipating = idx < startStep;
       const state = notParticipating ? 'skip' : (idx < active ? 'done' : (idx === active ? 'active' : 'todo'));
       const name = names[idx];
-      // Show the actor's name once they've acted; otherwise show the role label
       const displayLabel = name ? escapeHtml(name) : escapeHtml(label);
       return `<div class="wf-step ${state}" role="listitem" aria-current="${idx === active ? 'step' : 'false'}">
         <div class="wf-step__circle" aria-hidden="true">${idx + 1}</div>
@@ -537,11 +558,11 @@
   // Shows the full pipeline with explicit role names.
   // Steps before originalSubmitterRole are completely omitted (not greyed-out) so
   // the bar starts exactly where this section entered the pipeline.
-  window.GCP.renderUpperTierProgress = function(status, stepNames, lsr, originalSubmitterRole, returnTargetRole) {
+  window.GCP.renderUpperTierProgress = function(status, stepNames, lsr, originalSubmitterRole, returnTargetRole, documentSubmitterRole) {
     if (isAwaitingFirstAction(status, stepNames)) return awaitingProgressHtml();
     const skipCurator = String(lsr || 'collaborator_2').toLowerCase() !== 'collaborator_3';
     const sn = stepNames && typeof stepNames === 'object' ? stepNames : {};
-    const allSteps = skipCurator
+    const lowerCollabSteps = skipCurator
       ? [
           { label: 'Collaborator I',     name: sn.collabI      || null },
           { label: 'Head Collaborator',  name: sn.collabII     || null },
@@ -555,6 +576,8 @@
           { label: 'Collaborator',       name: sn.collaborator || null },
           { label: 'Super-Collaborator', name: sn.superCollab  || null },
         ];
+    const upperSteps = getUpperTierSteps(documentSubmitterRole).map(label => ({ label, name: null }));
+    const allSteps = lowerCollabSteps.concat(upperSteps);
     // Determine first visible step from originalSubmitterRole
     let startStep = 0;
     if (originalSubmitterRole) {
@@ -565,16 +588,13 @@
       else if (osr === 'super_collaborator') startStep = skipCurator ? 3 : 4;
     }
     const visibleSteps = allSteps.slice(startStep);
-    // Absolute active index from status, then offset to visible-relative.
-    // collabSimpleStepIndex deliberately keeps submitted_to_super_collaborator and
-    // approved_by_collaborator at the Collaborator step so the lower-tier bar can
-    // label that region "Waiting for Approval". For the upper-tier bar we have an
-    // explicit Super-Collaborator step, so advance past Collaborator for those statuses.
+    // For the upper-tier bar, Super-Collaborator is an explicit step so advance to it
+    // for statuses that collabSimpleStepIndex would still show at Collaborator.
     const _s = String(status || '').toLowerCase();
     const _superIdx = skipCurator ? 3 : 4;
     const activeAbs = (['submitted_to_super_collaborator', 'approved_by_collaborator'].includes(_s))
       ? _superIdx
-      : window.GCP.collabSimpleStepIndex(status, lsr, returnTargetRole);
+      : window.GCP.collabSimpleStepIndex(status, lsr, returnTargetRole, documentSubmitterRole);
     const active = Math.max(0, activeAbs - startStep);
     const fillPercent = visibleSteps.length > 1 ? (active / (visibleSteps.length - 1)) * 100 : 100;
     const stepHtml = visibleSteps.map((step, idx) => {
