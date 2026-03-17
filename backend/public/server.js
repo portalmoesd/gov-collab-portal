@@ -41,7 +41,7 @@ app.use('/api', (req, res, next) => {
   next();
 });
 
-app.use(express.json({ limit: '2mb' }));
+app.use(express.json({ limit: '20mb' }));
 app.use(cors({
   origin: CORS_ORIGIN === '*' ? true : CORS_ORIGIN,
   credentials: true,
@@ -73,13 +73,29 @@ async function ensureSchema() {
   `).catch(()=>{});
 
   // Lightweight, idempotent DDL to keep Render deployments working
-  await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMP`);
-  await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS deleted_by_user_id INTEGER`);
-  await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS entity TEXT`);
-  await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS department TEXT`);
-  await pool.query(`ALTER TABLE events ADD COLUMN IF NOT EXISTS ended_at TIMESTAMP`);
-  await pool.query(`ALTER TABLE events ADD COLUMN IF NOT EXISTS ended_by_user_id INTEGER`);
-  await pool.query(`ALTER TABLE events ADD COLUMN IF NOT EXISTS submitter_role TEXT NOT NULL DEFAULT 'deputy'`).catch(()=>{});
+  // NOTE: these use .catch() so a single failure doesn't abort the rest of schema setup
+  await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMP`).catch(e => console.error('DDL warn:', e.message));
+  await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS deleted_by_user_id INTEGER`).catch(e => console.error('DDL warn:', e.message));
+  await pool.query(`ALTER TABLE events ADD COLUMN IF NOT EXISTS ended_at TIMESTAMP`).catch(e => console.error('DDL warn:', e.message));
+  await pool.query(`ALTER TABLE events ADD COLUMN IF NOT EXISTS ended_by_user_id INTEGER`).catch(e => console.error('DDL warn:', e.message));
+  await pool.query(`ALTER TABLE events ADD COLUMN IF NOT EXISTS submitter_role TEXT NOT NULL DEFAULT 'deputy'`).catch(e => console.error('DDL warn:', e.message));
+  await pool.query(`ALTER TABLE events ADD COLUMN IF NOT EXISTS lower_submitter_role TEXT DEFAULT 'collaborator_2'`).catch(e => console.error('DDL warn:', e.message));
+  await pool.query(`ALTER TABLE tp_content ADD COLUMN IF NOT EXISTS original_submitter_role TEXT DEFAULT NULL`).catch(e => console.error('DDL warn:', e.message));
+  await pool.query(`ALTER TABLE tp_content ADD COLUMN IF NOT EXISTS return_target_role TEXT DEFAULT NULL`).catch(e => console.error('DDL warn:', e.message));
+  await pool.query(`ALTER TABLE tp_content ADD COLUMN IF NOT EXISTS last_content_edited_at TIMESTAMPTZ DEFAULT NULL`).catch(()=>{});
+  await pool.query(`ALTER TABLE tp_content ADD COLUMN IF NOT EXISTS last_content_edited_by_user_id INTEGER REFERENCES users(id) DEFAULT NULL`).catch(()=>{});
+  await pool.query(`CREATE TABLE IF NOT EXISTS section_return_requests (
+    id SERIAL PRIMARY KEY,
+    event_id INTEGER NOT NULL,
+    country_id INTEGER NOT NULL,
+    section_id INTEGER NOT NULL,
+    requested_by_user_id INTEGER REFERENCES users(id),
+    requested_by_name TEXT NOT NULL,
+    requested_by_role TEXT NOT NULL,
+    directed_to_role TEXT NOT NULL,
+    note TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+  )`).catch(()=>{});
 
   // Ensure enum value exists for minister approvals (legacy DBs)
   await pool.query(`ALTER TYPE tp_section_status ADD VALUE IF NOT EXISTS 'approved_by_minister'`).catch(async ()=>{
@@ -104,6 +120,54 @@ async function ensureSchema() {
   await pool.query(`ALTER TABLE document_status ADD COLUMN IF NOT EXISTS last_updated_by_user_id INTEGER`).catch(()=>{});
   await pool.query(`ALTER TABLE document_status ADD COLUMN IF NOT EXISTS deputy_comment TEXT`).catch(()=>{});
   await pool.query(`ALTER TABLE document_status ALTER COLUMN status TYPE TEXT USING status::text`).catch(()=>{});
+
+  // Curator tier statuses
+  await pool.query(`ALTER TYPE tp_section_status ADD VALUE IF NOT EXISTS 'submitted_to_collaborator_3'`).catch(()=>{});
+  await pool.query(`ALTER TYPE tp_section_status ADD VALUE IF NOT EXISTS 'returned_by_collaborator_3'`).catch(()=>{});
+  await pool.query(`ALTER TYPE tp_section_status ADD VALUE IF NOT EXISTS 'approved_by_collaborator_3'`).catch(()=>{});
+
+  // Deputy/minister pipeline statuses (needed for return and approve-all-sections routes)
+  await pool.query(`ALTER TYPE tp_section_status ADD VALUE IF NOT EXISTS 'submitted_to_deputy'`).catch(()=>{});
+  await pool.query(`ALTER TYPE tp_section_status ADD VALUE IF NOT EXISTS 'returned_by_deputy'`).catch(()=>{});
+  await pool.query(`ALTER TYPE tp_section_status ADD VALUE IF NOT EXISTS 'submitted_to_minister'`).catch(()=>{});
+  await pool.query(`ALTER TYPE tp_section_status ADD VALUE IF NOT EXISTS 'returned_by_minister'`).catch(()=>{});
+
+  // Section audit history
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS tp_section_history (
+      id SERIAL PRIMARY KEY,
+      event_id INTEGER NOT NULL,
+      country_id INTEGER NOT NULL,
+      section_id INTEGER NOT NULL,
+      action TEXT NOT NULL,
+      from_status TEXT,
+      to_status TEXT NOT NULL,
+      user_id INTEGER,
+      user_name TEXT,
+      user_role TEXT,
+      note TEXT,
+      acted_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `).catch(()=>{});
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_tsh_lookup ON tp_section_history(event_id, section_id, acted_at)`).catch(()=>{});
+
+  // Section-level comments
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS tp_section_comments (
+      id          SERIAL PRIMARY KEY,
+      event_id    INTEGER NOT NULL REFERENCES events(id) ON DELETE CASCADE,
+      country_id  INTEGER NOT NULL REFERENCES countries(id) ON DELETE CASCADE,
+      section_id  INTEGER NOT NULL REFERENCES sections(id) ON DELETE CASCADE,
+      user_id     INTEGER NOT NULL REFERENCES users(id),
+      author_name TEXT NOT NULL,
+      comment_text TEXT NOT NULL,
+      anchor_id   TEXT,
+      created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `).catch(()=>{});
+  await pool.query(`ALTER TABLE tp_section_comments ADD COLUMN IF NOT EXISTS anchor_id TEXT`).catch(()=>{});
+  await pool.query(`ALTER TABLE tp_section_comments ADD COLUMN IF NOT EXISTS parent_id INTEGER REFERENCES tp_section_comments(id) ON DELETE CASCADE`).catch(()=>{});
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_tsc_lookup ON tp_section_comments(event_id, country_id, section_id)`).catch(()=>{});
 }
 
 async function ensureRolesExist() {
@@ -115,7 +179,8 @@ async function ensureRolesExist() {
     ['protocol','Protocol'],
     ['super_collaborator','Super-collaborator'],
     ['collaborator','Collaborator'],
-    ['collaborator_2','Collaborator II'],
+    ['collaborator_3','Curator'],
+    ['collaborator_2','Head Collaborator'],
     ['collaborator_1','Collaborator I'],
     ['viewer','Viewer'],
   ];
@@ -237,6 +302,14 @@ async function resolveCountryIdForEvent(eventId){
   return row ? row.country_id : null;
 }
 
+async function recordHistory({ eventId, countryId, sectionId, action, fromStatus, toStatus, userId, userName, userRole, note }) {
+  await pool.query(
+    `INSERT INTO tp_section_history (event_id, country_id, section_id, action, from_status, to_status, user_id, user_name, user_role, note)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
+    [eventId, countryId, sectionId, action, fromStatus||null, toStatus, userId||null, userName||null, userRole||null, note||null]
+  ).catch(e => console.error('recordHistory failed', e.message));
+}
+
 async function getAssignedCountryIds(userId){
   const rows = await queryAll(`SELECT country_id FROM country_assignments WHERE user_id=$1`, [userId]);
   return rows.map(r => Number(r.country_id));
@@ -258,13 +331,14 @@ async function eventHasAnyRequiredSection(eventId, sectionIds){
 
 
 function isSectionPipelineRole(roleKey) {
-  return ['collaborator_1','collaborator_2','collaborator','super_collaborator'].includes(normalizeRoleKey(roleKey));
+  return ['collaborator_1','collaborator_2','collaborator_3','collaborator','super_collaborator'].includes(normalizeRoleKey(roleKey));
 }
 
 function nextSectionSubmitStatus(roleKey) {
   const rk = normalizeRoleKey(roleKey);
   if (rk === 'collaborator_1') return 'submitted_to_collaborator_2';
-  if (rk === 'collaborator_2') return 'submitted_to_collaborator';
+  if (rk === 'collaborator_2') return 'submitted_to_collaborator_3';
+  if (rk === 'collaborator_3') return 'submitted_to_collaborator';
   if (rk === 'collaborator') return 'submitted_to_super_collaborator';
   if (rk === 'super_collaborator') return 'submitted_to_supervisor';
   return null;
@@ -273,12 +347,18 @@ function nextSectionSubmitStatus(roleKey) {
 function returnSectionStatus(roleKey) {
   const rk = normalizeRoleKey(roleKey);
   if (rk === 'collaborator_2') return 'returned_by_collaborator_2';
+  if (rk === 'collaborator_3') return 'returned_by_collaborator_3';
+  if (rk === 'collaborator') return 'returned_by_collaborator';
+  if (rk === 'super_collaborator') return 'returned_by_super_collaborator';
   if (rk === 'supervisor') return 'returned_by_supervisor';
+  if (rk === 'deputy') return 'returned_by_deputy';
+  if (rk === 'minister') return 'returned_by_minister';
   return 'returned';
 }
 
 function approveSectionStatus(roleKey) {
   const rk = normalizeRoleKey(roleKey);
+  if (rk === 'super_collaborator') return 'approved_by_super_collaborator';
   if (rk === 'supervisor') return 'approved_by_supervisor';
   if (rk === 'deputy') return 'approved_by_deputy';
   if (rk === 'minister') return 'approved_by_minister';
@@ -288,16 +368,54 @@ function approveSectionStatus(roleKey) {
 function decisionStatusesForRole(roleKey) {
   const rk = normalizeRoleKey(roleKey);
   if (rk === 'collaborator_2') return ['submitted_to_collaborator_2', 'returned_by_collaborator_2'];
-  if (rk === 'supervisor') return ['submitted_to_supervisor', 'returned_by_supervisor'];
+  if (rk === 'collaborator_3') return ['submitted_to_collaborator_3', 'returned_by_collaborator_3'];
+  if (rk === 'collaborator') return ['submitted_to_collaborator', 'returned_by_collaborator', 'approved_by_collaborator_2', 'approved_by_collaborator_3'];
+  if (rk === 'super_collaborator') return [
+    'submitted_to_super_collaborator', 'returned_by_super_collaborator', 'approved_by_collaborator',
+    // Skip the Collaborator stage entirely
+    'submitted_to_collaborator', 'returned_by_collaborator', 'approved_by_collaborator_3',
+    // Skip Head Collaborator and Curator stages — bypass the entire lower pipeline
+    'submitted_to_collaborator_2', 'returned_by_collaborator_2', 'approved_by_collaborator_2',
+    'submitted_to_collaborator_3', 'returned_by_collaborator_3',
+  ];
+  if (rk === 'supervisor') return ['submitted_to_supervisor', 'returned_by_supervisor', 'approved_by_super_collaborator'];
   if (rk === 'deputy') return ['submitted_to_deputy', 'returned_by_deputy'];
   if (rk === 'minister') return ['submitted_to_minister', 'returned_by_minister'];
   if (rk === 'admin') return [
     'submitted_to_collaborator_2', 'returned_by_collaborator_2',
+    'submitted_to_collaborator_3', 'returned_by_collaborator_3',
+    'submitted_to_collaborator', 'returned_by_collaborator',
+    'submitted_to_super_collaborator', 'returned_by_super_collaborator',
     'submitted_to_supervisor', 'returned_by_supervisor',
     'submitted_to_deputy', 'returned_by_deputy',
     'submitted_to_minister', 'returned_by_minister'
   ];
   return [];
+}
+
+// Determines which role currently holds the section (i.e. whose turn it is to act).
+function currentHolderRole(status, returnTargetRole, originalSubmitterRole, lowerSubmitterRole) {
+  const s = String(status || 'draft').toLowerCase();
+  const skipCurator = String(lowerSubmitterRole || 'collaborator_2').toLowerCase() !== 'collaborator_3';
+  if (s === 'draft' || s === 'in_progress') return normalizeRoleKey(originalSubmitterRole || 'collaborator_1');
+  if (s.startsWith('returned_')) return normalizeRoleKey(returnTargetRole || originalSubmitterRole || 'collaborator_1');
+  const directMap = {
+    submitted_to_collaborator_2: 'collaborator_2',
+    submitted_to_collaborator_3: 'collaborator_3',
+    submitted_to_collaborator:   'collaborator',
+    submitted_to_super_collaborator: 'super_collaborator',
+    submitted_to_supervisor: 'supervisor',
+    submitted_to_deputy:   'deputy',
+    submitted_to_minister:   'minister',
+  };
+  if (directMap[s]) return directMap[s];
+  if (s === 'approved_by_collaborator_2') return skipCurator ? 'collaborator' : 'collaborator_3';
+  if (s === 'approved_by_collaborator_3') return 'collaborator';
+  if (s === 'approved_by_collaborator')   return 'super_collaborator';
+  if (s === 'approved_by_super_collaborator') return 'supervisor';
+  if (s === 'approved_by_supervisor') return 'deputy';
+  if (s === 'approved_by_deputy')   return 'minister';
+  return normalizeRoleKey(originalSubmitterRole || 'collaborator_1');
 }
 
 async function getCurrentSectionStatus(eventId, countryId, sectionId) {
@@ -311,10 +429,13 @@ async function getCurrentSectionStatus(eventId, countryId, sectionId) {
 
 async function userCanSeeEvent(user, event){
   const roleKey = normalizeRoleKey(user.role_key);
-  // Submitter visibility rules
+  // Upper-pipeline visibility: Deputy and Minister only see events that need them
   const submitterRole = String(event.submitter_role || 'deputy').toLowerCase();
   if (roleKey === 'deputy' && submitterRole === 'supervisor') return false;
   if (roleKey === 'minister' && submitterRole !== 'minister') return false;
+  // Lower-pipeline visibility: Curator only sees events where Curator is in the pipeline
+  const lowerSubmitterRole = String(event.lower_submitter_role || 'collaborator_2').toLowerCase();
+  if (roleKey === 'collaborator_3' && lowerSubmitterRole !== 'collaborator_3') return false;
 
   if (!isSectionPipelineRole(roleKey)) return true;
 
@@ -366,12 +487,11 @@ async function queryAll(text, params) {
 }
 
 function pickUserPayload(row) {
+  // Blueprint wants: { id, fullName, email, role }
   return {
     id: row.id,
     fullName: row.full_name,
     email: row.email,
-    entity: row.entity || null,
-    department: row.department || null,
     role: row.role_key,
     username: row.username,
     isActive: row.is_active,
@@ -480,12 +600,13 @@ async function ensureDocumentStatus(eventId, countryId) {
 }
 
 async function ensureTpRow(eventId, countryId, sectionId, userId){
-  // tp_content is unique on (event_id, country_id, section_id) in the deployed DB
+  // Create a minimal empty row — do NOT set last_updated_by_user_id or last_updated_at
+  // so the editor can correctly show "No updates yet" for untouched sections.
   await pool.query(
-    `INSERT INTO tp_content (event_id, country_id, section_id, html_content, status, status_comment, last_updated_by_user_id, last_updated_at)
-     VALUES ($1,$2,$3,'','draft',NULL,$4,NOW())
+    `INSERT INTO tp_content (event_id, country_id, section_id, html_content, status, status_comment)
+     VALUES ($1,$2,$3,'','draft',NULL)
      ON CONFLICT (event_id, country_id, section_id) DO NOTHING`,
-    [eventId, countryId, sectionId, userId]
+    [eventId, countryId, sectionId]
   );
 }
 
@@ -548,6 +669,7 @@ async function getEventWithSections(eventId, countryIdForStatuses = null) {
     title: event.title,
     occasion: event.occasion,
     submitterRole: event.submitter_role,
+    lowerSubmitterRole: event.lower_submitter_role || 'collaborator_2',
     deadlineDate: event.deadline_date,
     isActive: event.is_active,
     createdAt: event.created_at,
@@ -601,8 +723,6 @@ app.get('/api/auth/me', authRequired, attachUser, async (req, res) => {
     id: u.id,
     fullName: u.full_name,
     email: u.email,
-    entity: u.entity || null,
-    department: u.department || null,
     role: u.role_key,
     username: u.username,
   });
@@ -615,8 +735,6 @@ app.get('/api/me', authRequired, attachUser, async (req, res) => {
     username: req.user.username,
     fullName: req.user.full_name,
     email: req.user.email,
-    entity: req.user.entity || null,
-    department: req.user.department || null,
     role: req.user.role_key,
   });
 });
@@ -647,7 +765,7 @@ app.get('/api/users', requireRole('admin'), async (req, res) => {
 
 app.post('/api/users', requireRole('admin'), async (req, res) => {
   try {
-    const { username, password, fullName, email, entity, department, role, isActive } = req.body || {};
+    const { username, password, fullName, email, role, isActive } = req.body || {};
     if (!username || !password || !fullName || !role) {
       return res.status(400).json({ error: 'username, password, fullName, role required' });
     }
@@ -660,11 +778,11 @@ app.post('/api/users', requireRole('admin'), async (req, res) => {
 
     const created = await queryOne(
       `
-      INSERT INTO users (username, password_hash, full_name, email, entity, department, role_id, is_active, created_at, updated_at)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW(), NOW())
+      INSERT INTO users (username, password_hash, full_name, email, role_id, is_active, created_at, updated_at)
+      VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())
       RETURNING id
       `,
-      [String(username).trim(), passwordHash, String(fullName).trim(), email ? String(email).trim() : null, entity ? String(entity).trim() : null, department ? String(department).trim() : null, roleRow.id, isActive !== false]
+      [String(username).trim(), passwordHash, String(fullName).trim(), email ? String(email).trim() : null, roleRow.id, isActive !== false]
     );
 
     const out = await queryOne(
@@ -697,7 +815,7 @@ app.put('/api/users/:id', requireRole('admin'), async (req, res) => {
   const id = Number(req.params.id);
   if (!Number.isFinite(id)) return res.status(400).json({ error: 'Invalid id' });
 
-  const { username, password, fullName, email, entity, department, role, isActive } = req.body || {};
+  const { username, password, fullName, email, role, isActive } = req.body || {};
 
   const fields = [];
   const values = [];
@@ -706,8 +824,6 @@ app.put('/api/users/:id', requireRole('admin'), async (req, res) => {
   if (username !== undefined) { fields.push(`username=$${idx++}`); values.push(String(username)); }
   if (fullName !== undefined) { fields.push(`full_name=$${idx++}`); values.push(String(fullName)); }
   if (email !== undefined) { fields.push(`email=$${idx++}`); values.push(email ? String(email) : null); }
-  if (entity !== undefined) { fields.push(`entity=$${idx++}`); values.push(entity ? String(entity) : null); }
-  if (department !== undefined) { fields.push(`department=$${idx++}`); values.push(department ? String(department) : null); }
   if (isActive !== undefined) { fields.push(`is_active=$${idx++}`); values.push(Boolean(isActive)); }
 
   if (role !== undefined) {
@@ -1121,39 +1237,22 @@ app.get('/api/events', authRequired, attachUser, async (req, res) => {
     where.push(`EXISTS (SELECT 1 FROM event_required_sections ers WHERE ers.event_id=e.id AND ers.section_id = ANY($${idx++}::int[]))`); vals.push(sections);
   }
 
-  // Document submitter visibility rules
-  // - If submitter is Supervisor, Deputy and Minister should not see the event.
-  // - If submitter is Deputy, Minister should not see the event.
-  // - If submitter is Minister, only Minister sees it at final stage.
+  // Upper-pipeline visibility: Deputy and Minister only see events that need them
   if (roleKey === 'deputy') {
     where.push(`COALESCE(e.submitter_role,'deputy') <> 'supervisor'`);
   }
   if (roleKey === 'minister') {
     where.push(`COALESCE(e.submitter_role,'deputy') = 'minister'`);
   }
-
-  if (roleKey === 'deputy') {
-    where.push(`COALESCE(e.submitter_role,'deputy') <> 'supervisor'`);
-  }
-  if (roleKey === 'minister') {
-    where.push(`COALESCE(e.submitter_role,'deputy') = 'minister'`);
-  }
-
-  // Document submitter visibility rules:
-  // - If submitter is Supervisor, Deputy and Minister should not see the event.
-  // - If submitter is Deputy, Minister should not see the event.
-  // - If submitter is Minister, everyone can see (normal workflow).
-  if (roleKey === 'deputy') {
-    where.push(`COALESCE(e.submitter_role,'deputy') <> 'supervisor'`);
-  }
-  if (roleKey === 'minister') {
-    where.push(`COALESCE(e.submitter_role,'deputy') = 'minister'`);
+  // Lower-pipeline visibility: Curator only sees events where Curator is in the pipeline
+  if (roleKey === 'collaborator_3') {
+    where.push(`COALESCE(e.lower_submitter_role,'collaborator_2') = 'collaborator_3'`);
   }
 
   const rows = await queryAll(
     `
     SELECT e.id, e.country_id, c.name_en AS country_name_en, c.code AS country_code,
-           e.title, e.occasion, e.submitter_role, e.deadline_date, e.is_active, e.ended_at, e.created_at, e.updated_at
+           e.title, e.occasion, e.submitter_role, e.lower_submitter_role, e.deadline_date, e.is_active, e.ended_at, e.created_at, e.updated_at
     FROM events e
     JOIN countries c ON c.id = e.country_id
     ${where.length ? `WHERE ${where.join(' AND ')}` : ''}
@@ -1183,21 +1282,22 @@ app.get('/api/events/upcoming', authRequired, attachUser, async (req, res) => {
     where.push(`EXISTS (SELECT 1 FROM event_required_sections ers WHERE ers.event_id=e.id AND ers.section_id = ANY($${idx++}::int[]))`); vals.push(sections);
   }
 
-  // Document submitter visibility rules (keep consistent with /api/events and userCanSeeEvent)
-  // - If submitter is Supervisor, Deputy and Minister should not see the event.
-  // - If submitter is Deputy, Minister should not see the event.
-  // - If submitter is Minister, Minister should see it (Deputy still participates).
+  // Upper-pipeline visibility: Deputy and Minister only see events that need them
   if (roleKey === 'deputy') {
     where.push(`COALESCE(e.submitter_role,'deputy') <> 'supervisor'`);
   }
   if (roleKey === 'minister') {
     where.push(`COALESCE(e.submitter_role,'deputy') = 'minister'`);
   }
+  // Lower-pipeline visibility: Curator only sees events where Curator is in the pipeline
+  if (roleKey === 'collaborator_3') {
+    where.push(`COALESCE(e.lower_submitter_role,'collaborator_2') = 'collaborator_3'`);
+  }
 
   const rows = await queryAll(
     `
     SELECT e.id, e.country_id, c.name_en AS country_name_en, c.code AS country_code,
-           e.title, e.occasion, e.submitter_role, e.deadline_date, e.ended_at
+           e.title, e.occasion, e.submitter_role, e.lower_submitter_role, e.deadline_date, e.ended_at
     FROM events e
     JOIN countries c ON c.id = e.country_id
     WHERE ${where.join(' AND ')}
@@ -1372,12 +1472,13 @@ app.get('/api/my/sections', authRequired, attachUser, async (req, res) => {
 
 // Super-collaborators can also create/update events (they still cannot end events)
 app.post('/api/events', requireRole('admin', 'deputy', 'minister', 'supervisor', 'protocol', 'super_collaborator', 'collaborator'), async (req, res) => {
-  const { countryId, title, occasion, deadlineDate, requiredSectionIds, submitterRole } = req.body || {};
+  const { countryId, title, occasion, deadlineDate, requiredSectionIds, submitterRole, lowerSubmitterRole } = req.body || {};
   if (!countryId || !title) return res.status(400).json({ error: 'countryId and title required' });
 
-  const normalizedSubmitterRole = ['supervisor','deputy','minister'].includes(String(submitterRole||'').toLowerCase())
+  const normalizedSubmitterRole = ['supervisor','deputy','minister','super_collaborator'].includes(String(submitterRole||'').toLowerCase())
     ? String(submitterRole).toLowerCase()
     : 'deputy';
+  const normalizedLowerSubmitterRole = String(lowerSubmitterRole||'').toLowerCase() === 'collaborator_3' ? 'collaborator_3' : 'collaborator_2';
 
   const client = await pool.connect();
   try {
@@ -1385,8 +1486,8 @@ app.post('/api/events', requireRole('admin', 'deputy', 'minister', 'supervisor',
 
     const ev = await client.query(
       `
-      INSERT INTO events (country_id, title, occasion, submitter_role, deadline_date, created_by_user_id, is_active, created_at, updated_at)
-      VALUES ($1, $2, $3, $4, $5, $6, true, NOW(), NOW())
+      INSERT INTO events (country_id, title, occasion, submitter_role, lower_submitter_role, deadline_date, created_by_user_id, is_active, created_at, updated_at)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, true, NOW(), NOW())
       RETURNING id
       `,
       [
@@ -1394,6 +1495,7 @@ app.post('/api/events', requireRole('admin', 'deputy', 'minister', 'supervisor',
         String(title),
         occasion ? String(occasion) : null,
         normalizedSubmitterRole,
+        normalizedLowerSubmitterRole,
         deadlineDate ? String(deadlineDate) : null,
         req.user.id
       ]
@@ -1429,7 +1531,7 @@ app.put('/api/events/:id', requireRole('admin', 'deputy', 'minister', 'superviso
   const eventId = Number(req.params.id);
   if (!Number.isFinite(eventId)) return res.status(400).json({ error: 'Invalid id' });
 
-  const { countryId, title, occasion, deadlineDate, isActive, requiredSectionIds, submitterRole } = req.body || {};
+  const { countryId, title, occasion, deadlineDate, isActive, requiredSectionIds, submitterRole, lowerSubmitterRole } = req.body || {};
 
   const client = await pool.connect();
   try {
@@ -1443,11 +1545,16 @@ app.put('/api/events/:id', requireRole('admin', 'deputy', 'minister', 'superviso
     if (title !== undefined) { fields.push(`title=$${idx++}`); vals.push(String(title)); }
     if (occasion !== undefined) { fields.push(`occasion=$${idx++}`); vals.push(occasion ? String(occasion) : null); }
     if (submitterRole !== undefined) {
-      const nsr = ['supervisor','deputy','minister'].includes(String(submitterRole||'').toLowerCase())
+      const nsr = ['supervisor','deputy','minister','super_collaborator'].includes(String(submitterRole||'').toLowerCase())
         ? String(submitterRole).toLowerCase()
         : 'deputy';
       fields.push(`submitter_role=$${idx++}`);
       vals.push(nsr);
+    }
+    if (lowerSubmitterRole !== undefined) {
+      const nlsr = String(lowerSubmitterRole||'').toLowerCase() === 'collaborator_3' ? 'collaborator_3' : 'collaborator_2';
+      fields.push(`lower_submitter_role=$${idx++}`);
+      vals.push(nlsr);
     }
     if (deadlineDate !== undefined) { fields.push(`deadline_date=$${idx++}`); vals.push(deadlineDate ? String(deadlineDate) : null); }
     if (isActive !== undefined) { fields.push(`is_active=$${idx++}`); vals.push(Boolean(isActive)); }
@@ -1528,6 +1635,21 @@ app.get('/api/tp', authRequired, async (req, res) => {
         ok = decisionStatusesForRole(roleKey).includes(currentStatus);
       }
     }
+    // collaborator_2 / collaborator_3 may be section-assigned without country assignment;
+    // allow access when section is assigned to them and status is draft or their decision status.
+    if (!ok && ['collaborator_2','collaborator_3'].includes(roleKey)) {
+      const countryIdForAccess = await resolveCountryIdForEvent(eventId);
+      if (countryIdForAccess) {
+        const currentStatus = await getCurrentSectionStatus(eventId, countryIdForAccess, sectionId);
+        const assignedSections = await getAssignedSectionIds(req.user.id);
+        const required = await queryOne(
+          `SELECT 1 AS ok FROM event_required_sections WHERE event_id=$1 AND section_id=$2`,
+          [eventId, sectionId]
+        );
+        ok = !!required && assignedSections.includes(Number(sectionId)) &&
+             (currentStatus === 'draft' || decisionStatusesForRole(roleKey).includes(currentStatus));
+      }
+    }
     if (!ok) return res.status(403).json({ error: 'Forbidden' });
   }
 
@@ -1549,13 +1671,18 @@ app.get('/api/tp', authRequired, async (req, res) => {
     t.html_content,
     t.status,
     t.status_comment,
+    t.return_target_role,
+    t.original_submitter_role,
     t.last_updated_at,
-    u.full_name AS last_updated_by
+    u.full_name AS last_updated_by,
+    t.last_content_edited_at,
+    ue.full_name AS last_content_edited_by
   FROM tp_content t
   JOIN events e ON e.id = t.event_id
   JOIN countries c ON c.id = t.country_id
   JOIN sections s ON s.id = t.section_id
   LEFT JOIN users u ON u.id = t.last_updated_by_user_id
+  LEFT JOIN users ue ON ue.id = t.last_content_edited_by_user_id
   WHERE t.event_id=$1 AND t.country_id=$2 AND t.section_id=$3
   `,
   [eventId, countryId, sectionId]
@@ -1570,8 +1697,30 @@ return res.json({
   htmlContent: row.html_content || '',
   status: row.status || 'draft',
   statusComment: row.status_comment || null,
+  returnTargetRole: row.return_target_role || null,
+  originalSubmitterRole: row.original_submitter_role || null,
   lastUpdatedAt: row.last_updated_at,
-  lastUpdatedBy: row.last_updated_by || null
+  lastUpdatedBy: row.last_updated_by || null,
+  lastContentEditedAt: row.last_content_edited_at || null,
+  lastContentEditedBy: row.last_content_edited_by || null,
+  stepNames: await (async () => {
+    const snRes = await pool.query(
+      `SELECT u.full_name, r.key AS role_key
+       FROM users u
+       JOIN roles r ON r.id = u.role_id
+       JOIN country_assignments ca ON ca.user_id = u.id AND ca.country_id = $1
+       JOIN section_assignments sa ON sa.user_id = u.id AND sa.section_id = $2
+       WHERE u.is_active = true AND u.deleted_at IS NULL
+         AND r.key IN ('collaborator_1','collaborator_2')`,
+      [countryId, sectionId]
+    );
+    const sn = { collabI: null, collabII: null };
+    for (const u of snRes.rows) {
+      if (u.role_key === 'collaborator_1') sn.collabI = u.full_name;
+      if (u.role_key === 'collaborator_2') sn.collabII = u.full_name;
+    }
+    return sn;
+  })()
 });
 } catch (e) {
     console.error('GET /api/tp failed', e);
@@ -1590,7 +1739,7 @@ app.post('/api/tp/save', authRequired, async (req, res) => {
 
   const roleKey = normalizeRoleKey(req.user.role_key);
   const isCollab = isSectionPipelineRole(roleKey);
-  const canEdit = ['collaborator_1','collaborator_2','collaborator','super_collaborator','supervisor','deputy','minister','admin'].includes(roleKey);
+  const canEdit = ['collaborator_1','collaborator_2','collaborator_3','collaborator','super_collaborator','supervisor','deputy','minister','admin'].includes(roleKey);
   if (!canEdit) return res.status(403).json({ error: 'Forbidden' });
 
   // Pipeline roles may edit assigned sections and, for collaborator/super-collaborator,
@@ -1602,6 +1751,19 @@ app.post('/api/tp/save', authRequired, async (req, res) => {
       if (countryIdForAccess) {
         const currentStatus = await getCurrentSectionStatus(eventId, countryIdForAccess, sectionId);
         ok = decisionStatusesForRole(roleKey).includes(currentStatus);
+      }
+    }
+    if (!ok && ['collaborator_2','collaborator_3'].includes(roleKey)) {
+      const countryIdForAccess = await resolveCountryIdForEvent(eventId);
+      if (countryIdForAccess) {
+        const currentStatus = await getCurrentSectionStatus(eventId, countryIdForAccess, sectionId);
+        const assignedSections = await getAssignedSectionIds(req.user.id);
+        const required = await queryOne(
+          `SELECT 1 AS ok FROM event_required_sections WHERE event_id=$1 AND section_id=$2`,
+          [eventId, sectionId]
+        );
+        ok = !!required && assignedSections.includes(Number(sectionId)) &&
+             (currentStatus === 'draft' || decisionStatusesForRole(roleKey).includes(currentStatus));
       }
     }
     if (!ok) return res.status(403).json({ error: 'Forbidden' });
@@ -1617,33 +1779,79 @@ app.post('/api/tp/save', authRequired, async (req, res) => {
   // Save behavior:
   // - Pipeline roles keep the current workflow stage while editing.
   // - Elevated approvers save content only; they do not change stage on save.
-  if (isCollab) {
-    await pool.query(
-      `
-      UPDATE tp_content
-      SET html_content=$4, last_updated_at=NOW(), last_updated_by_user_id=$5
-      WHERE event_id=$1 AND country_id=$2 AND section_id=$3
-      `,
-      [eventId, countryId, sectionId, htmlContent, req.user.id]
-    );
-  } else {
-    await pool.query(
-      `
-      UPDATE tp_content
-      SET html_content=$4, last_updated_at=NOW(), last_updated_by_user_id=$5
-      WHERE event_id=$1 AND country_id=$2 AND section_id=$3
-      `,
-      [eventId, countryId, sectionId, htmlContent, req.user.id]
-    );
-  }
+  const currentStatusRow = await queryOne(`SELECT status::text AS status FROM tp_content WHERE event_id=$1 AND country_id=$2 AND section_id=$3`, [eventId, countryId, sectionId]);
+  const currentStatus = currentStatusRow?.status || 'draft';
+
+  await pool.query(
+    `
+    UPDATE tp_content
+    SET html_content=$4, last_updated_at=NOW(), last_updated_by_user_id=$5,
+        last_content_edited_at=NOW(), last_content_edited_by_user_id=$5
+    WHERE event_id=$1 AND country_id=$2 AND section_id=$3
+    `,
+    [eventId, countryId, sectionId, htmlContent, req.user.id]
+  );
+
+  await recordHistory({ eventId, countryId, sectionId, action: 'saved', fromStatus: currentStatus, toStatus: currentStatus,
+    userId: req.user.id, userName: req.user.full_name || req.user.username, userRole: roleKey });
 
   return res.json({ success:true });
+});
+
+// Ask to Return — any user can request the current holder to return a section
+app.post('/api/tp/ask-to-return', authRequired, async (req, res) => {
+  try {
+    const eventId  = Number(req.body?.eventId);
+    const sectionId = Number(req.body?.sectionId);
+    const note = String(req.body?.note || '').trim();
+    if (!Number.isFinite(eventId) || !Number.isFinite(sectionId)) {
+      return res.status(400).json({ error: 'eventId and sectionId required' });
+    }
+    const countryId = await resolveCountryIdForEvent(eventId);
+    if (!countryId) return res.status(404).json({ error: 'Event not found' });
+
+    const row = await queryOne(
+      `SELECT status::text, return_target_role, original_submitter_role FROM tp_content WHERE event_id=$1 AND country_id=$2 AND section_id=$3`,
+      [eventId, countryId, sectionId]
+    );
+    const evMeta = await queryOne(`SELECT lower_submitter_role FROM events WHERE id=$1`, [eventId]);
+    const lsr = String(evMeta?.lower_submitter_role || 'collaborator_2').toLowerCase();
+
+    const holder = currentHolderRole(row?.status, row?.return_target_role, row?.original_submitter_role, lsr);
+    const roleKey = normalizeRoleKey(req.user.role_key);
+    if (holder === roleKey) {
+      return res.status(400).json({ error: 'Section is already at your stage — use Return directly.' });
+    }
+
+    await pool.query(
+      `INSERT INTO section_return_requests
+         (event_id, country_id, section_id, requested_by_user_id, requested_by_name, requested_by_role, directed_to_role, note, created_at)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,NOW())`,
+      [eventId, countryId, sectionId, req.user.id, req.user.full_name || req.user.username, roleKey, holder, note || null]
+    );
+    await recordHistory({
+      eventId, countryId, sectionId,
+      action: 'asked_to_return',
+      fromStatus: row?.status || null,
+      toStatus: row?.status || null,
+      userId: req.user.id,
+      userName: req.user.full_name || req.user.username,
+      userRole: roleKey,
+      note: note || null,
+    });
+    return res.json({ success: true, directedToRole: holder });
+  } catch (e) {
+    console.error('ask-to-return error', e);
+    return res.status(500).json({ error: 'Server error' });
+  }
 });
 
 app.post('/api/tp/submit', authRequired, attachUser, async (req, res) => {
   const eventId = Number(req.body?.eventId);
   const sectionId = Number(req.body?.sectionId);
-  const htmlContent = String(req.body?.htmlContent || '');
+  // null = not provided (dashboard submit — preserve existing content)
+  // string = editor submit — update content
+  const htmlContent = req.body?.htmlContent != null ? String(req.body.htmlContent) : null;
 
   if (!Number.isFinite(eventId) || !Number.isFinite(sectionId)) {
     return res.status(400).json({ error: 'eventId and sectionId required' });
@@ -1662,6 +1870,19 @@ app.post('/api/tp/submit', authRequired, attachUser, async (req, res) => {
       ok = decisionStatusesForRole(roleKey).includes(currentStatus);
     }
   }
+  if (!ok && ['collaborator_2','collaborator_3'].includes(roleKey)) {
+    const countryIdForAccess = await resolveCountryIdForEvent(eventId);
+    if (countryIdForAccess) {
+      const currentStatus = await getCurrentSectionStatus(eventId, countryIdForAccess, sectionId);
+      const assignedSections = await getAssignedSectionIds(req.user.id);
+      const required = await queryOne(
+        `SELECT 1 AS ok FROM event_required_sections WHERE event_id=$1 AND section_id=$2`,
+        [eventId, sectionId]
+      );
+      ok = !!required && assignedSections.includes(Number(sectionId)) &&
+           (currentStatus === 'draft' || decisionStatusesForRole(roleKey).includes(currentStatus));
+    }
+  }
   if (!ok) return res.status(403).json({ error: 'Forbidden' });
 
   const countryId = await resolveCountryIdForEvent(eventId);
@@ -1670,22 +1891,70 @@ app.post('/api/tp/submit', authRequired, attachUser, async (req, res) => {
   await ensureDocumentStatus(eventId, countryId);
   await ensureTpRow(eventId, countryId, sectionId, req.user.id);
 
-  const targetStatus = nextSectionSubmitStatus(roleKey);
+  let targetStatus = nextSectionSubmitStatus(roleKey);
+  if (roleKey === 'collaborator_2') {
+    const evMetaLsr = await queryOne(`SELECT lower_submitter_role FROM events WHERE id=$1`, [eventId]);
+    const lsr = String(evMetaLsr?.lower_submitter_role || 'collaborator_2').toLowerCase();
+    if (lsr !== 'collaborator_3') targetStatus = 'submitted_to_collaborator';
+  }
   if (!targetStatus) return res.status(400).json({ error: 'Unsupported role for submit' });
 
+  const fromStatusRow = await queryOne(`SELECT status::text AS status, original_submitter_role FROM tp_content WHERE event_id=$1 AND country_id=$2 AND section_id=$3`, [eventId, countryId, sectionId]);
+  const fromStatus = fromStatusRow?.status || 'draft';
+  // Set original_submitter_role when starting a new round (from draft or any returned state)
+  const isNewRound = fromStatus === 'draft' || fromStatus.startsWith('returned_by');
+
+  if (isNewRound) {
+    if (htmlContent !== null) {
+      await pool.query(
+        `UPDATE tp_content
+         SET html_content=$4, last_updated_at=NOW(), last_updated_by_user_id=$5, status=$6, status_comment=NULL,
+             original_submitter_role=$7, return_target_role=NULL,
+             last_content_edited_at=NOW(), last_content_edited_by_user_id=$5
+         WHERE event_id=$1 AND country_id=$2 AND section_id=$3`,
+        [eventId, countryId, sectionId, htmlContent, req.user.id, targetStatus, roleKey]
+      );
+    } else {
+      await pool.query(
+        `UPDATE tp_content
+         SET last_updated_at=NOW(), last_updated_by_user_id=$4, status=$5, status_comment=NULL,
+             original_submitter_role=$6, return_target_role=NULL
+         WHERE event_id=$1 AND country_id=$2 AND section_id=$3`,
+        [eventId, countryId, sectionId, req.user.id, targetStatus, roleKey]
+      );
+    }
+  } else {
+    if (htmlContent !== null) {
+      await pool.query(
+        `UPDATE tp_content
+         SET html_content=$4, last_updated_at=NOW(), last_updated_by_user_id=$5, status=$6, status_comment=NULL,
+             last_content_edited_at=NOW(), last_content_edited_by_user_id=$5
+         WHERE event_id=$1 AND country_id=$2 AND section_id=$3`,
+        [eventId, countryId, sectionId, htmlContent, req.user.id, targetStatus]
+      );
+    } else {
+      await pool.query(
+        `UPDATE tp_content
+         SET last_updated_at=NOW(), last_updated_by_user_id=$4, status=$5, status_comment=NULL
+         WHERE event_id=$1 AND country_id=$2 AND section_id=$3`,
+        [eventId, countryId, sectionId, req.user.id, targetStatus]
+      );
+    }
+  }
+
+  // Clear any pending return requests for this section now that it has been re-submitted
   await pool.query(
-    `
-    UPDATE tp_content
-    SET html_content=$4, last_updated_at=NOW(), last_updated_by_user_id=$5, status=$6, status_comment=NULL
-    WHERE event_id=$1 AND country_id=$2 AND section_id=$3
-    `,
-    [eventId, countryId, sectionId, htmlContent, req.user.id, targetStatus]
+    `DELETE FROM section_return_requests WHERE event_id=$1 AND country_id=$2 AND section_id=$3`,
+    [eventId, countryId, sectionId]
   );
+
+  await recordHistory({ eventId, countryId, sectionId, action: 'submitted', fromStatus, toStatus: targetStatus,
+    userId: req.user.id, userName: req.user.full_name || req.user.username, userRole: roleKey });
 
   return res.json({ success:true, status: targetStatus });
 });
 
-app.post('/api/tp/return', requireRole('collaborator_2','supervisor','deputy','admin'), async (req, res) => {
+app.post('/api/tp/return', requireRole('collaborator_2','collaborator_3','collaborator','super_collaborator','supervisor','deputy','minister','admin'), async (req, res) => {
   const eventId = Number(req.body?.eventId);
   const sectionId = Number(req.body?.sectionId);
   const note = String((req.body?.note ?? req.body?.comment) || '');
@@ -1708,25 +1977,60 @@ app.post('/api/tp/return', requireRole('collaborator_2','supervisor','deputy','a
   await ensureDocumentStatus(eventId, countryId);
   await ensureTpRow(eventId, countryId, sectionId, req.user.id);
 
-  const currentStatus = await getCurrentSectionStatus(eventId, countryId, sectionId);
+  const contentRow = await queryOne(
+    `SELECT status::text AS status, original_submitter_role FROM tp_content WHERE event_id=$1 AND country_id=$2 AND section_id=$3`,
+    [eventId, countryId, sectionId]
+  );
+  const currentStatus = contentRow?.status || 'draft';
+  const originalSubmitterRole = contentRow?.original_submitter_role || null;
+
   const allowedStatuses = decisionStatusesForRole(roleKey);
-  if (allowedStatuses.length && !allowedStatuses.includes(currentStatus)) {
+  // Allow return if section is in allowed statuses OR if this role is the return_target
+  const retTargetRow = await queryOne(
+    `SELECT return_target_role FROM tp_content WHERE event_id=$1 AND country_id=$2 AND section_id=$3`,
+    [eventId, countryId, sectionId]
+  );
+  const isReturnTarget = retTargetRow?.return_target_role === roleKey;
+  // Upper-tier roles can return sections at any stage before their approval level
+  const upperTierBeyond = {
+    supervisor: ['approved_by_supervisor','submitted_to_deputy','returned_by_deputy',
+      'approved_by_deputy','submitted_to_minister','returned_by_minister','approved_by_minister','approved','locked'],
+    deputy:   ['approved_by_deputy','submitted_to_minister','returned_by_minister',
+      'approved_by_minister','approved','locked'],
+    minister:   ['approved_by_minister','approved','locked'],
+  };
+  const upperTierPreReturn = upperTierBeyond[roleKey] && !upperTierBeyond[roleKey].includes(currentStatus);
+  if (!upperTierPreReturn && allowedStatuses.length && !allowedStatuses.includes(currentStatus) && !isReturnTarget) {
     return res.status(400).json({ error: 'Section is not at your review stage' });
   }
 
+  // Determine where to return: collab_2 always returns to collab_1; others return to original submitter
+  let returnTarget;
+  if (roleKey === 'collaborator_2') {
+    returnTarget = 'collaborator_1';
+  } else {
+    returnTarget = originalSubmitterRole || 'collaborator_1';
+  }
+
   await pool.query(
-    `
-    UPDATE tp_content
-    SET status=$4, status_comment=$5, last_updated_at=NOW(), last_updated_by_user_id=$6
-    WHERE event_id=$1 AND country_id=$2 AND section_id=$3
-    `,
-    [eventId, countryId, sectionId, returnStatus, note, req.user.id]
+    `UPDATE tp_content
+     SET status=$4, status_comment=$5, last_updated_at=NOW(), last_updated_by_user_id=$6, return_target_role=$7
+     WHERE event_id=$1 AND country_id=$2 AND section_id=$3`,
+    [eventId, countryId, sectionId, returnStatus, note, req.user.id, returnTarget]
   );
+
+  await pool.query(
+    `DELETE FROM section_return_requests WHERE event_id=$1 AND country_id=$2 AND section_id=$3`,
+    [eventId, countryId, sectionId]
+  );
+
+  await recordHistory({ eventId, countryId, sectionId, action: 'returned', fromStatus: currentStatus, toStatus: returnStatus,
+    userId: req.user.id, userName: req.user.full_name || req.user.username, userRole: roleKey, note });
 
   return res.json({ success:true, status: returnStatus });
 });
 
-app.post('/api/tp/approve-section', requireRole('supervisor','admin'), async (req, res) => {
+app.post('/api/tp/approve-section', requireRole('super_collaborator','supervisor','admin'), asyncRoute(async (req, res) => {
   const eventId = Number(req.body?.eventId);
   const sectionId = Number(req.body?.sectionId);
   if (!Number.isFinite(eventId) || !Number.isFinite(sectionId)) {
@@ -1747,23 +2051,54 @@ app.post('/api/tp/approve-section', requireRole('supervisor','admin'), async (re
   await ensureDocumentStatus(eventId, countryId);
   await ensureTpRow(eventId, countryId, sectionId, req.user.id);
 
-  const currentStatus = await getCurrentSectionStatus(eventId, countryId, sectionId);
+  const contentRowApp = await queryOne(
+    `SELECT status::text AS status, original_submitter_role FROM tp_content WHERE event_id=$1 AND country_id=$2 AND section_id=$3`,
+    [eventId, countryId, sectionId]
+  );
+  const currentStatus = contentRowApp?.status || 'draft';
   const allowedStatuses = decisionStatusesForRole(roleKey);
-  if (allowedStatuses.length && !allowedStatuses.includes(currentStatus)) {
+  // super_collaborator can act as lowest: approve sections at draft state
+  const canActAsLowest = roleKey === 'super_collaborator' && currentStatus === 'draft';
+  // Supervisor can approve sections at any stage before their approval level
+  const supervisorPreApproval = roleKey === 'supervisor' && !['approved_by_supervisor',
+    'submitted_to_deputy','returned_by_deputy','approved_by_deputy',
+    'submitted_to_minister','returned_by_minister','approved_by_minister','approved','locked',
+  ].includes(currentStatus);
+  if (!supervisorPreApproval && allowedStatuses.length && !allowedStatuses.includes(currentStatus) && !canActAsLowest) {
     return res.status(400).json({ error: 'Section is not at your review stage' });
   }
 
+  // Set original_submitter_role when acting outside the normal pipeline entry point
+  const setOriginalRole = canActAsLowest ||
+    (supervisorPreApproval && !contentRowApp?.original_submitter_role);
+  if (setOriginalRole) {
+    // Acting as lowest: set original_submitter_role
+    await pool.query(
+      `UPDATE tp_content
+       SET status=$4, status_comment=NULL, last_updated_at=NOW(), last_updated_by_user_id=$5,
+           original_submitter_role=$6, return_target_role=NULL
+       WHERE event_id=$1 AND country_id=$2 AND section_id=$3`,
+      [eventId, countryId, sectionId, targetStatus, req.user.id, roleKey]
+    );
+  } else {
+    await pool.query(
+      `UPDATE tp_content
+       SET status=$4, status_comment=NULL, last_updated_at=NOW(), last_updated_by_user_id=$5
+       WHERE event_id=$1 AND country_id=$2 AND section_id=$3`,
+      [eventId, countryId, sectionId, targetStatus, req.user.id]
+    );
+  }
+
   await pool.query(
-    `
-    UPDATE tp_content
-    SET status=$4, status_comment=NULL, last_updated_at=NOW(), last_updated_by_user_id=$5
-    WHERE event_id=$1 AND country_id=$2 AND section_id=$3
-    `,
-    [eventId, countryId, sectionId, targetStatus, req.user.id]
+    `DELETE FROM section_return_requests WHERE event_id=$1 AND country_id=$2 AND section_id=$3`,
+    [eventId, countryId, sectionId]
   );
 
+  await recordHistory({ eventId, countryId, sectionId, action: 'approved', fromStatus: currentStatus, toStatus: targetStatus,
+    userId: req.user.id, userName: req.user.full_name || req.user.username, userRole: roleKey });
+
   return res.json({ success:true, status: targetStatus });
-});
+}));
 
 app.post('/api/tp/approve-all-sections', requireRole('supervisor','deputy','minister','admin'), async (req, res) => {
   try {
@@ -1795,6 +2130,11 @@ app.post('/api/tp/approve-all-sections', requireRole('supervisor','deputy','mini
     if (!targetStatus) return res.status(400).json({ error: 'Unsupported role for bulk approve' });
 
     const allowedStatuses = decisionStatusesForRole(roleKey);
+    // Fetch from-statuses before update so we can record accurate history
+    const beforeRows = await queryAll(
+      `SELECT section_id, status::text AS status FROM tp_content WHERE event_id=$1 AND country_id=$2 AND section_id=ANY($3::int[]) AND status=ANY($4::text[])`,
+      [eventId, countryId, sectionIds, allowedStatuses]
+    );
     const { rows } = await pool.query(
       `
       UPDATE tp_content
@@ -1805,6 +2145,14 @@ app.post('/api/tp/approve-all-sections', requireRole('supervisor','deputy','mini
       `,
       [eventId, countryId, sectionIds, targetStatus, req.user.id, allowedStatuses]
     );
+    const updatedSet = new Set(rows.map(r => Number(r.section_id)));
+    for (const br of beforeRows) {
+      if (updatedSet.has(Number(br.section_id))) {
+        await recordHistory({ eventId, countryId, sectionId: Number(br.section_id), action: 'approved',
+          fromStatus: br.status, toStatus: targetStatus,
+          userId: req.user.id, userName: req.user.full_name || req.user.username, userRole: roleKey });
+      }
+    }
 
     return res.json({ success:true, approved: rows.length, status: targetStatus });
   } catch (e) {
@@ -1815,14 +2163,21 @@ app.post('/api/tp/approve-all-sections', requireRole('supervisor','deputy','mini
 
 
 
-app.post('/api/tp/submit-approved-to-collaborator', requireRole('collaborator_2','admin'), async (req, res) => {
+app.post('/api/tp/submit-approved-to-collaborator-3', requireRole('collaborator_2','admin'), asyncRoute(async (req, res) => {
   const eventId = Number(req.body?.eventId);
-  if (!Number.isFinite(eventId)) {
-    return res.status(400).json({ error: 'eventId required' });
-  }
+  if (!Number.isFinite(eventId)) return res.status(400).json({ error: 'eventId required' });
 
   const countryId = await resolveCountryIdForEvent(eventId);
   if (!countryId) return res.status(404).json({ error: 'Event not found' });
+
+  // Check event's lower_submitter_role to determine routing
+  const evMetaBatch = await queryOne(`SELECT lower_submitter_role FROM events WHERE id=$1`, [eventId]);
+  const batchLsr = String(evMetaBatch?.lower_submitter_role || 'collaborator_2').toLowerCase();
+  const skipCurator = batchLsr !== 'collaborator_3';
+  const targetBatchStatus = skipCurator ? 'submitted_to_collaborator' : 'submitted_to_collaborator_3';
+  const eligibleStatuses = skipCurator
+    ? ['approved_by_collaborator_2', 'returned_by_collaborator']
+    : ['approved_by_collaborator_2', 'returned_by_collaborator_3'];
 
   let sectionIds = await queryAll(
     `SELECT section_id FROM event_required_sections WHERE event_id=$1 ORDER BY section_id ASC`,
@@ -1841,21 +2196,77 @@ app.post('/api/tp/submit-approved-to-collaborator', requireRole('collaborator_2'
     await ensureTpRow(eventId, countryId, sid, req.user.id);
   }
 
+  const eligibleStatusSql = eligibleStatuses.map(s => `'${s}'`).join(',');
+  const beforeRows3 = await queryAll(
+    `SELECT section_id, status::text AS status FROM tp_content WHERE event_id=$1 AND country_id=$2 AND section_id=ANY($3::int[]) AND (status IN (${eligibleStatusSql}) OR return_target_role='collaborator_2')`,
+    [eventId, countryId, sectionIds]
+  );
   const { rows } = await pool.query(
     `
     UPDATE tp_content
-    SET status='submitted_to_collaborator', status_comment=NULL, last_updated_at=NOW(), last_updated_by_user_id=$4
+    SET status=$5, status_comment=NULL, last_updated_at=NOW(), last_updated_by_user_id=$4, return_target_role=NULL
     WHERE event_id=$1 AND country_id=$2 AND section_id = ANY($3::int[])
-      AND status IN ('approved_by_collaborator_2','returned_by_collaborator')
+      AND (status IN (${eligibleStatusSql}) OR return_target_role='collaborator_2')
+    RETURNING section_id
+    `,
+    [eventId, countryId, sectionIds, req.user.id, targetBatchStatus]
+  );
+  const updatedSet3 = new Set(rows.map(r => Number(r.section_id)));
+  for (const br of beforeRows3) {
+    if (updatedSet3.has(Number(br.section_id))) {
+      await recordHistory({ eventId, countryId, sectionId: Number(br.section_id), action: 'submitted',
+        fromStatus: br.status, toStatus: targetBatchStatus,
+        userId: req.user.id, userName: req.user.full_name || req.user.username, userRole: normalizeRoleKey(req.user.role_key) });
+    }
+  }
+
+  return res.json({ success:true, submitted: rows.length, status: targetBatchStatus });
+}));
+
+app.post('/api/tp/submit-approved-to-collaborator', requireRole('collaborator_3','admin'), asyncRoute(async (req, res) => {
+  const eventId = Number(req.body?.eventId);
+  if (!Number.isFinite(eventId)) return res.status(400).json({ error: 'eventId required' });
+
+  const countryId = await resolveCountryIdForEvent(eventId);
+  if (!countryId) return res.status(404).json({ error: 'Event not found' });
+
+  let sectionIds = await queryAll(
+    `SELECT section_id FROM event_required_sections WHERE event_id=$1 ORDER BY section_id ASC`,
+    [eventId]
+  );
+  sectionIds = sectionIds.map(r => Number(r.section_id)).filter(Number.isFinite);
+
+  const roleKey = normalizeRoleKey(req.user.role_key);
+  if (roleKey === 'collaborator_3') {
+    const assignedSectionIds = await getAssignedSectionIds(req.user.id);
+    sectionIds = sectionIds.filter(id => assignedSectionIds.includes(id));
+  }
+  if (!sectionIds.length) return res.json({ success:true, submitted: 0 });
+
+  for (const sid of sectionIds) {
+    await ensureTpRow(eventId, countryId, sid, req.user.id);
+  }
+
+  const beforeRowsC = await queryAll(
+    `SELECT section_id, status::text AS status FROM tp_content WHERE event_id=$1 AND country_id=$2 AND section_id=ANY($3::int[]) AND (status IN ('approved_by_collaborator_3','returned_by_collaborator') OR return_target_role='collaborator_3')`,
+    [eventId, countryId, sectionIds]
+  );
+  const { rows } = await pool.query(
+    `
+    UPDATE tp_content
+    SET status='submitted_to_collaborator', status_comment=NULL, last_updated_at=NOW(), last_updated_by_user_id=$4, return_target_role=NULL
+    WHERE event_id=$1 AND country_id=$2 AND section_id = ANY($3::int[])
+      AND (status IN ('approved_by_collaborator_3','returned_by_collaborator') OR return_target_role='collaborator_3')
     RETURNING section_id
     `,
     [eventId, countryId, sectionIds, req.user.id]
   );
+  { const us = new Set(rows.map(r=>Number(r.section_id))); for (const br of beforeRowsC) { if (us.has(Number(br.section_id))) await recordHistory({ eventId, countryId, sectionId: Number(br.section_id), action:'submitted', fromStatus:br.status, toStatus:'submitted_to_collaborator', userId:req.user.id, userName:req.user.full_name||req.user.username, userRole:normalizeRoleKey(req.user.role_key) }); } }
 
   return res.json({ success:true, submitted: rows.length, status: 'submitted_to_collaborator' });
-});
+}));
 
-app.post('/api/tp/submit-approved-to-super-collaborator', requireRole('collaborator','admin'), async (req, res) => {
+app.post('/api/tp/submit-approved-to-super-collaborator', requireRole('collaborator','admin'), asyncRoute(async (req, res) => {
   const eventId = Number(req.body?.eventId);
   if (!Number.isFinite(eventId)) {
     return res.status(400).json({ error: 'eventId required' });
@@ -1881,21 +2292,31 @@ app.post('/api/tp/submit-approved-to-super-collaborator', requireRole('collabora
     await ensureTpRow(eventId, countryId, sid, req.user.id);
   }
 
+  const beforeRowsSC = await queryAll(
+    `SELECT section_id, status::text AS status FROM tp_content WHERE event_id=$1 AND country_id=$2 AND section_id=ANY($3::int[])
+     AND (status IN ('submitted_to_collaborator','returned_by_collaborator','approved_by_collaborator',
+                     'approved_by_collaborator_2','approved_by_collaborator_3','returned_by_super_collaborator')
+          OR return_target_role='collaborator')`,
+    [eventId, countryId, sectionIds]
+  );
   const { rows } = await pool.query(
     `
     UPDATE tp_content
-    SET status='submitted_to_super_collaborator', status_comment=NULL, last_updated_at=NOW(), last_updated_by_user_id=$4
+    SET status='submitted_to_super_collaborator', status_comment=NULL, last_updated_at=NOW(), last_updated_by_user_id=$4, return_target_role=NULL
     WHERE event_id=$1 AND country_id=$2 AND section_id = ANY($3::int[])
-      AND status IN ('approved_by_collaborator','returned_by_super_collaborator')
+      AND (status IN ('submitted_to_collaborator','returned_by_collaborator','approved_by_collaborator',
+                      'approved_by_collaborator_2','approved_by_collaborator_3','returned_by_super_collaborator')
+           OR return_target_role='collaborator')
     RETURNING section_id
     `,
     [eventId, countryId, sectionIds, req.user.id]
   );
+  { const us = new Set(rows.map(r=>Number(r.section_id))); for (const br of beforeRowsSC) { if (us.has(Number(br.section_id))) await recordHistory({ eventId, countryId, sectionId: Number(br.section_id), action:'submitted', fromStatus:br.status, toStatus:'submitted_to_super_collaborator', userId:req.user.id, userName:req.user.full_name||req.user.username, userRole:normalizeRoleKey(req.user.role_key) }); } }
 
   return res.json({ success:true, submitted: rows.length, status: 'submitted_to_super_collaborator' });
-});
+}));
 
-app.post('/api/tp/submit-approved-to-supervisor', requireRole('super_collaborator','admin'), async (req, res) => {
+app.post('/api/tp/submit-approved-to-supervisor', requireRole('super_collaborator','admin'), asyncRoute(async (req, res) => {
   const eventId = Number(req.body?.eventId);
   if (!Number.isFinite(eventId)) {
     return res.status(400).json({ error: 'eventId required' });
@@ -1921,21 +2342,26 @@ app.post('/api/tp/submit-approved-to-supervisor', requireRole('super_collaborato
     await ensureTpRow(eventId, countryId, sid, req.user.id);
   }
 
+  const beforeRowsSup = await queryAll(
+    `SELECT section_id, status::text AS status FROM tp_content WHERE event_id=$1 AND country_id=$2 AND section_id=ANY($3::int[]) AND (status IN ('approved_by_super_collaborator','returned_by_supervisor') OR return_target_role='super_collaborator')`,
+    [eventId, countryId, sectionIds]
+  );
   const { rows } = await pool.query(
     `
     UPDATE tp_content
-    SET status='submitted_to_supervisor', status_comment=NULL, last_updated_at=NOW(), last_updated_by_user_id=$4
+    SET status='submitted_to_supervisor', status_comment=NULL, last_updated_at=NOW(), last_updated_by_user_id=$4, return_target_role=NULL
     WHERE event_id=$1 AND country_id=$2 AND section_id = ANY($3::int[])
-      AND status IN ('approved_by_super_collaborator','returned_by_supervisor')
+      AND (status IN ('approved_by_super_collaborator','returned_by_supervisor') OR return_target_role='super_collaborator')
     RETURNING section_id
     `,
     [eventId, countryId, sectionIds, req.user.id]
   );
+  { const us = new Set(rows.map(r=>Number(r.section_id))); for (const br of beforeRowsSup) { if (us.has(Number(br.section_id))) await recordHistory({ eventId, countryId, sectionId: Number(br.section_id), action:'submitted', fromStatus:br.status, toStatus:'submitted_to_supervisor', userId:req.user.id, userName:req.user.full_name||req.user.username, userRole:normalizeRoleKey(req.user.role_key) }); } }
 
   return res.json({ success:true, submitted: rows.length, status: 'submitted_to_supervisor' });
-});
+}));
 
-app.post('/api/tp/approve-section-deputy', requireRole('deputy','minister','admin'), async (req, res) => {
+app.post('/api/tp/approve-section-deputy', requireRole('deputy','minister','admin'), asyncRoute(async (req, res) => {
   const eventId = Number(req.body?.eventId);
   const sectionId = Number(req.body?.sectionId);
   if (!Number.isFinite(eventId) || !Number.isFinite(sectionId)) {
@@ -1951,6 +2377,9 @@ app.post('/api/tp/approve-section-deputy', requireRole('deputy','minister','admi
   const roleKey = normalizeRoleKey(req.user.role_key);
   const targetStatus = (roleKey === 'minister') ? 'approved_by_minister' : 'approved_by_deputy';
 
+  const fromStatusRow2 = await queryOne(`SELECT status::text AS status FROM tp_content WHERE event_id=$1 AND country_id=$2 AND section_id=$3`, [eventId, countryId, sectionId]);
+  const fromStatus2 = fromStatusRow2?.status || 'draft';
+
   await pool.query(
     `
     UPDATE tp_content
@@ -1960,8 +2389,11 @@ app.post('/api/tp/approve-section-deputy', requireRole('deputy','minister','admi
     [eventId, countryId, sectionId, req.user.id, targetStatus]
   );
 
+  await recordHistory({ eventId, countryId, sectionId, action: 'approved', fromStatus: fromStatus2, toStatus: targetStatus,
+    userId: req.user.id, userName: req.user.full_name || req.user.username, userRole: roleKey });
+
   return res.json({ success:true });
-});
+}));
 
 /** 7.8 Document Status and Library **/
 
@@ -2026,6 +2458,15 @@ app.get('/api/tp/status-grid', authRequired, async (req, res) => {
     const countryId = await resolveCountryIdForEvent(eventId);
     if (!countryId) return res.status(404).json({ error: 'event not found' });
 
+    const evMetaGrid = await queryOne(`SELECT lower_submitter_role, submitter_role FROM events WHERE id=$1`, [eventId]);
+    const lowerSubmitterRole = String(evMetaGrid?.lower_submitter_role || 'collaborator_2').toLowerCase();
+    const documentSubmitterRole = String(evMetaGrid?.submitter_role || 'deputy').toLowerCase();
+
+    // Curator only participates when the event pipeline includes Curator
+    if (roleKey === 'collaborator_3' && lowerSubmitterRole !== 'collaborator_3') {
+      return res.json({ event_id: eventId, country_id: countryId, lowerSubmitterRole, sections: [] });
+    }
+
     let q = `
       SELECT
         ers.section_id AS id,
@@ -2033,15 +2474,17 @@ app.get('/api/tp/status-grid', authRequired, async (req, res) => {
         s.order_index,
         COALESCE(t.status::text, 'draft') AS status,
         t.status_comment,
-        t.last_updated_at,
-        u.full_name AS last_updated_by
+        t.last_content_edited_at AS last_updated_at,
+        ue.full_name AS last_updated_by,
+        t.original_submitter_role,
+        t.return_target_role
       FROM event_required_sections ers
       JOIN sections s ON s.id = ers.section_id
       LEFT JOIN tp_content t
         ON t.event_id = ers.event_id
        AND t.country_id = $2
        AND t.section_id = ers.section_id
-      LEFT JOIN users u ON u.id = t.last_updated_by_user_id
+      LEFT JOIN users ue ON ue.id = t.last_content_edited_by_user_id
       WHERE ers.event_id = $1
     `;
     const params = [eventId, countryId];
@@ -2061,49 +2504,55 @@ app.get('/api/tp/status-grid', authRequired, async (req, res) => {
     const { rows } = await pool.query(q, params);
     const assignedSet = new Set((assignedSectionIds || []).map(Number));
 
-    // Fetch pipeline user names per section (for progress bar display)
-    // collaborator_1 + collaborator_2 → section_assignments (per section)
-    // collaborator + super_collaborator → country_assignments (per country)
-    const sectionIds = rows.map(r => r.id);
-    let pipelineBySection = {};
+    // Fetch names from history: a user's name appears on a step only after they've acted.
+    const sectionIds = rows.map(r => Number(r.id));
+    let stepNameRows = [];
     if (sectionIds.length) {
-      const [saRows, caRows] = await Promise.all([
-        pool.query(
-          `SELECT sa.section_id, u.full_name, r.key AS role_key
-           FROM section_assignments sa
-           JOIN users u ON u.id = sa.user_id
-           JOIN roles r ON r.id = u.role_id
-           WHERE sa.section_id = ANY($1::int[]) AND u.deleted_at IS NULL AND u.is_active = TRUE`,
-          [sectionIds]
-        ),
-        pool.query(
-          `SELECT ca.user_id, u.full_name, r.key AS role_key
-           FROM country_assignments ca
-           JOIN users u ON u.id = ca.user_id
-           JOIN roles r ON r.id = u.role_id
-           WHERE ca.country_id = $1 AND u.deleted_at IS NULL AND u.is_active = TRUE`,
-          [countryId]
-        ),
-      ]);
-      // country-level (collaborator, super_collaborator) - shared across all sections
-      const countryNames = { collaborator: [], super_collaborator: [] };
-      for (const row of caRows.rows) {
-        if (row.role_key === 'collaborator') countryNames.collaborator.push(row.full_name);
-        if (row.role_key === 'super_collaborator') countryNames.super_collaborator.push(row.full_name);
+      const snRes = await pool.query(
+        `SELECT DISTINCT ON (section_id, user_role)
+           section_id, user_name AS full_name, user_role AS role_key
+         FROM tp_section_history
+         WHERE event_id = $1 AND section_id = ANY($2::int[])
+           AND user_role IN ('collaborator_1','collaborator_2','collaborator_3','collaborator','super_collaborator')
+         ORDER BY section_id, user_role, acted_at ASC`,
+        [eventId, sectionIds]
+      );
+      stepNameRows = snRes.rows;
+    }
+
+    // Build per-section step-name map (null = not acted yet → show role label)
+    const stepNames = {};
+    sectionIds.forEach(id => {
+      stepNames[id] = { collabI: null, collabII: null, collabIII: null, collaborator: null, superCollab: null };
+    });
+    for (const u of stepNameRows) {
+      const sid = Number(u.section_id);
+      if (stepNames[sid]) {
+        if (u.role_key === 'collaborator_1')    stepNames[sid].collabI      = u.full_name;
+        if (u.role_key === 'collaborator_2')    stepNames[sid].collabII     = u.full_name;
+        if (u.role_key === 'collaborator_3')    stepNames[sid].collabIII    = u.full_name;
+        if (u.role_key === 'collaborator')      stepNames[sid].collaborator = u.full_name;
+        if (u.role_key === 'super_collaborator')stepNames[sid].superCollab  = u.full_name;
       }
-      // section-level (collaborator_1, collaborator_2)
-      const sectionNames = {};
-      for (const row of saRows.rows) {
-        if (!sectionNames[row.section_id]) sectionNames[row.section_id] = { collaborator_1: [], collaborator_2: [] };
-        if (row.role_key === 'collaborator_1') sectionNames[row.section_id].collaborator_1.push(row.full_name);
-        if (row.role_key === 'collaborator_2') sectionNames[row.section_id].collaborator_2.push(row.full_name);
-      }
-      for (const secId of sectionIds) {
-        pipelineBySection[secId] = {
-          collabI: (sectionNames[secId]?.collaborator_1 || []).join(', ') || null,
-          collabII: (sectionNames[secId]?.collaborator_2 || []).join(', ') || null,
-          collaborator: countryNames.collaborator.join(', ') || null,
-          superCollab: countryNames.super_collaborator.join(', ') || null,
+    }
+
+    // Fetch the latest pending "Ask to Return" request directed at the current user's role
+    const returnRequestsBySection = {};
+    if (sectionIds.length) {
+      const rrRes = await pool.query(
+        `SELECT DISTINCT ON (section_id)
+           section_id, requested_by_name, requested_by_role, note, created_at
+         FROM section_return_requests
+         WHERE event_id=$1 AND section_id=ANY($2::int[])
+         ORDER BY section_id, created_at DESC`,
+        [eventId, sectionIds]
+      );
+      for (const r of rrRes.rows) {
+        returnRequestsBySection[Number(r.section_id)] = {
+          from: r.requested_by_name,
+          fromRole: r.requested_by_role,
+          note: r.note || '',
+          at: r.created_at,
         };
       }
     }
@@ -2111,6 +2560,8 @@ app.get('/api/tp/status-grid', authRequired, async (req, res) => {
     res.json({
       event_id: eventId,
       country_id: countryId,
+      lowerSubmitterRole,
+      documentSubmitterRole,
       sections: rows.map(r => ({
         sectionId: r.id,
         sectionLabel: r.label,
@@ -2119,11 +2570,38 @@ app.get('/api/tp/status-grid', authRequired, async (req, res) => {
         lastUpdatedAt: r.last_updated_at,
         lastUpdatedBy: r.last_updated_by || null,
         isAssigned: assignedSet.has(Number(r.id)),
-        pipelineNames: pipelineBySection[r.id] || null,
+        lowerSubmitterRole,
+        documentSubmitterRole,
+        originalSubmitterRole: r.original_submitter_role || null,
+        returnTargetRole: r.return_target_role || null,
+        returnRequest: returnRequestsBySection[Number(r.id)] || null,
+        stepNames: stepNames[Number(r.id)] || { collabI: null, collabII: null, collabIII: null, collaborator: null, superCollab: null },
       }))
     });
   } catch (e) {
     console.error('status-grid error', e);
+    res.status(500).json({ error: 'server error' });
+  }
+});
+
+// Section audit history
+app.get('/api/tp/section-history', authRequired, async (req, res) => {
+  try {
+    const eventId = parseInt(req.query.event_id, 10);
+    const sectionId = parseInt(req.query.section_id, 10);
+    if (!eventId || !sectionId) return res.status(400).json({ error: 'event_id and section_id required' });
+    const countryId = await resolveCountryIdForEvent(eventId);
+    if (!countryId) return res.status(404).json({ error: 'Event not found' });
+    const { rows } = await pool.query(
+      `SELECT id, action, from_status, to_status, user_name, user_role, note, acted_at
+       FROM tp_section_history
+       WHERE event_id=$1 AND section_id=$2
+       ORDER BY acted_at ASC`,
+      [eventId, sectionId]
+    );
+    res.json({ history: rows });
+  } catch (e) {
+    console.error('section-history error', e);
     res.status(500).json({ error: 'server error' });
   }
 });
@@ -2398,6 +2876,98 @@ app.get('/api/library/document', requireRole('admin','deputy','minister','superv
 });
 
 
+/** File upload endpoints **/
+const UPLOADS_DIR = path.join(__dirname, 'uploads');
+
+app.get('/api/tp/files/download', authRequired, attachUser, async (req, res) => {
+  try {
+    const { event_id, section_id, filename } = req.query;
+    if (!event_id || !section_id || !filename) return res.status(400).json({ error: 'Missing params' });
+    const safeName = path.basename(String(filename));
+    const filePath = path.join(UPLOADS_DIR, String(event_id), String(section_id), safeName);
+    if (!fs.existsSync(filePath)) return res.status(404).json({ error: 'File not found' });
+    res.sendFile(filePath);
+  } catch (e) {
+    res.status(500).json({ error: 'Download failed' });
+  }
+});
+
+app.post('/api/tp/files/upload', authRequired, attachUser, async (req, res) => {
+  try {
+    const { eventId, sectionId, filename, mimeType, base64 } = req.body || {};
+    if (!eventId || !sectionId || !filename || !base64) return res.status(400).json({ error: 'Missing fields' });
+    // Sanitize filename
+    const safeName = path.basename(filename).replace(/[^a-zA-Z0-9._\-]/g, '_');
+    const dir = path.join(UPLOADS_DIR, String(eventId), String(sectionId));
+    fs.mkdirSync(dir, { recursive: true });
+    const buf = Buffer.from(base64, 'base64');
+    fs.writeFileSync(path.join(dir, safeName), buf);
+    res.json({ ok: true, filename: safeName });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'Upload failed' });
+  }
+});
+
+app.get('/api/tp/files', authRequired, attachUser, async (req, res) => {
+  try {
+    const { event_id: eventId, section_id: sectionId } = req.query;
+    if (!eventId || !sectionId) return res.status(400).json({ error: 'Missing event_id/section_id' });
+    const dir = path.join(UPLOADS_DIR, String(eventId), String(sectionId));
+    if (!fs.existsSync(dir)) return res.json({ files: [] });
+    const files = fs.readdirSync(dir).map(filename => {
+      const stat = fs.statSync(path.join(dir, filename));
+      return { filename, size: stat.size };
+    });
+    res.json({ files });
+  } catch (e) {
+    res.status(500).json({ error: 'Failed to list files' });
+  }
+});
+
+// ── Section Comments ──────────────────────────────────────────────────────────
+
+app.get('/api/tp/comments', authRequired, attachUser, asyncRoute(async (req, res) => {
+  const { event_id, section_id } = req.query;
+  if (!event_id || !section_id) return res.status(400).json({ error: 'Missing event_id or section_id' });
+  const countryId = await resolveCountryIdForEvent(event_id);
+  if (!countryId) return res.status(404).json({ error: 'Country not found for event' });
+  const isAdmin = normalizeRoleKey(req.user.role_key) === 'admin';
+  const rows = await pool.query(
+    `SELECT id, author_name, comment_text, anchor_id, created_at, parent_id,
+            (user_id = $4) AS is_own
+     FROM tp_section_comments
+     WHERE event_id=$1 AND country_id=$2 AND section_id=$3
+     ORDER BY COALESCE(parent_id, id), id ASC`,
+    [event_id, countryId, section_id, req.user.id]
+  );
+  const comments = rows.rows.map(c => ({ ...c, can_delete: true }));
+  res.json({ comments });
+}));
+
+app.post('/api/tp/comments', authRequired, attachUser, asyncRoute(async (req, res) => {
+  const { eventId, sectionId, commentText, anchorId, parentId } = req.body || {};
+  if (!eventId || !sectionId || !commentText?.trim())
+    return res.status(400).json({ error: 'Missing required fields' });
+  const countryId = await resolveCountryIdForEvent(eventId);
+  if (!countryId) return res.status(404).json({ error: 'Country not found for event' });
+  const authorName = req.user.full_name || req.user.username || 'Unknown';
+  const row = await pool.query(
+    `INSERT INTO tp_section_comments (event_id, country_id, section_id, user_id, author_name, comment_text, anchor_id, parent_id)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id, author_name, comment_text, anchor_id, created_at, parent_id`,
+    [eventId, countryId, sectionId, req.user.id, authorName, commentText.trim(), anchorId || null, parentId || null]
+  );
+  res.json({ comment: { ...row.rows[0], is_own: true, can_delete: true } });
+}));
+
+app.delete('/api/tp/comments/:id', authRequired, attachUser, asyncRoute(async (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  if (!id) return res.status(400).json({ error: 'Invalid id' });
+  const result = await pool.query(`DELETE FROM tp_section_comments WHERE id=$1`, [id]);
+  if (result.rowCount === 0) return res.status(404).json({ error: 'Comment not found or not yours' });
+  res.json({ ok: true });
+}));
+
 /** Static frontend (served from backend/public for Render) **/
 const PUBLIC_DIR = path.join(__dirname, 'public');
 app.use(express.static(PUBLIC_DIR));
@@ -2414,17 +2984,21 @@ app.use((err, req, res, next) => {
   res.status(500).json({ error: 'Server error' });
 });
 
-(async () => {
-  try {
-    await ensureSchema();
-    await ensureRolesExist();
-    await ensureBaseData();
-    await ensureInitialAdmin();
-  } catch (err) {
-    console.error('Startup ensureSchema/ensureRoles failed:', err);
-  }
+if (require.main === module) {
+  (async () => {
+    try {
+      await ensureSchema();
+      await ensureRolesExist();
+      await ensureBaseData();
+      await ensureInitialAdmin();
+    } catch (err) {
+      console.error('Startup ensureSchema/ensureRoles failed:', err);
+    }
 
-  app.listen(PORT, () => {
-    console.log(`GOV COLLAB PORTAL API listening on port ${PORT}`);
-  });
-})();
+    app.listen(PORT, () => {
+      console.log(`GOV COLLAB PORTAL API listening on port ${PORT}`);
+    });
+  })();
+}
+
+module.exports = app;
