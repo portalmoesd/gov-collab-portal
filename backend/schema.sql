@@ -120,6 +120,8 @@ CREATE TABLE IF NOT EXISTS tp_content (
   status_comment           TEXT, -- used for "returned with comment" (per blueprint workflow)
   last_updated_by_user_id  INTEGER REFERENCES users(id),
   last_updated_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  original_submitter_role  TEXT DEFAULT NULL,
+  return_target_role       TEXT DEFAULT NULL,
   CONSTRAINT uq_tp_content_event_country_section UNIQUE (event_id, country_id, section_id)
 );
 
@@ -162,6 +164,19 @@ CREATE TABLE IF NOT EXISTS country_assignments (
     PRIMARY KEY (user_id, country_id)
 );
 
+CREATE TABLE IF NOT EXISTS section_return_requests (
+    id SERIAL PRIMARY KEY,
+    event_id INTEGER NOT NULL,
+    country_id INTEGER NOT NULL,
+    section_id INTEGER NOT NULL,
+    requested_by_user_id INTEGER REFERENCES users(id),
+    requested_by_name TEXT NOT NULL,
+    requested_by_role TEXT NOT NULL,
+    directed_to_role TEXT NOT NULL,
+    note TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
 
 -- Keep older databases in sync with the newer section workflow statuses
 ALTER TYPE tp_section_status ADD VALUE IF NOT EXISTS 'submitted_to_collaborator_2';
@@ -175,3 +190,11 @@ ALTER TYPE tp_section_status ADD VALUE IF NOT EXISTS 'returned_by_super_collabor
 ALTER TYPE tp_section_status ADD VALUE IF NOT EXISTS 'approved_by_super_collaborator';
 ALTER TYPE tp_section_status ADD VALUE IF NOT EXISTS 'submitted_to_supervisor';
 ALTER TYPE tp_section_status ADD VALUE IF NOT EXISTS 'returned_by_supervisor';
+ALTER TYPE tp_section_status ADD VALUE IF NOT EXISTS 'submitted_to_collaborator_3';
+ALTER TYPE tp_section_status ADD VALUE IF NOT EXISTS 'returned_by_collaborator_3';
+ALTER TYPE tp_section_status ADD VALUE IF NOT EXISTS 'approved_by_collaborator_3';
+ALTER TYPE tp_section_status ADD VALUE IF NOT EXISTS 'approved_by_minister';
+ALTER TYPE tp_section_status ADD VALUE IF NOT EXISTS 'submitted_to_deputy';
+ALTER TYPE tp_section_status ADD VALUE IF NOT EXISTS 'returned_by_deputy';
+ALTER TYPE tp_section_status ADD VALUE IF NOT EXISTS 'submitted_to_minister';
+ALTER TYPE tp_section_status ADD VALUE IF NOT EXISTS 'returned_by_minister';

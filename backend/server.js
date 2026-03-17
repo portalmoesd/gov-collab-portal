@@ -73,14 +73,15 @@ async function ensureSchema() {
   `).catch(()=>{});
 
   // Lightweight, idempotent DDL to keep Render deployments working
-  await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMP`);
-  await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS deleted_by_user_id INTEGER`);
-  await pool.query(`ALTER TABLE events ADD COLUMN IF NOT EXISTS ended_at TIMESTAMP`);
-  await pool.query(`ALTER TABLE events ADD COLUMN IF NOT EXISTS ended_by_user_id INTEGER`);
-  await pool.query(`ALTER TABLE events ADD COLUMN IF NOT EXISTS submitter_role TEXT NOT NULL DEFAULT 'deputy'`).catch(()=>{});
-  await pool.query(`ALTER TABLE events ADD COLUMN IF NOT EXISTS lower_submitter_role TEXT DEFAULT 'collaborator_2'`).catch(()=>{});
-  await pool.query(`ALTER TABLE tp_content ADD COLUMN IF NOT EXISTS original_submitter_role TEXT DEFAULT NULL`).catch(()=>{});
-  await pool.query(`ALTER TABLE tp_content ADD COLUMN IF NOT EXISTS return_target_role TEXT DEFAULT NULL`).catch(()=>{});
+  // NOTE: these use .catch() so a single failure doesn't abort the rest of schema setup
+  await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMP`).catch(e => console.error('DDL warn:', e.message));
+  await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS deleted_by_user_id INTEGER`).catch(e => console.error('DDL warn:', e.message));
+  await pool.query(`ALTER TABLE events ADD COLUMN IF NOT EXISTS ended_at TIMESTAMP`).catch(e => console.error('DDL warn:', e.message));
+  await pool.query(`ALTER TABLE events ADD COLUMN IF NOT EXISTS ended_by_user_id INTEGER`).catch(e => console.error('DDL warn:', e.message));
+  await pool.query(`ALTER TABLE events ADD COLUMN IF NOT EXISTS submitter_role TEXT NOT NULL DEFAULT 'deputy'`).catch(e => console.error('DDL warn:', e.message));
+  await pool.query(`ALTER TABLE events ADD COLUMN IF NOT EXISTS lower_submitter_role TEXT DEFAULT 'collaborator_2'`).catch(e => console.error('DDL warn:', e.message));
+  await pool.query(`ALTER TABLE tp_content ADD COLUMN IF NOT EXISTS original_submitter_role TEXT DEFAULT NULL`).catch(e => console.error('DDL warn:', e.message));
+  await pool.query(`ALTER TABLE tp_content ADD COLUMN IF NOT EXISTS return_target_role TEXT DEFAULT NULL`).catch(e => console.error('DDL warn:', e.message));
   await pool.query(`ALTER TABLE tp_content ADD COLUMN IF NOT EXISTS last_content_edited_at TIMESTAMPTZ DEFAULT NULL`).catch(()=>{});
   await pool.query(`ALTER TABLE tp_content ADD COLUMN IF NOT EXISTS last_content_edited_by_user_id INTEGER REFERENCES users(id) DEFAULT NULL`).catch(()=>{});
   await pool.query(`CREATE TABLE IF NOT EXISTS section_return_requests (
@@ -124,6 +125,12 @@ async function ensureSchema() {
   await pool.query(`ALTER TYPE tp_section_status ADD VALUE IF NOT EXISTS 'submitted_to_collaborator_3'`).catch(()=>{});
   await pool.query(`ALTER TYPE tp_section_status ADD VALUE IF NOT EXISTS 'returned_by_collaborator_3'`).catch(()=>{});
   await pool.query(`ALTER TYPE tp_section_status ADD VALUE IF NOT EXISTS 'approved_by_collaborator_3'`).catch(()=>{});
+
+  // Deputy/minister pipeline statuses (needed for return and approve-all-sections routes)
+  await pool.query(`ALTER TYPE tp_section_status ADD VALUE IF NOT EXISTS 'submitted_to_deputy'`).catch(()=>{});
+  await pool.query(`ALTER TYPE tp_section_status ADD VALUE IF NOT EXISTS 'returned_by_deputy'`).catch(()=>{});
+  await pool.query(`ALTER TYPE tp_section_status ADD VALUE IF NOT EXISTS 'submitted_to_minister'`).catch(()=>{});
+  await pool.query(`ALTER TYPE tp_section_status ADD VALUE IF NOT EXISTS 'returned_by_minister'`).catch(()=>{});
 
   // Section audit history
   await pool.query(`
