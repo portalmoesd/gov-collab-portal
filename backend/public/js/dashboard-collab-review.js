@@ -19,16 +19,12 @@
   const sectionsCards         = document.getElementById('sectionsCards');
   const sectionsEmpty         = document.getElementById('sectionsEmpty');
   const requiredSectionsPanel = document.getElementById('requiredSectionsPanel');
-  const submitDocBtn          = document.getElementById('submitDocBtn');
   const previewFullBtn     = document.getElementById('previewFullBtn');
   const modalBackdrop      = document.getElementById('modalBackdrop');
   const modalContent       = document.getElementById('modalContent');
   const modalCloseBtn      = document.getElementById('modalCloseBtn');
   const msg                = document.getElementById('msg');
   const docStatusBox       = document.getElementById('docStatusBox');
-
-  // Update submit button label
-  if (submitDocBtn) submitDocBtn.textContent = 'Submit Approved Sections to Super-collaborator';
 
   let currentEventId = null;
   let currentSections = [];
@@ -309,7 +305,6 @@
     if(!currentSections.length){
       if(sectionsEmpty) sectionsEmpty.hidden=false;
       if(sectionsTbody) sectionsTbody.innerHTML=`<tr class="required-sections-empty-row"><td colspan="3">No required sections for this event.</td></tr>`;
-      if(submitDocBtn) submitDocBtn.disabled=true;
       return;
     }
 
@@ -318,14 +313,6 @@
       if(sectionsCards) sectionsCards.appendChild(renderCard(s));
     }
 
-    // Enable batch submit if any section is at the collaborator review stage
-    const canSubmit=currentSections.some(s=>{
-      const st=String(s.status||'').toLowerCase();
-      const rtr=String(s.returnTargetRole||'').toLowerCase();
-      return ['submitted_to_collaborator','returned_by_collaborator','approved_by_collaborator',
-              'approved_by_collaborator_2','approved_by_collaborator_3','returned_by_super_collaborator'].includes(st)||rtr==='collaborator';
-    });
-    if(submitDocBtn){ submitDocBtn.disabled=!canSubmit; submitDocBtn.style.display=''; }
   }
 
   async function loadUpcoming(){
@@ -350,7 +337,6 @@
       if(sectionsTbody) sectionsTbody.innerHTML='';
       if(sectionsCards) sectionsCards.innerHTML='';
       if(sectionsEmpty) sectionsEmpty.hidden=false;
-      if(submitDocBtn) submitDocBtn.disabled=true;
       if(docStatusBox) docStatusBox.innerHTML='';
       if(requiredSectionsPanel) requiredSectionsPanel.hidden=true;
       return;
@@ -358,18 +344,6 @@
     if(requiredSectionsPanel) requiredSectionsPanel.hidden=false;
     try{ await refreshStatusGrid(); }
     catch(e){ setMsg(e.message||'Failed to load sections',true); }
-  });
-
-  if(submitDocBtn) submitDocBtn.addEventListener('click', async()=>{
-    if(!currentEventId||submitDocBtn.disabled) return;
-    if(!confirm('Submit approved sections to Super-collaborator?')) return;
-    setMsg('');
-    try{
-      const result=await window.GCP.apiFetch('/tp/submit-approved-to-super-collaborator',{method:'POST',body:JSON.stringify({eventId:currentEventId})});
-      if(result&&Number(result.submitted||0)>0) setMsg('Sections submitted to Super-collaborator.');
-      else setMsg('No sections were ready to submit. Approve sections first.');
-      await refreshStatusGrid();
-    }catch(e){ setMsg(e.message||'Submit failed',true); }
   });
 
   if(previewFullBtn) previewFullBtn.addEventListener('click', async()=>{
