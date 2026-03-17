@@ -163,6 +163,16 @@
 
     if (!isMyTurn(tp)) {
       // Not this user's turn — editor is read-only.
+      // Exception: deputy/minister who IS the original submitter can Return directly
+      // even after they've approved (section has moved past their stage).
+      const isApprovedState = s.startsWith('approved_by_') || s === 'approved' || s === 'locked';
+      if ((role === 'deputy' || role === 'minister') && isApprovedState) {
+        const originalSubmitter = String(tp.originalSubmitterRole || '').toLowerCase();
+        if (originalSubmitter === role) {
+          if (btnReturn) btnReturn.style.display = "";
+          return;
+        }
+      }
       // Only show Ask to Return when someone else holds the section (non-draft).
       // In draft state there is no current holder, so Ask to Return is meaningless.
       if (s !== 'draft' && btnAskToReturn) btnAskToReturn.style.display = "";
