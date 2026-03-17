@@ -127,10 +127,18 @@ async function ensureSchema() {
   await pool.query(`ALTER TYPE tp_section_status ADD VALUE IF NOT EXISTS 'approved_by_collaborator_3'`).catch(()=>{});
 
   // Deputy/minister pipeline statuses (needed for return and approve-all-sections routes)
+  // NOTE: 'approved_by_deputy' was previously 'approved_by_chairman' in the enum — add it for existing DBs
+  await pool.query(`ALTER TYPE tp_section_status ADD VALUE IF NOT EXISTS 'approved_by_deputy'`).catch(()=>{});
   await pool.query(`ALTER TYPE tp_section_status ADD VALUE IF NOT EXISTS 'submitted_to_deputy'`).catch(()=>{});
   await pool.query(`ALTER TYPE tp_section_status ADD VALUE IF NOT EXISTS 'returned_by_deputy'`).catch(()=>{});
   await pool.query(`ALTER TYPE tp_section_status ADD VALUE IF NOT EXISTS 'submitted_to_minister'`).catch(()=>{});
   await pool.query(`ALTER TYPE tp_section_status ADD VALUE IF NOT EXISTS 'returned_by_minister'`).catch(()=>{});
+
+  // Migrate legacy 'approved_by_chairman' rows to 'approved_by_deputy'
+  await pool.query(`
+    UPDATE tp_content SET status='approved_by_deputy'
+    WHERE status::text = 'approved_by_chairman'
+  `).catch(()=>{});
 
   // Section audit history
   await pool.query(`
