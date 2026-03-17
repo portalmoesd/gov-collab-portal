@@ -338,10 +338,7 @@
         if(!title){ title=tp.eventTitle||''; country=tp.countryName||''; }
         sections.push({ label: tp.sectionLabel||s.sectionLabel||'', html: tp.htmlContent||'' });
       }
-      const modalEl=modalBackdrop&&modalBackdrop.querySelector('.modal');
-      if(modalEl) modalEl.classList.add('paper-modal');
-      if(modalContent) window.GCP.renderPaperPreview(modalContent, { title, country, sections });
-      if(modalBackdrop) modalBackdrop.style.display='flex';
+      window.GCP.openPaperPreview({ title, country, sections });
     }catch(e){ setMsg(e.message||'Failed to preview',true); }
   });
 

@@ -1,11 +1,12 @@
 /**
  * preview-paper.js — A4 paper preview for talking-points dashboards.
  *
- * Renders content as stacked A4-proportioned pages with a document header
- * on the first page. Automatically paginates by measuring element heights.
+ * Opens a new browser tab with content formatted for A4 paper.
+ * The browser's native @page CSS handles pagination perfectly.
+ * Users can print / "Save as PDF" directly from the tab.
  *
  * Usage:
- *   window.GCP.renderPaperPreview(modalContent, {
+ *   window.GCP.openPaperPreview({
  *     title: 'Event Title',
  *     country: 'Country Name',
  *     sections: [ { label: 'Section 1', html: '<p>...</p>' }, ... ]
@@ -14,217 +15,84 @@
 (function () {
   'use strict';
 
-  // A4 proportions at ~96 DPI: 794 × 1123 px.
-  // We use a slightly smaller width for comfortable on-screen reading.
-  const PAGE_W = 760;                  // px – paper width (content + padding)
-  const PAGE_H = Math.round(PAGE_W * (297 / 210)); // ≈ 1074 px
-  const PAD_X = 60;                    // px – horizontal padding inside paper
-  const PAD_TOP = 50;                  // px – top padding
-  const PAD_BOT = 50;                  // px – bottom padding
-  const CONTENT_H = PAGE_H - PAD_TOP - PAD_BOT; // usable height per page
-
-  /**
-   * Build the document header HTML shown on the first page.
-   */
-  function buildHeader(title, country) {
-    const esc = window.GCP.escapeHtml;
-    const parts = [];
-    if (country) {
-      parts.push(`<div style="text-align:center;font-size:13px;color:#555;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:6px;">${esc(country)}</div>`);
-    }
-    if (title) {
-      parts.push(`<div style="text-align:center;font-size:20px;font-weight:700;color:#1a1a1a;margin-bottom:4px;line-height:1.3;">${esc(title)}</div>`);
-    }
-    parts.push(`<hr style="border:none;border-top:1.5px solid #bbb;margin:18px 0 10px;">`);
-    return parts.join('');
+  function esc(s) {
+    return (window.GCP && window.GCP.escapeHtml)
+      ? window.GCP.escapeHtml(s)
+      : s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
   }
 
-  /**
-   * Create a blank A4 page element and return its content area.
-   */
-  function createPage() {
-    const page = document.createElement('div');
-    page.className = 'paper-page';
-    page.style.cssText = `
-      width:${PAGE_W}px; min-height:${PAGE_H}px;
-      background:#fff; border:1px solid #d0d0d0;
-      box-shadow:0 2px 12px rgba(0,0,0,.18);
-      padding:${PAD_TOP}px ${PAD_X}px ${PAD_BOT}px;
-      box-sizing:border-box;
-      margin:0 auto 32px;
-      position:relative;
-    `;
-    const content = document.createElement('div');
-    content.className = 'paper-page-content';
-    page.appendChild(content);
-    return { page, content };
-  }
-
-  /**
-   * Main renderer.
-   *
-   * @param {HTMLElement} container – the modalContent element to fill
-   * @param {Object} opts
-   * @param {string} opts.title – event title
-   * @param {string} opts.country – country name
-   * @param {Array}  opts.sections – [{ label, html }]
-   */
-  function renderPaperPreview(container, opts) {
+  function openPaperPreview(opts) {
     const { title, country, sections } = opts;
 
-    // -- 1. Build a hidden measuring container (same width as page content area)
-    const measurer = document.createElement('div');
-    measurer.style.cssText = `
-      position:absolute; left:-9999px; top:0;
-      width:${PAGE_W - PAD_X * 2}px;
-      font-family:inherit; font-size:inherit; line-height:inherit;
-      visibility:hidden;
-    `;
-    document.body.appendChild(measurer);
+    // Build sections HTML
+    const sectionsHtml = sections.map(function (sec) {
+      const body = sec.html || '<div style="color:#999;">—</div>';
+      return '<div class="tp-section">' +
+        '<h2>' + esc(sec.label) + '</h2>' +
+        '<div class="tp-body">' + body + '</div>' +
+        '</div>';
+    }).join('');
 
-    // Insert header into measurer
-    const headerDiv = document.createElement('div');
-    headerDiv.innerHTML = buildHeader(title, country);
-    measurer.appendChild(headerDiv);
+    const html = '<!DOCTYPE html>\n<html lang="en"><head><meta charset="utf-8">' +
+      '<title>' + esc(title || 'Preview') + '</title>' +
+      '<style>' +
+      // -- Print: A4 page rules (browser handles pagination) --
+      '@page{size:A4;margin:20mm 25mm;}' +
+      '@media print{' +
+        'body{margin:0;padding:0;background:#fff;}' +
+        '.doc{box-shadow:none;border:none;margin:0;padding:0;width:auto;max-width:none;border-radius:0;}' +
+        '.print-bar{display:none!important;}' +
+      '}' +
+      // -- Screen: looks like a sheet of paper --
+      '@media screen{' +
+        'body{margin:0;padding:32px 16px;background:#e8e8e8;min-height:100vh;box-sizing:border-box;}' +
+        '.doc{' +
+          'width:210mm;max-width:100%;margin:0 auto;background:#fff;' +
+          'border:1px solid #d0d0d0;border-radius:4px;' +
+          'box-shadow:0 2px 12px rgba(0,0,0,.18);' +
+          'padding:20mm 25mm;box-sizing:border-box;' +
+        '}' +
+        '.print-bar{' +
+          'position:sticky;top:0;z-index:10;background:#555;color:#fff;' +
+          'padding:8px 20px;text-align:center;font-family:sans-serif;font-size:14px;' +
+        '}' +
+        '.print-bar button{' +
+          'background:#fff;color:#333;border:none;border-radius:6px;' +
+          'padding:6px 20px;font-size:14px;cursor:pointer;margin-left:12px;' +
+        '}' +
+        '.print-bar button:hover{background:#e0e0e0;}' +
+      '}' +
+      // -- Content typography --
+      'body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;font-size:14px;line-height:1.65;color:#222;}' +
+      '.doc-header{text-align:center;margin-bottom:10px;}' +
+      '.doc-header .country{font-size:13px;color:#555;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:6px;}' +
+      '.doc-header .title{font-size:20px;font-weight:700;color:#1a1a1a;line-height:1.3;margin-bottom:4px;}' +
+      '.doc-header hr{border:none;border-top:1.5px solid #bbb;margin:18px 0 10px;}' +
+      '.tp-section h2{font-size:16px;font-weight:600;color:#222;border-bottom:1px solid #e0e0e0;padding-bottom:5px;margin:20px 0 8px;break-after:avoid;page-break-after:avoid;}' +
+      '.tp-body{font-size:14px;line-height:1.65;color:#222;}' +
+      '.tp-body p{margin:0 0 8px;}' +
+      '</style></head><body>' +
+      '<div class="print-bar">Preview — ' + esc(title || 'Document') +
+        '<button onclick="window.print()">Print / Save PDF</button></div>' +
+      '<div class="doc">' +
+        '<div class="doc-header">' +
+          (country ? '<div class="country">' + esc(country) + '</div>' : '') +
+          (title ? '<div class="title">' + esc(title) + '</div>' : '') +
+          '<hr>' +
+        '</div>' +
+        sectionsHtml +
+      '</div>' +
+      '</body></html>';
 
-    // Insert all sections into measurer
-    for (const sec of sections) {
-      const secDiv = document.createElement('div');
-      secDiv.className = 'paper-section';
-      secDiv.innerHTML =
-        `<h2 style="margin:20px 0 8px;font-size:16px;font-weight:600;color:#222;border-bottom:1px solid #e0e0e0;padding-bottom:5px;">${window.GCP.escapeHtml(sec.label)}</h2>` +
-        `<div class="paper-section-body" style="font-size:14px;line-height:1.65;color:#222;">${sec.html || '<div style="color:#999;">—</div>'}</div>`;
-      measurer.appendChild(secDiv);
+    var win = window.open('', '_blank');
+    if (!win) {
+      alert('Please allow pop-ups for this site to use the preview feature.');
+      return;
     }
-
-    // Force layout
-    void measurer.offsetHeight;
-
-    // -- 2. Paginate by walking top-level children in measurer
-    const pages = [];
-    let currentPage = createPage();
-    pages.push(currentPage);
-    let usedH = 0;
-
-    /**
-     * Helper: get an element's outer height including margins.
-     * offsetHeight misses margins, which causes under-counting.
-     */
-    function outerH(el) {
-      const style = getComputedStyle(el);
-      return el.offsetHeight
-        + parseFloat(style.marginTop || 0)
-        + parseFloat(style.marginBottom || 0);
-    }
-
-    /** Helper: start a fresh page and return it. */
-    function newPage() {
-      const p = createPage();
-      pages.push(p);
-      return p;
-    }
-
-    /**
-     * Append a list of measured elements to pages, splitting across
-     * page boundaries. Mutates currentPage / usedH in closure.
-     */
-    function flowElements(elements) {
-      for (const el of elements) {
-        const h = outerH(el);
-        if (usedH > 0 && usedH + h > CONTENT_H) {
-          currentPage = newPage();
-          usedH = 0;
-        }
-        currentPage.content.appendChild(el.cloneNode(true));
-        usedH += h;
-      }
-    }
-
-    const children = Array.from(measurer.children);
-    for (const child of children) {
-      const childH = outerH(child);
-
-      // Does this child fit on the current page?
-      const fits = usedH === 0 || usedH + childH <= CONTENT_H;
-
-      if (fits) {
-        // Fits as-is → append whole
-        currentPage.content.appendChild(child.cloneNode(true));
-        usedH += childH;
-        continue;
-      }
-
-      // Doesn't fit. If it's a section, split it intelligently.
-      if (child.classList.contains('paper-section')) {
-        const h2 = child.querySelector('h2');
-        const body = child.querySelector('.paper-section-body');
-
-        if (h2 && body) {
-          const h2H = outerH(h2);
-
-          // Ensure room for header + at least some body content (120px).
-          // If not enough room, start a new page first.
-          if (usedH + h2H + 120 > CONTENT_H) {
-            currentPage = newPage();
-            usedH = 0;
-          }
-
-          // Place section header
-          currentPage.content.appendChild(h2.cloneNode(true));
-          usedH += h2H;
-
-          // Flow body children across pages
-          const bodyChildren = Array.from(body.children);
-          if (bodyChildren.length > 0) {
-            flowElements(bodyChildren);
-          } else {
-            // No block children (single text node?), append body whole
-            const bh = outerH(body);
-            if (usedH > 0 && usedH + bh > CONTENT_H) {
-              currentPage = newPage();
-              usedH = 0;
-            }
-            currentPage.content.appendChild(body.cloneNode(true));
-            usedH += bh;
-          }
-          continue;
-        }
-      }
-
-      // Non-section or no h2/body structure → push to new page as whole
-      currentPage = newPage();
-      usedH = 0;
-      currentPage.content.appendChild(child.cloneNode(true));
-      usedH += childH;
-    }
-
-    // -- 3. Clean up measurer
-    document.body.removeChild(measurer);
-
-    // -- 4. Build final output
-    const wrapper = document.createElement('div');
-    wrapper.className = 'paper-preview-wrapper';
-    wrapper.style.cssText = `
-      padding:32px 16px;
-      background:#e8e8e8;
-      min-height:100%;
-    `;
-
-    // Page counter
-    const totalPages = pages.length;
-    pages.forEach(({ page }, i) => {
-      const counter = document.createElement('div');
-      counter.style.cssText = 'position:absolute;bottom:14px;right:20px;font-size:11px;color:#999;';
-      counter.textContent = `${i + 1} / ${totalPages}`;
-      page.appendChild(counter);
-      wrapper.appendChild(page);
-    });
-
-    container.innerHTML = '';
-    container.appendChild(wrapper);
+    win.document.write(html);
+    win.document.close();
   }
 
-  // Expose on GCP namespace
   if (!window.GCP) window.GCP = {};
-  window.GCP.renderPaperPreview = renderPaperPreview;
+  window.GCP.openPaperPreview = openPaperPreview;
 })();
