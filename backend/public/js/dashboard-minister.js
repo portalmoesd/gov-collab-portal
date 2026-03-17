@@ -12,7 +12,7 @@
   const sectionsEmpty         = document.getElementById('sectionsEmpty');
   const requiredSectionsPanel = document.getElementById('requiredSectionsPanel');
   const approveAllSectionsBtn = document.getElementById('approveAllSectionsBtn');
-  const approveDocBtn = document.getElementById('approveDocBtn');
+  const sendToLibraryBtn = document.getElementById('sendToLibraryBtn');
   const returnDocBtn = document.getElementById('returnDocBtn');
   const previewBtn = document.getElementById('previewBtn');
   const msg = document.getElementById('msg');
@@ -314,8 +314,8 @@
     const evId = Number(eventSelect.value);
     if (!Number.isFinite(evId) || evId <= 0) {
       currentEventId = null;
-      approveDocBtn.disabled = true;
-      approveDocBtn.style.display = 'none';
+      sendToLibraryBtn.disabled = true;
+      sendToLibraryBtn.style.display = 'none';
       returnDocBtn.disabled = true;
       previewBtn.disabled = true;
       if (approveAllSectionsBtn) approveAllSectionsBtn.disabled = true;
@@ -353,25 +353,17 @@
     try {
       const evDetails = await window.GCP.apiFetch(`/events/${currentEventId}`, { method:'GET' });
       const sr = String(evDetails.submitterRole || evDetails.submitter_role || '').toLowerCase();
-      if (sr === 'minister') {
-        const labelEl = approveDocBtn.querySelector('.micro-action__label');
-        if (labelEl) labelEl.textContent = 'Send to Library';
-        else approveDocBtn.textContent = 'Send to Library';
-        approveDocBtn.setAttribute('aria-label', 'Send to Library');
-        approveDocBtn.style.display = '';
-      } else {
-        approveDocBtn.style.display = 'none';
-      }
+      sendToLibraryBtn.style.display = sr === 'minister' ? '' : 'none';
     } catch (e) {
-      approveDocBtn.style.display = 'none';
+      sendToLibraryBtn.style.display = 'none';
     }
 
-    approveDocBtn.disabled = false;
+    sendToLibraryBtn.disabled = false;
     returnDocBtn.disabled = false;
     previewBtn.disabled = false;
   }
 
-  approveDocBtn.addEventListener('click', async () => {
+  sendToLibraryBtn.addEventListener('click', async () => {
     setMsg('');
     if (!currentEventId) return;
     if (!confirm('Send this document to the Library?')) return;
