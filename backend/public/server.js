@@ -132,8 +132,15 @@ async function ensureSchema() {
   await pool.query(`ALTER TYPE tp_section_status ADD VALUE IF NOT EXISTS 'submitted_to_minister'`).catch(()=>{});
   await pool.query(`ALTER TYPE tp_section_status ADD VALUE IF NOT EXISTS 'returned_by_minister'`).catch(()=>{});
 
-  // Migrate legacy 'chairman' role key to 'deputy' so existing users retain access
-  await pool.query(`UPDATE roles SET key='deputy', label='Deputy' WHERE key='chairman'`).catch(()=>{});
+  // Migrate legacy 'chairman' role to 'deputy': reassign users and remove the stale row.
+  // We cannot rename the row directly because 'deputy' already exists (unique constraint),
+  // so instead we point every user whose role_id is the old 'chairman' row at the 'deputy' row.
+  await pool.query(`
+    UPDATE users
+    SET role_id = (SELECT id FROM roles WHERE key = 'deputy')
+    WHERE role_id = (SELECT id FROM roles WHERE key = 'chairman')
+  `).catch(()=>{});
+  await pool.query(`DELETE FROM roles WHERE key = 'chairman'`).catch(()=>{});
 
   // Section audit history
   await pool.query(`
