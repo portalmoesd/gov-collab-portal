@@ -120,29 +120,26 @@
 
       // If a section still doesn't fit on the (now possibly fresh) page, split its children
       if (childH > CONTENT_H && child.classList.contains('paper-section')) {
-        const innerChildren = Array.from(child.children);
-        for (let ii = 0; ii < innerChildren.length; ii++) {
-          const inner = innerChildren[ii];
-          const innerH = inner.offsetHeight;
+        const h2 = child.querySelector('h2');
+        const body = child.querySelector('.paper-section-body');
 
-          // Prevent orphaned headers: if this is an h2 and there isn't enough room
-          // for the header + at least 120px of body content, push to next page
-          if (usedH > 0 && inner.tagName === 'H2') {
-            const MIN_BODY_AFTER_HEADER = 120;
-            if (usedH + innerH + MIN_BODY_AFTER_HEADER > CONTENT_H) {
-              currentPage = createPage();
-              pages.push(currentPage);
-              usedH = 0;
-            }
-          } else if (usedH > 0 && usedH + innerH > CONTENT_H) {
+        if (h2 && body) {
+          const h2H = h2.offsetHeight;
+
+          // Ensure room for header + at least some body content
+          if (usedH > 0 && usedH + h2H + 120 > CONTENT_H) {
             currentPage = createPage();
             pages.push(currentPage);
             usedH = 0;
           }
 
-          // If a section body is itself too tall, split its children too
-          if (innerH > CONTENT_H && inner.classList.contains('paper-section-body')) {
-            const bodyChildren = Array.from(inner.children);
+          // Place header
+          currentPage.content.appendChild(h2.cloneNode(true));
+          usedH += h2H;
+
+          // Split body children across pages (never push body as a whole block)
+          const bodyChildren = Array.from(body.children);
+          if (bodyChildren.length > 0) {
             for (const bc of bodyChildren) {
               const bcH = bc.offsetHeight;
               if (usedH > 0 && usedH + bcH > CONTENT_H) {
@@ -153,15 +150,15 @@
               currentPage.content.appendChild(bc.cloneNode(true));
               usedH += bcH;
             }
-            // If inner had no block children (plain text?), append whole thing
-            if (bodyChildren.length === 0) {
-              currentPage.content.appendChild(inner.cloneNode(true));
-              usedH += innerH;
-            }
           } else {
-            currentPage.content.appendChild(inner.cloneNode(true));
-            usedH += innerH;
+            // No block children (plain text node?), append body as whole
+            currentPage.content.appendChild(body.cloneNode(true));
+            usedH += body.offsetHeight;
           }
+        } else {
+          // Fallback: no clear h2/body structure, append whole section
+          currentPage.content.appendChild(child.cloneNode(true));
+          usedH += childH;
         }
       } else {
         currentPage.content.appendChild(child.cloneNode(true));
