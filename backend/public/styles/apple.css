@@ -2457,6 +2457,7 @@ body.gp-shell-ready .gp-sidebar__scrim{
   flex:0 0 auto;
 }
 .calendar-sections-grid .checkitem span{ line-height:1.22; }
+.calendar-form-col--task{ grid-column: 1 / -1; }
 .calendar-form-actions{
   justify-content:flex-end;
   align-items:center;
@@ -2469,15 +2470,15 @@ body.gp-shell-ready .gp-sidebar__scrim{
   .calendar-event-form{ grid-template-columns: 1fr 1fr; }
   .calendar-form-col--right{ grid-column: 2; grid-row: 1 / span 2; }
   .calendar-form-col--middle{ grid-column: 1 / span 2; }
-  .calendar-event-form textarea{ min-height:220px; }
+  .calendar-form-col--task{ grid-column: 1 / -1; }
   .calendar-sections-grid{ max-height:220px !important; }
 }
 @media (max-width: 860px){
   .calendar-event-form{ grid-template-columns: 1fr; }
   .calendar-form-col--right,
   .calendar-form-col--middle,
-  .calendar-form-col--left{ grid-column:auto; grid-row:auto; }
-  .calendar-event-form textarea{ min-height:180px; }
+  .calendar-form-col--left,
+  .calendar-form-col--task{ grid-column:auto; grid-row:auto; }
   .calendar-sections-grid{ max-height:180px !important; }
   .calendar-form-actions{ justify-content:flex-start; flex-wrap:wrap; }
 }

@@ -14,7 +14,8 @@
 
   const countrySelect = document.getElementById("countryId");
   const titleInput = document.getElementById("title");
-  const occasionInput = document.getElementById("occasion");
+  const occasionEditorContainer = document.getElementById("occasionEditor");
+  const occasionEditor = window.GCP.createSimpleEditor(occasionEditorContainer, { placeholder: 'Enter task description...' });
   const deadlineInput = document.getElementById("deadlineDate");
   const submitterSelect = document.getElementById("submitterRole");
   const lowerSubmitterSelect = document.getElementById("lowerSubmitterRole");
@@ -121,7 +122,7 @@
     editEventId = ev.id;
     countrySelect.value = String(details.country_id);
     titleInput.value = details.title || "";
-    occasionInput.value = details.occasion || "";
+    occasionEditor.setHtml(details.occasion || "");
     deadlineInput.value = formatDate(details.deadline_date);
     if (submitterSelect) submitterSelect.value = String(details.submitterRole || details.submitter_role || "deputy");
     if (lowerSubmitterSelect) lowerSubmitterSelect.value = String(details.lowerSubmitterRole || details.lower_submitter_role || "collaborator_2");
@@ -250,6 +251,7 @@
   function resetForm(){
     editEventId = null;
     form.reset();
+    occasionEditor.clear();
     if (submitterSelect) submitterSelect.value = "deputy";
     if (lowerSubmitterSelect) lowerSubmitterSelect.value = "collaborator_2";
     if (languageSelect) languageSelect.value = "en";
@@ -272,7 +274,7 @@
 
     const countryId = Number(countrySelect.value);
     const title = (titleInput.value || "").trim();
-    const occasion = (occasionInput.value || "").trim();
+    const occasion = occasionEditor.getHtml();
     const deadlineDate = (deadlineInput.value || "").trim();
     const submitterRole = submitterSelect ? String(submitterSelect.value || "deputy") : "deputy";
     const lowerSubmitterRole = lowerSubmitterSelect ? String(lowerSubmitterSelect.value || "collaborator_2") : "collaborator_2";
