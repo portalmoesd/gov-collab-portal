@@ -310,7 +310,7 @@
       if (sectionsTbody) sectionsTbody.innerHTML = '';
       if (sectionsCards) sectionsCards.innerHTML = '';
       if (sectionsEmpty) sectionsEmpty.hidden = false;
-      if (submitDocBtn) submitDocBtn.disabled = true;
+      if (submitDocBtn){ submitDocBtn.disabled = true; submitDocBtn.style.display = 'none'; }
       if (docStatusBox) docStatusBox.innerHTML = '';
       if (requiredSectionsPanel) requiredSectionsPanel.hidden = true;
       return;
@@ -327,7 +327,12 @@
       }catch(e){ /* keep default */ }
     }
     if (submitDocBtn){
-      submitDocBtn.textContent = sr === 'supervisor' ? 'Send to Library' : (sr === 'minister' ? 'Submit to Deputy' : 'Submit document to Deputy');
+      if (sr === 'supervisor'){
+        submitDocBtn.textContent = 'Send to Library';
+        submitDocBtn.style.display = '';
+      } else {
+        submitDocBtn.style.display = 'none';
+      }
       submitDocBtn.dataset.submitterRole = sr || 'deputy';
     }
 
@@ -386,12 +391,11 @@
 
   if (submitDocBtn) submitDocBtn.addEventListener('click', async () => {
     if (!currentEventId || submitDocBtn.disabled) return;
+    if (!confirm('Send this document to the Library?')) return;
     setMsg('');
     try{
-      const selectedOpt = eventSelect.options[eventSelect.selectedIndex];
-      const sr = String(selectedOpt?.dataset?.submitterRole || '').toLowerCase();
       await window.GCP.apiFetch('/document/submit-to-deputy', { method: 'POST', body: JSON.stringify({ eventId: currentEventId }) });
-      setMsg(sr === 'supervisor' ? 'Document finalized and sent to Library.' : 'Submitted to Deputy.');
+      setMsg('Document finalized and sent to Library.');
       await refreshStatusGrid();
     }catch(e){ setMsg(e.message || 'Submit failed', true); }
   });
