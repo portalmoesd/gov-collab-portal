@@ -2023,7 +2023,7 @@ app.post('/api/tp/return', requireRole('collaborator_2','collaborator_3','collab
   return res.json({ success:true, status: returnStatus });
 });
 
-app.post('/api/tp/approve-section', requireRole('super_collaborator','supervisor','admin'), async (req, res) => {
+app.post('/api/tp/approve-section', requireRole('super_collaborator','supervisor','admin'), asyncRoute(async (req, res) => {
   const eventId = Number(req.body?.eventId);
   const sectionId = Number(req.body?.sectionId);
   if (!Number.isFinite(eventId) || !Number.isFinite(sectionId)) {
@@ -2091,7 +2091,7 @@ app.post('/api/tp/approve-section', requireRole('super_collaborator','supervisor
     userId: req.user.id, userName: req.user.full_name || req.user.username, userRole: roleKey });
 
   return res.json({ success:true, status: targetStatus });
-});
+}));
 
 app.post('/api/tp/approve-all-sections', requireRole('supervisor','deputy','minister','admin'), async (req, res) => {
   try {
@@ -2156,7 +2156,7 @@ app.post('/api/tp/approve-all-sections', requireRole('supervisor','deputy','mini
 
 
 
-app.post('/api/tp/submit-approved-to-collaborator-3', requireRole('collaborator_2','admin'), async (req, res) => {
+app.post('/api/tp/submit-approved-to-collaborator-3', requireRole('collaborator_2','admin'), asyncRoute(async (req, res) => {
   const eventId = Number(req.body?.eventId);
   if (!Number.isFinite(eventId)) return res.status(400).json({ error: 'eventId required' });
 
@@ -2214,9 +2214,9 @@ app.post('/api/tp/submit-approved-to-collaborator-3', requireRole('collaborator_
   }
 
   return res.json({ success:true, submitted: rows.length, status: targetBatchStatus });
-});
+}));
 
-app.post('/api/tp/submit-approved-to-collaborator', requireRole('collaborator_3','admin'), async (req, res) => {
+app.post('/api/tp/submit-approved-to-collaborator', requireRole('collaborator_3','admin'), asyncRoute(async (req, res) => {
   const eventId = Number(req.body?.eventId);
   if (!Number.isFinite(eventId)) return res.status(400).json({ error: 'eventId required' });
 
@@ -2257,9 +2257,9 @@ app.post('/api/tp/submit-approved-to-collaborator', requireRole('collaborator_3'
   { const us = new Set(rows.map(r=>Number(r.section_id))); for (const br of beforeRowsC) { if (us.has(Number(br.section_id))) await recordHistory({ eventId, countryId, sectionId: Number(br.section_id), action:'submitted', fromStatus:br.status, toStatus:'submitted_to_collaborator', userId:req.user.id, userName:req.user.full_name||req.user.username, userRole:normalizeRoleKey(req.user.role_key) }); } }
 
   return res.json({ success:true, submitted: rows.length, status: 'submitted_to_collaborator' });
-});
+}));
 
-app.post('/api/tp/submit-approved-to-super-collaborator', requireRole('collaborator','admin'), async (req, res) => {
+app.post('/api/tp/submit-approved-to-super-collaborator', requireRole('collaborator','admin'), asyncRoute(async (req, res) => {
   const eventId = Number(req.body?.eventId);
   if (!Number.isFinite(eventId)) {
     return res.status(400).json({ error: 'eventId required' });
@@ -2307,9 +2307,9 @@ app.post('/api/tp/submit-approved-to-super-collaborator', requireRole('collabora
   { const us = new Set(rows.map(r=>Number(r.section_id))); for (const br of beforeRowsSC) { if (us.has(Number(br.section_id))) await recordHistory({ eventId, countryId, sectionId: Number(br.section_id), action:'submitted', fromStatus:br.status, toStatus:'submitted_to_super_collaborator', userId:req.user.id, userName:req.user.full_name||req.user.username, userRole:normalizeRoleKey(req.user.role_key) }); } }
 
   return res.json({ success:true, submitted: rows.length, status: 'submitted_to_super_collaborator' });
-});
+}));
 
-app.post('/api/tp/submit-approved-to-supervisor', requireRole('super_collaborator','admin'), async (req, res) => {
+app.post('/api/tp/submit-approved-to-supervisor', requireRole('super_collaborator','admin'), asyncRoute(async (req, res) => {
   const eventId = Number(req.body?.eventId);
   if (!Number.isFinite(eventId)) {
     return res.status(400).json({ error: 'eventId required' });
@@ -2352,9 +2352,9 @@ app.post('/api/tp/submit-approved-to-supervisor', requireRole('super_collaborato
   { const us = new Set(rows.map(r=>Number(r.section_id))); for (const br of beforeRowsSup) { if (us.has(Number(br.section_id))) await recordHistory({ eventId, countryId, sectionId: Number(br.section_id), action:'submitted', fromStatus:br.status, toStatus:'submitted_to_supervisor', userId:req.user.id, userName:req.user.full_name||req.user.username, userRole:normalizeRoleKey(req.user.role_key) }); } }
 
   return res.json({ success:true, submitted: rows.length, status: 'submitted_to_supervisor' });
-});
+}));
 
-app.post('/api/tp/approve-section-deputy', requireRole('deputy','minister','admin'), async (req, res) => {
+app.post('/api/tp/approve-section-deputy', requireRole('deputy','minister','admin'), asyncRoute(async (req, res) => {
   const eventId = Number(req.body?.eventId);
   const sectionId = Number(req.body?.sectionId);
   if (!Number.isFinite(eventId) || !Number.isFinite(sectionId)) {
@@ -2386,7 +2386,7 @@ app.post('/api/tp/approve-section-deputy', requireRole('deputy','minister','admi
     userId: req.user.id, userName: req.user.full_name || req.user.username, userRole: roleKey });
 
   return res.json({ success:true });
-});
+}));
 
 /** 7.8 Document Status and Library **/
 
