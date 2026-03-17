@@ -94,7 +94,6 @@ function formatTbilisiDate(value) {
   function roleToTitle(r){
     const map = {
       admin:"Admin",
-      chairman:"Deputy",
       deputy:"Deputy",
       minister:"Minister",
       supervisor:"Supervisor",
