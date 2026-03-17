@@ -127,18 +127,14 @@ async function ensureSchema() {
   await pool.query(`ALTER TYPE tp_section_status ADD VALUE IF NOT EXISTS 'approved_by_collaborator_3'`).catch(()=>{});
 
   // Deputy/minister pipeline statuses (needed for return and approve-all-sections routes)
-  // NOTE: 'approved_by_deputy' was previously 'approved_by_chairman' in the enum — add it for existing DBs
   await pool.query(`ALTER TYPE tp_section_status ADD VALUE IF NOT EXISTS 'approved_by_deputy'`).catch(()=>{});
   await pool.query(`ALTER TYPE tp_section_status ADD VALUE IF NOT EXISTS 'submitted_to_deputy'`).catch(()=>{});
   await pool.query(`ALTER TYPE tp_section_status ADD VALUE IF NOT EXISTS 'returned_by_deputy'`).catch(()=>{});
   await pool.query(`ALTER TYPE tp_section_status ADD VALUE IF NOT EXISTS 'submitted_to_minister'`).catch(()=>{});
   await pool.query(`ALTER TYPE tp_section_status ADD VALUE IF NOT EXISTS 'returned_by_minister'`).catch(()=>{});
 
-  // Migrate legacy 'approved_by_chairman' rows to 'approved_by_deputy'
-  await pool.query(`
-    UPDATE tp_content SET status='approved_by_deputy'
-    WHERE status::text = 'approved_by_chairman'
-  `).catch(()=>{});
+  // Migrate any legacy rows that stored the old DB enum label
+  await pool.query(`UPDATE tp_content SET status='approved_by_deputy' WHERE status::text = 'approved_by_chairman'`).catch(()=>{});
 
   // Section audit history
   await pool.query(`
@@ -480,8 +476,7 @@ async function assertUserCanAccessEventSection(user, eventId, sectionId){
 function normalizeRoleKey(roleKey) {
   const k0 = String(roleKey || '').trim().toLowerCase();
   const k = k0.replace(/-/g, '_');
-  if (k === 'chairman') return 'deputy';
-  return k === 'deputy' ? 'deputy' : k;
+  return k;
 }
 
 async function queryOne(text, params) {
