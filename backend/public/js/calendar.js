@@ -68,7 +68,7 @@
       submitted_to_supervisor: ['in_review','In review','is-review'],
       approved_by_supervisor: ['in_review','In review','is-review'],
       submitted_to_deputy: ['submitted_to_deputy','Submitted to Deputy','is-submitted'],
-      approved_by_deputy: ['submitted_to_deputy','Submitted to Deputy','is-submitted'],
+      approved_by_deputy: ['approved','Approved','is-approved'],
       submitted_to_minister: ['submitted_to_minister','Submitted to Minister','is-submitted'],
       approved_by_minister: ['submitted_to_minister','Submitted to Minister','is-submitted'],
       returned: ['returned','Returned','is-returned'],
