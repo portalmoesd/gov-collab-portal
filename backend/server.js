@@ -465,6 +465,7 @@ async function assertUserCanAccessEventSection(user, eventId, sectionId){
 function normalizeRoleKey(roleKey) {
   const k0 = String(roleKey || '').trim().toLowerCase();
   const k = k0.replace(/-/g, '_');
+  if (k === 'chairman') return 'deputy';
   return k === 'deputy' ? 'deputy' : k;
 }
 

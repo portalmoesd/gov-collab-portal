@@ -20,7 +20,7 @@
 
   const modalBackdrop = document.getElementById('modalBackdrop');
   const modalContent = document.getElementById('modalContent');
-  const closeModalBtn = document.getElementById('closeModalBtn');
+  const modalCloseBtn = document.getElementById('modalCloseBtn');
 
   const dropdownRegistry = new Map();
 
@@ -205,39 +205,6 @@
   let currentSections = [];
   const eventsById = new Map();
 
-  function humanStatus(s){
-    const map = {
-      draft: 'Draft',
-      in_progress: 'Draft',
-      submitted_to_collaborator_2: 'Submitted to Head Collaborator',
-      returned_by_collaborator_2: 'Returned by Head Collaborator',
-      approved_by_collaborator_2: 'Approved by Head Collaborator',
-      submitted_to_collaborator: 'Submitted to Collaborator',
-      returned_by_collaborator: 'Returned by Collaborator',
-      approved_by_collaborator: 'Approved by Collaborator',
-      submitted_to_super_collaborator: 'Awaiting Super-collaborator',
-      returned_by_super_collaborator: 'Returned (Super-collaborator)',
-      approved_by_super_collaborator: 'Approved (Super-collaborator)',
-      submitted_to_supervisor: 'Submitted',
-      returned_by_supervisor: 'Returned',
-      approved_by_supervisor: 'Approved (Supervisor)',
-      submitted_to_deputy: 'Submitted to Deputy',
-      returned_by_deputy: 'Returned (Deputy)',
-      approved_by_deputy: 'Approved (Deputy)',
-      locked: 'Locked'
-    };
-    return map[s] || (s || '');
-  }
-
-  function statusBadgeClass(status){
-    const s = String(status || '').toLowerCase();
-    if (!s || s === 'draft' || s === 'in_progress') return 'is-draft';
-    if (s.includes('returned')) return 'is-returned';
-    if (s.includes('approved') || s === 'locked') return 'is-approved';
-    if (s.includes('submitted')) return 'is-submitted';
-    return 'is-review';
-  }
-
   function setMsg(text, isError=false){
     msg.textContent = text || '';
     msg.style.color = isError ? 'crimson' : '#2b445b';
@@ -299,6 +266,49 @@
     target.appendChild(wrap);
   }
 
+  function renderRow(s){
+    const last = s.lastUpdatedAt ? window.GCP.formatDateTime(s.lastUpdatedAt) : '';
+    const note = (s.statusComment || '').trim();
+    const updatedBy = s.lastUpdatedBy || '—';
+    const progressHtml = window.GCP.renderUpperTierProgress(s.status, s.stepNames, s.lowerSubmitterRole, s.originalSubmitterRole, s.returnTargetRole, s.documentSubmitterRole);
+    const tr = document.createElement('tr'); tr.className = 'required-sections-row';
+    tr.innerHTML = `
+      <td>
+        <div class="required-section-name">${escape(s.sectionLabel)}</div>
+        <div class="required-section-meta">${escape(last || '—')} · ${escape(updatedBy)}</div>
+        ${note ? `<div class="required-section-note"><b>Comment:</b> ${escape(note)}</div>` : ''}
+        ${s.returnRequest ? `<div class="section-return-request-notice"><strong>Return requested</strong> by ${escape(s.returnRequest.from)}: ${escape(s.returnRequest.note || '(no comment)')}</div>` : ''}
+      </td>
+      <td class="required-progress-cell"><div class="lower-progress-inline">${progressHtml}</div><div class="section-history-toggle-mount"></div></td>
+      <td class="required-actions-cell"></td>
+    `;
+    appendSectionActions(tr.querySelector('.required-actions-cell'), s);
+    window.GCP.attachSectionHistoryToggle(tr.querySelector('.section-history-toggle-mount'), s, currentEventId, false);
+    return tr;
+  }
+
+  function renderCard(s){
+    const last = s.lastUpdatedAt ? window.GCP.formatDateTime(s.lastUpdatedAt) : '';
+    const note = (s.statusComment || '').trim();
+    const updatedBy = s.lastUpdatedBy || '—';
+    const progressHtml = window.GCP.renderUpperTierProgress(s.status, s.stepNames, s.lowerSubmitterRole, s.originalSubmitterRole, s.returnTargetRole, s.documentSubmitterRole);
+    const card = document.createElement('article'); card.className = 'required-section-card';
+    card.innerHTML = `
+      <div class="required-section-card__head">
+        <div class="required-section-name">${escape(s.sectionLabel)}</div>
+        <div class="required-section-meta">${escape(last || '—')} · ${escape(updatedBy)}</div>
+        ${note ? `<div class="required-section-note"><b>Comment:</b> ${escape(note)}</div>` : ''}
+        ${s.returnRequest ? `<div class="section-return-request-notice"><strong>Return requested</strong> by ${escape(s.returnRequest.from)}: ${escape(s.returnRequest.note || '(no comment)')}</div>` : ''}
+      </div>
+      <div class="lower-progress-inline">${progressHtml}</div>
+      <div class="section-history-toggle-mount"></div>
+      <div class="required-actions-card"></div>
+    `;
+    appendSectionActions(card.querySelector('.required-actions-card'), s);
+    window.GCP.attachSectionHistoryToggle(card.querySelector('.section-history-toggle-mount'), s, currentEventId, true);
+    return card;
+  }
+
   async function loadEvents(){
     eventSelect.innerHTML = '<option value="">Select…</option>';
     const events = await window.GCP.apiFetch('/events/upcoming', { method:'GET' });
@@ -355,48 +365,13 @@
 
     if (!currentSections.length){
       if (sectionsEmpty) sectionsEmpty.hidden = false;
-      sectionsTbody.innerHTML = `<tr class="required-sections-empty-row"><td colspan="5">No required sections yet.</td></tr>`;
+      sectionsTbody.innerHTML = `<tr class="required-sections-empty-row"><td colspan="3">No required sections yet.</td></tr>`;
       if (approveAllSectionsBtn) approveAllSectionsBtn.disabled = true;
     } else {
       if (approveAllSectionsBtn) approveAllSectionsBtn.disabled = false;
       for (const s of currentSections){
-        const tr = document.createElement('tr');
-        tr.className = 'required-sections-row';
-        const lastUpdate = s.lastUpdatedAt ? window.GCP.formatDateTime(s.lastUpdatedAt) : '';
-        const note = (s.statusComment || '').trim();
-        const updatedBy = s.lastUpdatedBy || '—';
-        const badgeClass = statusBadgeClass(s.status);
-        tr.innerHTML = `
-          <td>
-            <div class="required-section-name">${escape(s.sectionLabel || '')}</div>
-            ${note ? `<div class="required-section-note"><b>Comment:</b> ${escape(note)}</div>` : ''}
-          </td>
-          <td><span class="required-status-badge ${badgeClass}">${escape(humanStatus(s.status))}</span></td>
-          <td><span class="required-updated-at">${escape(lastUpdate || '—')}</span></td>
-          <td><span class="required-updated-by">${escape(updatedBy)}</span></td>
-          <td class="required-actions-cell"></td>
-        `;
-        appendSectionActions(tr.querySelector('.required-actions-cell'), s);
-        sectionsTbody.appendChild(tr);
-
-        if (sectionsCards){
-          const card = document.createElement('article');
-          card.className = 'required-section-card';
-          card.innerHTML = `
-            <div class="required-section-card__top">
-              <div class="required-section-card__meta">
-                <div class="required-section-name">${escape(s.sectionLabel || '')}</div>
-                <div class="required-section-meta">Last update · ${escape(lastUpdate || '—')}</div>
-              </div>
-              <span class="required-status-badge ${badgeClass}">${escape(humanStatus(s.status))}</span>
-            </div>
-            <div class="required-section-card__line"><span>Updated by</span><strong>${escape(updatedBy)}</strong></div>
-            ${note ? `<div class="required-section-note"><b>Comment:</b> ${escape(note)}</div>` : ''}
-            <div class="required-actions-card"></div>
-          `;
-          appendSectionActions(card.querySelector('.required-actions-card'), s);
-          sectionsCards.appendChild(card);
-        }
+        sectionsTbody.appendChild(renderRow(s));
+        if (sectionsCards) sectionsCards.appendChild(renderCard(s));
       }
     }
 
@@ -462,7 +437,7 @@
     }
   });
 
-  closeModalBtn.addEventListener('click', () => {
+  if (modalCloseBtn) modalCloseBtn.addEventListener('click', () => {
     modalBackdrop.style.display = 'none';
     modalContent.innerHTML = '';
   });
