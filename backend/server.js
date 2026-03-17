@@ -480,6 +480,29 @@ async function assertUserCanAccessEventSection(user, eventId, sectionId){
 }
 
 
+/**
+ * Strip track-changes markup from HTML content.
+ * - Removes <del ...>...</del> entirely (deleted text should not appear)
+ * - Unwraps <ins ...>...</ins> keeping inner content (accepted insertions)
+ * - Removes format-change spans (data-tc-fmt-id)
+ * - Removes comment anchors (.gcp-cmt-anchor)
+ */
+function stripTrackChanges(html) {
+  if (!html) return '';
+  let s = html;
+  // Remove <del data-tc-id="...">...</del> (may be nested, run twice)
+  for (let i = 0; i < 3; i++) {
+    s = s.replace(/<del\b[^>]*data-tc-id[^>]*>[\s\S]*?<\/del>/gi, '');
+  }
+  // Unwrap <ins data-tc-id="...">content</ins> → content
+  s = s.replace(/<ins\b[^>]*data-tc-id[^>]*>([\s\S]*?)<\/ins>/gi, '$1');
+  // Remove format-change spans
+  s = s.replace(/<span\b[^>]*data-tc-fmt-id[^>]*>([\s\S]*?)<\/span>/gi, '$1');
+  // Remove comment anchors
+  s = s.replace(/<span\b[^>]*class="[^"]*gcp-cmt-anchor[^"]*"[^>]*>[\s\S]*?<\/span>/gi, '');
+  return s;
+}
+
 function normalizeRoleKey(roleKey) {
   const k0 = String(roleKey || '').trim().toLowerCase();
   const k = k0.replace(/-/g, '_');
@@ -1705,7 +1728,7 @@ return res.json({
   sectionLabel: row.section_label,
   eventTitle: row.event_title,
   countryName: row.country_name,
-  htmlContent: row.html_content || '',
+  htmlContent: req.query.clean === '1' ? stripTrackChanges(row.html_content || '') : (row.html_content || ''),
   status: row.status || 'draft',
   statusComment: row.status_comment || null,
   returnTargetRole: row.return_target_role || null,
