@@ -80,6 +80,7 @@ async function ensureSchema() {
   await pool.query(`ALTER TABLE events ADD COLUMN IF NOT EXISTS ended_by_user_id INTEGER`).catch(e => console.error('DDL warn:', e.message));
   await pool.query(`ALTER TABLE events ADD COLUMN IF NOT EXISTS submitter_role TEXT NOT NULL DEFAULT 'deputy'`).catch(e => console.error('DDL warn:', e.message));
   await pool.query(`ALTER TABLE events ADD COLUMN IF NOT EXISTS lower_submitter_role TEXT DEFAULT 'collaborator_2'`).catch(e => console.error('DDL warn:', e.message));
+  await pool.query(`ALTER TABLE events ADD COLUMN IF NOT EXISTS language TEXT NOT NULL DEFAULT 'en'`).catch(e => console.error('DDL warn:', e.message));
   await pool.query(`ALTER TABLE tp_content ADD COLUMN IF NOT EXISTS original_submitter_role TEXT DEFAULT NULL`).catch(e => console.error('DDL warn:', e.message));
   await pool.query(`ALTER TABLE tp_content ADD COLUMN IF NOT EXISTS return_target_role TEXT DEFAULT NULL`).catch(e => console.error('DDL warn:', e.message));
   await pool.query(`ALTER TABLE tp_content ADD COLUMN IF NOT EXISTS last_content_edited_at TIMESTAMPTZ DEFAULT NULL`).catch(()=>{});
@@ -1505,13 +1506,14 @@ app.get('/api/my/sections', authRequired, attachUser, async (req, res) => {
 
 // Super-collaborators can also create/update events (they still cannot end events)
 app.post('/api/events', requireRole('admin', 'deputy', 'minister', 'supervisor', 'protocol', 'super_collaborator', 'collaborator'), async (req, res) => {
-  const { countryId, title, occasion, deadlineDate, requiredSectionIds, submitterRole, lowerSubmitterRole } = req.body || {};
+  const { countryId, title, occasion, deadlineDate, requiredSectionIds, submitterRole, lowerSubmitterRole, language } = req.body || {};
   if (!countryId || !title) return res.status(400).json({ error: 'countryId and title required' });
 
   const normalizedSubmitterRole = ['supervisor','deputy','minister','super_collaborator'].includes(String(submitterRole||'').toLowerCase())
     ? String(submitterRole).toLowerCase()
     : 'deputy';
   const normalizedLowerSubmitterRole = String(lowerSubmitterRole||'').toLowerCase() === 'collaborator_3' ? 'collaborator_3' : 'collaborator_2';
+  const normalizedLanguage = ['en','ka','ru'].includes(String(language||'').toLowerCase()) ? String(language).toLowerCase() : 'en';
 
   const client = await pool.connect();
   try {
@@ -1519,8 +1521,8 @@ app.post('/api/events', requireRole('admin', 'deputy', 'minister', 'supervisor',
 
     const ev = await client.query(
       `
-      INSERT INTO events (country_id, title, occasion, submitter_role, lower_submitter_role, deadline_date, created_by_user_id, is_active, created_at, updated_at)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, true, NOW(), NOW())
+      INSERT INTO events (country_id, title, occasion, submitter_role, lower_submitter_role, language, deadline_date, created_by_user_id, is_active, created_at, updated_at)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, true, NOW(), NOW())
       RETURNING id
       `,
       [
@@ -1529,6 +1531,7 @@ app.post('/api/events', requireRole('admin', 'deputy', 'minister', 'supervisor',
         occasion ? String(occasion) : null,
         normalizedSubmitterRole,
         normalizedLowerSubmitterRole,
+        normalizedLanguage,
         deadlineDate ? String(deadlineDate) : null,
         req.user.id
       ]
@@ -1564,7 +1567,7 @@ app.put('/api/events/:id', requireRole('admin', 'deputy', 'minister', 'superviso
   const eventId = Number(req.params.id);
   if (!Number.isFinite(eventId)) return res.status(400).json({ error: 'Invalid id' });
 
-  const { countryId, title, occasion, deadlineDate, isActive, requiredSectionIds, submitterRole, lowerSubmitterRole } = req.body || {};
+  const { countryId, title, occasion, deadlineDate, isActive, requiredSectionIds, submitterRole, lowerSubmitterRole, language } = req.body || {};
 
   const client = await pool.connect();
   try {
@@ -1588,6 +1591,11 @@ app.put('/api/events/:id', requireRole('admin', 'deputy', 'minister', 'superviso
       const nlsr = String(lowerSubmitterRole||'').toLowerCase() === 'collaborator_3' ? 'collaborator_3' : 'collaborator_2';
       fields.push(`lower_submitter_role=$${idx++}`);
       vals.push(nlsr);
+    }
+    if (language !== undefined) {
+      const nl = ['en','ka','ru'].includes(String(language||'').toLowerCase()) ? String(language).toLowerCase() : 'en';
+      fields.push(`language=$${idx++}`);
+      vals.push(nl);
     }
     if (deadlineDate !== undefined) { fields.push(`deadline_date=$${idx++}`); vals.push(deadlineDate ? String(deadlineDate) : null); }
     if (isActive !== undefined) { fields.push(`is_active=$${idx++}`); vals.push(Boolean(isActive)); }

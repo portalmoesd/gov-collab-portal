@@ -14,10 +14,12 @@
 
   const countrySelect = document.getElementById("countryId");
   const titleInput = document.getElementById("title");
-  const occasionInput = document.getElementById("occasion");
+  const occasionEditorContainer = document.getElementById("occasionEditor");
+  const occasionEditor = window.GCP.createSimpleEditor(occasionEditorContainer, { placeholder: 'Enter task description...' });
   const deadlineInput = document.getElementById("deadlineDate");
   const submitterSelect = document.getElementById("submitterRole");
   const lowerSubmitterSelect = document.getElementById("lowerSubmitterRole");
+  const languageSelect = document.getElementById("language");
   const requiredBox = document.getElementById("requiredSectionsBox");
   const saveBtn = document.getElementById("saveEventBtn");
   const resetBtn = document.getElementById("resetFormBtn");
@@ -120,10 +122,11 @@
     editEventId = ev.id;
     countrySelect.value = String(details.country_id);
     titleInput.value = details.title || "";
-    occasionInput.value = details.occasion || "";
+    occasionEditor.setHtml(details.occasion || "");
     deadlineInput.value = formatDate(details.deadline_date);
     if (submitterSelect) submitterSelect.value = String(details.submitterRole || details.submitter_role || "deputy");
     if (lowerSubmitterSelect) lowerSubmitterSelect.value = String(details.lowerSubmitterRole || details.lower_submitter_role || "collaborator_2");
+    if (languageSelect) languageSelect.value = String(details.language || "en");
     const req = (details.required_sections || details.requiredSections || []);
     const reqIds = new Set((Array.isArray(req) ? req : []).map(s => String(s.id)));
     for (const cb of requiredBox.querySelectorAll('input[type=checkbox]')){
@@ -248,8 +251,10 @@
   function resetForm(){
     editEventId = null;
     form.reset();
+    occasionEditor.clear();
     if (submitterSelect) submitterSelect.value = "deputy";
     if (lowerSubmitterSelect) lowerSubmitterSelect.value = "collaborator_2";
+    if (languageSelect) languageSelect.value = "en";
     saveBtn.textContent = "Create event";
     msg.style.color = "var(--danger)";
     msg.textContent = "";
@@ -269,10 +274,11 @@
 
     const countryId = Number(countrySelect.value);
     const title = (titleInput.value || "").trim();
-    const occasion = (occasionInput.value || "").trim();
+    const occasion = occasionEditor.getHtml();
     const deadlineDate = (deadlineInput.value || "").trim();
     const submitterRole = submitterSelect ? String(submitterSelect.value || "deputy") : "deputy";
     const lowerSubmitterRole = lowerSubmitterSelect ? String(lowerSubmitterSelect.value || "collaborator_2") : "collaborator_2";
+    const language = languageSelect ? String(languageSelect.value || "en") : "en";
     const requiredSectionIds = Array.from(requiredBox.querySelectorAll('input[type=checkbox]:checked')).map(cb => Number(cb.value)).filter(Number.isFinite);
 
     if (!Number.isFinite(countryId) || !title) {
@@ -280,7 +286,7 @@
       return;
     }
 
-    const payload = { countryId, title, occasion, deadlineDate, requiredSectionIds, submitterRole, lowerSubmitterRole };
+    const payload = { countryId, title, occasion, deadlineDate, requiredSectionIds, submitterRole, lowerSubmitterRole, language };
 
     try {
       saveBtn.disabled = true;
