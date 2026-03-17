@@ -2003,22 +2003,28 @@ app.post('/api/tp/return', requireRole('collaborator_2','collaborator_3','collab
     [eventId, countryId, sectionId]
   );
   const isReturnTarget = retTargetRow?.return_target_role === roleKey;
-  // Upper-tier roles can return sections at any stage before their approval level
-  // If deputy is the document submitter (final approver), they can return from approved_by_deputy
-  let deputyIsFinalApprover = false;
-  if (roleKey === 'deputy' && currentStatus === 'approved_by_deputy') {
+  // Upper-tier roles can return sections at any stage before their approval level.
+  // If the role IS the document submitter (final approver), they can return from their own
+  // approved state so they can still edit and re-approve after approving.
+  let finalApproverRole = null;
+  if ((roleKey === 'deputy' && currentStatus === 'approved_by_deputy') ||
+      (roleKey === 'minister' && currentStatus === 'approved_by_minister')) {
     const evMetaRet = await queryOne(`SELECT submitter_role FROM events WHERE id=$1`, [eventId]);
-    deputyIsFinalApprover = String(evMetaRet?.submitter_role || '').toLowerCase() === 'deputy';
+    const evSubmitter = String(evMetaRet?.submitter_role || '').toLowerCase();
+    if (evSubmitter === roleKey) finalApproverRole = roleKey;
   }
   const upperTierBeyond = {
     supervisor: ['approved_by_supervisor','submitted_to_deputy','returned_by_deputy',
       'approved_by_deputy','submitted_to_minister','returned_by_minister','approved_by_minister','approved','locked'],
     deputy:   [
-      ...(deputyIsFinalApprover ? [] : ['approved_by_deputy']),
+      ...(finalApproverRole === 'deputy' ? [] : ['approved_by_deputy']),
       'submitted_to_minister','returned_by_minister',
       'approved_by_minister','approved','locked'
     ],
-    minister:   ['approved_by_minister','approved','locked'],
+    minister:   [
+      ...(finalApproverRole === 'minister' ? [] : ['approved_by_minister']),
+      'approved','locked'
+    ],
   };
   const upperTierPreReturn = upperTierBeyond[roleKey] && !upperTierBeyond[roleKey].includes(currentStatus);
   if (!upperTierPreReturn && allowedStatuses.length && !allowedStatuses.includes(currentStatus) && !isReturnTarget) {
@@ -2085,13 +2091,14 @@ app.post('/api/tp/approve-section', requireRole('super_collaborator','supervisor
     'submitted_to_deputy','returned_by_deputy','approved_by_deputy',
     'submitted_to_minister','returned_by_minister','approved_by_minister','approved','locked',
   ].includes(currentStatus);
-  // Deputy can re-approve a section already at approved_by_deputy if they are the final approver
-  let deputyReApprove = false;
-  if (roleKey === 'deputy' && currentStatus === 'approved_by_deputy') {
+  // Deputy/minister can re-approve a section already at their approved state if they are the final approver
+  let upperTierReApprove = false;
+  if ((roleKey === 'deputy' && currentStatus === 'approved_by_deputy') ||
+      (roleKey === 'minister' && currentStatus === 'approved_by_minister')) {
     const evMetaApprove = await queryOne(`SELECT submitter_role FROM events WHERE id=$1`, [eventId]);
-    deputyReApprove = String(evMetaApprove?.submitter_role || '').toLowerCase() === 'deputy';
+    upperTierReApprove = String(evMetaApprove?.submitter_role || '').toLowerCase() === roleKey;
   }
-  if (!supervisorPreApproval && !deputyReApprove && allowedStatuses.length && !allowedStatuses.includes(currentStatus) && !canActAsLowest) {
+  if (!supervisorPreApproval && !upperTierReApprove && allowedStatuses.length && !allowedStatuses.includes(currentStatus) && !canActAsLowest) {
     return res.status(400).json({ error: 'Section is not at your review stage' });
   }
 
