@@ -1846,7 +1846,7 @@ app.post('/api/tp/ask-to-return', authRequired, async (req, res) => {
   }
 });
 
-app.post('/api/tp/submit', authRequired, attachUser, async (req, res) => {
+app.post('/api/tp/submit', authRequired, attachUser, asyncRoute(async (req, res) => {
   const eventId = Number(req.body?.eventId);
   const sectionId = Number(req.body?.sectionId);
   // null = not provided (dashboard submit — preserve existing content)
@@ -1952,9 +1952,9 @@ app.post('/api/tp/submit', authRequired, attachUser, async (req, res) => {
     userId: req.user.id, userName: req.user.full_name || req.user.username, userRole: roleKey });
 
   return res.json({ success:true, status: targetStatus });
-});
+}));
 
-app.post('/api/tp/return', requireRole('collaborator_2','collaborator_3','collaborator','super_collaborator','supervisor','deputy','minister','admin'), async (req, res) => {
+app.post('/api/tp/return', requireRole('collaborator_2','collaborator_3','collaborator','super_collaborator','supervisor','deputy','minister','admin'), asyncRoute(async (req, res) => {
   const eventId = Number(req.body?.eventId);
   const sectionId = Number(req.body?.sectionId);
   const note = String((req.body?.note ?? req.body?.comment) || '');
@@ -2028,7 +2028,7 @@ app.post('/api/tp/return', requireRole('collaborator_2','collaborator_3','collab
     userId: req.user.id, userName: req.user.full_name || req.user.username, userRole: roleKey, note });
 
   return res.json({ success:true, status: returnStatus });
-});
+}));
 
 app.post('/api/tp/approve-section', requireRole('super_collaborator','supervisor','admin'), asyncRoute(async (req, res) => {
   const eventId = Number(req.body?.eventId);
