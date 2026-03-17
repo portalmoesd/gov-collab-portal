@@ -133,6 +133,9 @@ async function ensureSchema() {
   await pool.query(`ALTER TYPE tp_section_status ADD VALUE IF NOT EXISTS 'submitted_to_minister'`).catch(()=>{});
   await pool.query(`ALTER TYPE tp_section_status ADD VALUE IF NOT EXISTS 'returned_by_minister'`).catch(()=>{});
 
+  // Migrate legacy 'chairman' role key to 'deputy' so existing users retain access
+  await pool.query(`UPDATE roles SET key='deputy', label='Deputy' WHERE key='chairman'`).catch(()=>{});
+
   // Section audit history
   await pool.query(`
     CREATE TABLE IF NOT EXISTS tp_section_history (
