@@ -118,12 +118,23 @@
         usedH = 0;
       }
 
-      // If a single section is taller than a page, try to split its inner elements
+      // If a section still doesn't fit on the (now possibly fresh) page, split its children
       if (childH > CONTENT_H && child.classList.contains('paper-section')) {
         const innerChildren = Array.from(child.children);
-        for (const inner of innerChildren) {
+        for (let ii = 0; ii < innerChildren.length; ii++) {
+          const inner = innerChildren[ii];
           const innerH = inner.offsetHeight;
-          if (usedH > 0 && usedH + innerH > CONTENT_H) {
+
+          // Prevent orphaned headers: if this is an h2 and there isn't enough room
+          // for the header + at least 120px of body content, push to next page
+          if (usedH > 0 && inner.tagName === 'H2') {
+            const MIN_BODY_AFTER_HEADER = 120;
+            if (usedH + innerH + MIN_BODY_AFTER_HEADER > CONTENT_H) {
+              currentPage = createPage();
+              pages.push(currentPage);
+              usedH = 0;
+            }
+          } else if (usedH > 0 && usedH + innerH > CONTENT_H) {
             currentPage = createPage();
             pages.push(currentPage);
             usedH = 0;
@@ -174,7 +185,7 @@
     const totalPages = pages.length;
     pages.forEach(({ page }, i) => {
       const counter = document.createElement('div');
-      counter.style.cssText = 'text-align:right;font-size:11px;color:#999;margin-top:8px;padding-right:4px;';
+      counter.style.cssText = 'position:absolute;bottom:14px;right:20px;font-size:11px;color:#999;';
       counter.textContent = `${i + 1} / ${totalPages}`;
       page.appendChild(counter);
       wrapper.appendChild(page);
