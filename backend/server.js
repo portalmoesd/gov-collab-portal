@@ -1728,7 +1728,7 @@ return res.json({
   }
 });
 
-app.post('/api/tp/save', authRequired, async (req, res) => {
+app.post('/api/tp/save', authRequired, asyncRoute(async (req, res) => {
   const eventId = Number(req.body?.eventId);
   const sectionId = Number(req.body?.sectionId);
   const htmlContent = String(req.body?.htmlContent || '');
@@ -1796,7 +1796,7 @@ app.post('/api/tp/save', authRequired, async (req, res) => {
     userId: req.user.id, userName: req.user.full_name || req.user.username, userRole: roleKey });
 
   return res.json({ success:true });
-});
+}));
 
 // Ask to Return — any user can request the current holder to return a section
 app.post('/api/tp/ask-to-return', authRequired, async (req, res) => {
@@ -2672,6 +2672,19 @@ app.post('/api/document/submit-to-deputy', requireRole('supervisor','admin'), as
       [eventId, req.user.id]
     );
   }
+
+  // Also transition individual section statuses so the deputy's approve-all-sections
+  // can find them. Sections approved by supervisor need to move to submitted_to_deputy;
+  // when finalizing at supervisor stage, move them to approved_by_supervisor (already there).
+  if (nextStatus === 'submitted_to_deputy') {
+    await pool.query(
+      `UPDATE tp_content
+       SET status='submitted_to_deputy', last_updated_at=NOW(), last_updated_by_user_id=$3
+       WHERE event_id=$1 AND country_id=$2 AND status='approved_by_supervisor'`,
+      [eventId, countryId, req.user.id]
+    );
+  }
+
   return res.json({ success:true });
 }));
 
