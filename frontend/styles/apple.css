@@ -2372,7 +2372,7 @@ body.gp-shell-ready .gp-sidebar__scrim{
 /* Calendar form alignment */
 .calendar-event-form{
   display:grid;
-  grid-template-columns: minmax(240px, 0.95fr) minmax(280px, 0.92fr) minmax(360px, 1.12fr);
+  grid-template-columns: 1fr 1fr;
   gap: 14px 18px;
   align-items:start;
 }
@@ -2459,24 +2459,16 @@ body.gp-shell-ready .gp-sidebar__scrim{
 .calendar-sections-grid .checkitem span{ line-height:1.22; }
 .calendar-form-col--task{ grid-column: 1 / -1; }
 .calendar-form-actions{
+  display:flex;
   justify-content:flex-end;
   align-items:center;
   gap:12px;
-  margin-top:auto;
   padding-top:4px;
 }
 .calendar-form-actions .btn{ min-width:0; }
-@media (max-width: 1180px){
-  .calendar-event-form{ grid-template-columns: 1fr 1fr; }
-  .calendar-form-col--right{ grid-column: 2; grid-row: 1 / span 2; }
-  .calendar-form-col--middle{ grid-column: 1 / span 2; }
-  .calendar-form-col--task{ grid-column: 1 / -1; }
-  .calendar-sections-grid{ max-height:220px !important; }
-}
 @media (max-width: 860px){
   .calendar-event-form{ grid-template-columns: 1fr; }
   .calendar-form-col--right,
-  .calendar-form-col--middle,
   .calendar-form-col--left,
   .calendar-form-col--task{ grid-column:auto; grid-row:auto; }
   .calendar-sections-grid{ max-height:180px !important; }
