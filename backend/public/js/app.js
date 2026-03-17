@@ -641,8 +641,8 @@
     if (['submitted_to_collaborator','returned_by_collaborator','approved_by_collaborator'].includes(s)) return collabIdx;
     if (['submitted_to_super_collaborator','returned_by_super_collaborator','approved_by_super_collaborator'].includes(s)) return collabIdx + 1;
     if (['submitted_to_supervisor','returned_by_supervisor','approved_by_supervisor'].includes(s)) return collabIdx + 2;
-    if (['submitted_to_deputy','returned_by_deputy','approved_by_deputy'].includes(s)) return collabIdx + 3;
-    if (['submitted_to_minister','approved_by_minister','approved','locked'].includes(s)) return collabIdx + 4;
+    if (['submitted_to_deputy','returned_by_deputy'].includes(s)) return collabIdx + 3;
+    if (['approved_by_deputy','submitted_to_minister','approved_by_minister','approved','locked'].includes(s)) return collabIdx + 4;
     return 0; // draft / in_progress / returned_by_collaborator_1
   }
 
