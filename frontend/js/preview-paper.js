@@ -52,7 +52,6 @@
       padding:${PAD_TOP}px ${PAD_X}px ${PAD_BOT}px;
       box-sizing:border-box;
       margin:0 auto 32px;
-      overflow:hidden;
       position:relative;
     `;
     const content = document.createElement('div');
@@ -107,63 +106,96 @@
     pages.push(currentPage);
     let usedH = 0;
 
+    /**
+     * Helper: get an element's outer height including margins.
+     * offsetHeight misses margins, which causes under-counting.
+     */
+    function outerH(el) {
+      const style = getComputedStyle(el);
+      return el.offsetHeight
+        + parseFloat(style.marginTop || 0)
+        + parseFloat(style.marginBottom || 0);
+    }
+
+    /** Helper: start a fresh page and return it. */
+    function newPage() {
+      const p = createPage();
+      pages.push(p);
+      return p;
+    }
+
+    /**
+     * Append a list of measured elements to pages, splitting across
+     * page boundaries. Mutates currentPage / usedH in closure.
+     */
+    function flowElements(elements) {
+      for (const el of elements) {
+        const h = outerH(el);
+        if (usedH > 0 && usedH + h > CONTENT_H) {
+          currentPage = newPage();
+          usedH = 0;
+        }
+        currentPage.content.appendChild(el.cloneNode(true));
+        usedH += h;
+      }
+    }
+
     const children = Array.from(measurer.children);
     for (const child of children) {
-      const childH = child.offsetHeight;
+      const childH = outerH(child);
 
-      // If adding this child overflows AND the page already has content, start new page
-      if (usedH > 0 && usedH + childH > CONTENT_H) {
-        currentPage = createPage();
-        pages.push(currentPage);
-        usedH = 0;
+      // Does this child fit on the current page?
+      const fits = usedH === 0 || usedH + childH <= CONTENT_H;
+
+      if (fits) {
+        // Fits as-is → append whole
+        currentPage.content.appendChild(child.cloneNode(true));
+        usedH += childH;
+        continue;
       }
 
-      // If a section still doesn't fit on the (now possibly fresh) page, split its children
-      if (childH > CONTENT_H && child.classList.contains('paper-section')) {
+      // Doesn't fit. If it's a section, split it intelligently.
+      if (child.classList.contains('paper-section')) {
         const h2 = child.querySelector('h2');
         const body = child.querySelector('.paper-section-body');
 
         if (h2 && body) {
-          const h2H = h2.offsetHeight;
+          const h2H = outerH(h2);
 
-          // Ensure room for header + at least some body content
-          if (usedH > 0 && usedH + h2H + 120 > CONTENT_H) {
-            currentPage = createPage();
-            pages.push(currentPage);
+          // Ensure room for header + at least some body content (120px).
+          // If not enough room, start a new page first.
+          if (usedH + h2H + 120 > CONTENT_H) {
+            currentPage = newPage();
             usedH = 0;
           }
 
-          // Place header
+          // Place section header
           currentPage.content.appendChild(h2.cloneNode(true));
           usedH += h2H;
 
-          // Split body children across pages (never push body as a whole block)
+          // Flow body children across pages
           const bodyChildren = Array.from(body.children);
           if (bodyChildren.length > 0) {
-            for (const bc of bodyChildren) {
-              const bcH = bc.offsetHeight;
-              if (usedH > 0 && usedH + bcH > CONTENT_H) {
-                currentPage = createPage();
-                pages.push(currentPage);
-                usedH = 0;
-              }
-              currentPage.content.appendChild(bc.cloneNode(true));
-              usedH += bcH;
-            }
+            flowElements(bodyChildren);
           } else {
-            // No block children (plain text node?), append body as whole
+            // No block children (single text node?), append body whole
+            const bh = outerH(body);
+            if (usedH > 0 && usedH + bh > CONTENT_H) {
+              currentPage = newPage();
+              usedH = 0;
+            }
             currentPage.content.appendChild(body.cloneNode(true));
-            usedH += body.offsetHeight;
+            usedH += bh;
           }
-        } else {
-          // Fallback: no clear h2/body structure, append whole section
-          currentPage.content.appendChild(child.cloneNode(true));
-          usedH += childH;
+          continue;
         }
-      } else {
-        currentPage.content.appendChild(child.cloneNode(true));
-        usedH += childH;
       }
+
+      // Non-section or no h2/body structure → push to new page as whole
+      currentPage = newPage();
+      usedH = 0;
+      currentPage.content.appendChild(child.cloneNode(true));
+      usedH += childH;
     }
 
     // -- 3. Clean up measurer
