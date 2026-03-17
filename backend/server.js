@@ -380,7 +380,7 @@ function decisionStatusesForRole(roleKey) {
     'submitted_to_collaborator_3', 'returned_by_collaborator_3',
   ];
   if (rk === 'supervisor') return ['submitted_to_supervisor', 'returned_by_supervisor', 'approved_by_super_collaborator'];
-  if (rk === 'deputy') return ['submitted_to_deputy', 'returned_by_deputy'];
+  if (rk === 'deputy') return ['submitted_to_deputy', 'returned_by_deputy', 'approved_by_supervisor'];
   if (rk === 'minister') return ['submitted_to_minister', 'returned_by_minister'];
   if (rk === 'admin') return [
     'submitted_to_collaborator_2', 'returned_by_collaborator_2',
