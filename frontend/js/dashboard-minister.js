@@ -400,13 +400,16 @@
     setMsg('');
     if (!currentEventId) return;
     try {
-      const parts = [];
+      const sections = [];
+      let title = '', country = '';
       for (const s of currentSections){
         const tp = await window.GCP.apiFetch(`/tp?event_id=${encodeURIComponent(currentEventId)}&section_id=${encodeURIComponent(s.sectionId)}&clean=1`, { method:'GET' });
-        parts.push(`<h2 style="margin:18px 0 8px;">${escape(tp.sectionLabel || s.sectionLabel || '')}</h2>`);
-        parts.push(tp.htmlContent || '<div class="muted">—</div>');
+        if (!title) { title = tp.eventTitle || ''; country = tp.countryName || ''; }
+        sections.push({ label: tp.sectionLabel || s.sectionLabel || '', html: tp.htmlContent || '' });
       }
-      modalContent.innerHTML = `<div style="padding:8px 2px;">${parts.join('')}</div>`;
+      const modalEl = modalBackdrop.querySelector('.modal');
+      if (modalEl) modalEl.classList.add('paper-modal');
+      window.GCP.renderPaperPreview(modalContent, { title, country, sections });
       modalBackdrop.style.display = 'flex';
     } catch (e) {
       setMsg(e.message || 'Failed to preview', true);
