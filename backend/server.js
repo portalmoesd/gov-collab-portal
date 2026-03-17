@@ -133,9 +133,6 @@ async function ensureSchema() {
   await pool.query(`ALTER TYPE tp_section_status ADD VALUE IF NOT EXISTS 'submitted_to_minister'`).catch(()=>{});
   await pool.query(`ALTER TYPE tp_section_status ADD VALUE IF NOT EXISTS 'returned_by_minister'`).catch(()=>{});
 
-  // Migrate any legacy rows that stored the old DB enum label
-  await pool.query(`UPDATE tp_content SET status='approved_by_deputy' WHERE status::text = 'approved_by_chairman'`).catch(()=>{});
-
   // Section audit history
   await pool.query(`
     CREATE TABLE IF NOT EXISTS tp_section_history (

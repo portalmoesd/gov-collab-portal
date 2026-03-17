@@ -265,63 +265,6 @@
   window.GCP.escapeHtml = escapeHtml;
   window.GCP.roleToTitle = roleToTitle;
 
-  // ------------------------------
-  // Dynamic document status progress bar
-  // ------------------------------
-  // submitterRole: 'supervisor' | 'deputy' | 'minister' (or undefined)
-  window.GCP.getStatusSteps = function(submitterRole){
-    const raw = String(submitterRole || '').toLowerCase();
-    const r = raw === 'deputy' ? 'deputy' : raw;
-    if (r === 'supervisor') return ['Draft','Supervisor','Approved'];
-    if (r === 'minister') return ['Draft','Supervisor','Deputy','Minister','Approved'];
-    return ['Draft','Supervisor','Deputy','Approved'];
-  };
-
-  window.GCP.statusToStepIndex = function(status, submitterRole){
-    const s = String(status || '').toLowerCase();
-    const rawRole = String(submitterRole || '').toLowerCase();
-    const r = rawRole === 'deputy' ? 'deputy' : rawRole;
-
-    if (!s || s === 'draft' || s === 'returned' || s === 'in_progress') return 0;
-    if (s === 'submitted_to_supervisor' || s === 'approved_by_supervisor') return 1;
-    if (s === 'submitted_to_deputy' || s === 'submitted_to_deputy' || s === 'approved_by_deputy') {
-      return r === 'supervisor' ? 1 : 2;
-    }
-    if (s === 'submitted_to_minister' || s === 'approved_by_minister') {
-      return r === 'minister' ? 3 : 0;
-    }
-    if (s === 'approved' || s === 'locked') return window.GCP.getStatusSteps(r).length - 1;
-    return 0;
-  };
-
-  window.GCP.renderWorkflowProgress = function(status, submitterRole){
-    const steps = window.GCP.getStatusSteps(submitterRole);
-    const active = window.GCP.statusToStepIndex(status, submitterRole);
-    const maxIndex = Math.max(steps.length - 1, 1);
-    const fillPercent = (active / maxIndex) * 100;
-
-    const stepHtml = steps.map((label, idx) => {
-      const state = idx < active ? 'done' : (idx === active ? 'active' : 'todo');
-      return `
-        <div class="wf-step ${state}" role="listitem" aria-current="${idx === active ? 'step' : 'false'}">
-          <div class="wf-step__circle" aria-hidden="true">${idx + 1}</div>
-          <div class="wf-step__label">${escapeHtml(label)}</div>
-        </div>
-      `;
-    }).join('');
-
-    return `
-      <div class="wf-progress" style="--wf-count:${steps.length};" role="group" aria-label="Document status progress">
-        <div class="wf-progress__steps" role="list">${stepHtml}</div>
-        <div class="wf-progress__track" aria-hidden="true">
-          <div class="wf-progress__fill" style="width:${fillPercent}%;"></div>
-        </div>
-      </div>
-    `;
-  };
-
-  window.GCP.renderStatusProgress = window.GCP.renderWorkflowProgress;
-
   // --- Tbilisi timezone formatting ---
   function formatTbilisiDateTime(value) {
     if (!value) return '';
@@ -352,85 +295,6 @@
 
   window.GCP.formatDate = formatTbilisiDate;
   window.GCP.formatDateTime = formatTbilisiDateTime;
-
-  // --- Section pipeline progress bar ---
-  // Full pipeline: Collab I → Collab II → Collaborator → Super-collab → Supervisor → Deputy → Approved
-  // Lower-tier roles (collab I/II/collab) see a 5-step bar (up to Super-collab).
-  // Super-collab+ see the full 7-step bar.
-
-  const FULL_PIPELINE_LABELS  = ['Collab. I', 'Head Collab.', 'Curator', 'Collaborator', 'Super-collab.', 'Supervisor', 'Deputy', 'Approved'];
-  const SHORT_PIPELINE_LABELS = ['Collab. I', 'Head Collab.', 'Curator', 'Collaborator', 'Super-collab.', 'Approved'];
-
-  window.GCP.lowerTierSteps = SHORT_PIPELINE_LABELS;
-
-  function sectionStepIndex(status, full) {
-    const s = String(status || 'draft').toLowerCase();
-    const labels = full ? FULL_PIPELINE_LABELS : SHORT_PIPELINE_LABELS;
-    const lastIdx = labels.length - 1;
-
-    if (['draft', 'returned', 'returned_by_collaborator_2'].includes(s)) return 0;
-    if (s === 'submitted_to_collaborator_2') return 1;
-    if (['submitted_to_collaborator_3', 'returned_by_collaborator_3', 'approved_by_collaborator_2'].includes(s)) return 2;
-    if (['submitted_to_collaborator', 'returned_by_collaborator', 'approved_by_collaborator_3'].includes(s)) return 3;
-    if (['submitted_to_super_collaborator', 'returned_by_super_collaborator', 'approved_by_collaborator'].includes(s)) return 4;
-    if (full) {
-      if (['approved_by_super_collaborator', 'submitted_to_supervisor', 'returned_by_supervisor'].includes(s)) return 5;
-      if (['approved_by_supervisor', 'submitted_to_deputy', 'returned_by_deputy'].includes(s)) return 6;
-      if (['approved_by_deputy', 'submitted_to_minister', 'returned_by_minister', 'approved_by_minister', 'approved', 'locked'].includes(s)) return 7;
-    } else {
-      if (['approved_by_super_collaborator', 'submitted_to_supervisor', 'returned_by_supervisor',
-           'approved_by_supervisor', 'submitted_to_deputy', 'returned_by_deputy', 'approved_by_deputy',
-           'submitted_to_minister', 'returned_by_minister', 'approved_by_minister', 'approved', 'locked'].includes(s)) return lastIdx;
-    }
-    return 0;
-  }
-
-  window.GCP.lowerTierStepIndex = function(status) { return sectionStepIndex(status, false); };
-
-  // Render per-section progress bar with optional user names.
-  // pipelineNames: { collabI, collabII, collabIII, collaborator, superCollab } — null values fall back to role labels.
-  // full: true = show full 8-step bar (for super-collab+ dashboards)
-  window.GCP.renderSectionProgress = function(status, pipelineNames, full) {
-    const labels = full ? FULL_PIPELINE_LABELS : SHORT_PIPELINE_LABELS;
-    const names = pipelineNames && typeof pipelineNames === 'object' ? [
-      pipelineNames.collabI      || null,
-      pipelineNames.collabII     || null,
-      pipelineNames.collabIII    || null,
-      pipelineNames.collaborator || null,
-      pipelineNames.superCollab  || null,
-      null, // Supervisor — no assignment needed
-      null, // Deputy
-      null, // Approved
-    ] : labels.map(() => null);
-
-    const active = sectionStepIndex(status, full);
-    const maxIndex = labels.length - 1;
-    const fillPercent = (active / maxIndex) * 100;
-
-    const stepHtml = labels.map((label, idx) => {
-      const state = idx < active ? 'done' : (idx === active ? 'active' : 'todo');
-      const name = names[idx];
-      const displayLabel = name ? escapeHtml(name) : escapeHtml(label);
-      const sublabel = name ? `<div class="wf-step__sublabel">${escapeHtml(label)}</div>` : '';
-      return `<div class="wf-step ${state}" role="listitem" aria-current="${idx === active ? 'step' : 'false'}">
-        <div class="wf-step__circle" aria-hidden="true">${idx + 1}</div>
-        <div class="wf-step__label">${displayLabel}</div>
-        ${sublabel}
-      </div>`;
-    }).join('');
-
-    return `<div class="wf-progress section-pipeline-bar" style="--wf-count:${labels.length};" role="group" aria-label="Section workflow progress">
-      <div class="wf-progress__steps" role="list">${stepHtml}</div>
-      <div class="wf-progress__track" aria-hidden="true">
-        <div class="wf-progress__fill" style="width:${fillPercent}%;"></div>
-      </div>
-    </div>`;
-  };
-
-  // Backward compat alias
-  window.GCP.renderLowerTierProgress = function(status, stepNames) {
-    return window.GCP.renderSectionProgress(status, stepNames, false);
-  };
 
   // Collab simplified step index (supports skipping Curator when lsr === 'collaborator_2')
   // Maps a return_target_role to its step index in the progress bar
@@ -511,48 +375,6 @@
       <span class="wf-progress__awaiting-label">Awaiting action</span>
     </div>`;
   }
-
-  window.GCP.renderCollabSimpleProgress = function(status, stepNames, lsr, originalSubmitterRole, returnTargetRole, documentSubmitterRole) {
-    if (isAwaitingFirstAction(status, stepNames)) return awaitingProgressHtml();
-    const skipCurator = String(lsr || 'collaborator_2').toLowerCase() !== 'collaborator_3';
-    const lowerSteps = skipCurator
-      ? ['Collaborator I', 'Head Collaborator', 'Waiting for Approval']
-      : ['Collaborator I', 'Head Collaborator', 'Curator', 'Waiting for Approval'];
-    const steps = lowerSteps.concat(getUpperTierSteps(documentSubmitterRole));
-    const names = stepNames && typeof stepNames === 'object'
-      ? (skipCurator
-          ? [stepNames.collabI || null, stepNames.collabII || null, null]
-          : [stepNames.collabI || null, stepNames.collabII || null, stepNames.collabIII || null, null])
-        .concat(getUpperTierSteps(documentSubmitterRole).map(() => null))
-      : steps.map(() => null);
-    // Determine the first participating step based on originalSubmitterRole
-    let startStep = 0;
-    if (originalSubmitterRole) {
-      const osr = String(originalSubmitterRole).toLowerCase();
-      if (osr === 'collaborator_2') startStep = 1;
-      else if (osr === 'collaborator_3') startStep = skipCurator ? 1 : 2;
-      else if (osr === 'collaborator') startStep = skipCurator ? 2 : 3;
-      else if (osr === 'super_collaborator') startStep = skipCurator ? 2 : 3;
-    }
-    const active = window.GCP.collabSimpleStepIndex(status, lsr, returnTargetRole, documentSubmitterRole);
-    const fillPercent = (active / (steps.length - 1)) * 100;
-    const stepHtml = steps.map((label, idx) => {
-      const notParticipating = idx < startStep;
-      const state = notParticipating ? 'skip' : (idx < active ? 'done' : (idx === active ? 'active' : 'todo'));
-      const name = names[idx];
-      const displayLabel = name ? escapeHtml(name) : escapeHtml(label);
-      return `<div class="wf-step ${state}" role="listitem" aria-current="${idx === active ? 'step' : 'false'}">
-        <div class="wf-step__circle" aria-hidden="true">${idx + 1}</div>
-        <div class="wf-step__label">${displayLabel}</div>
-      </div>`;
-    }).join('');
-    return `<div class="wf-progress lower-tier-progress" style="--wf-count:${steps.length};" role="group" aria-label="Section workflow progress">
-      <div class="wf-progress__steps" role="list">${stepHtml}</div>
-      <div class="wf-progress__track" aria-hidden="true">
-        <div class="wf-progress__fill" style="width:${fillPercent}%;"></div>
-      </div>
-    </div>`;
-  };
 
   // Progress bar for Collaborator and Super-Collaborator dashboards.
   // Shows the full pipeline with explicit role names.
