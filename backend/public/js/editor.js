@@ -197,9 +197,20 @@
       if (btnApprove) btnApprove.style.display = "";
       if (btnReturn)  btnReturn.style.display  = "";
     } else if (['supervisor','deputy','minister','admin'].includes(role)) {
-      if (btnSave)    btnSave.style.display    = "";
-      if (btnApprove) btnApprove.style.display = "";
-      if (btnReturn)  btnReturn.style.display  = "";
+      const isApprovedState = s.startsWith('approved_by_') || s === 'approved' || s === 'locked';
+      if ((role === 'deputy' || role === 'minister') && isApprovedState) {
+        // After approval: only Return if this user is the document submitter, else Ask to Return
+        const originalSubmitter = String(tp.originalSubmitterRole || '').toLowerCase();
+        if (originalSubmitter === role) {
+          if (btnReturn) btnReturn.style.display = "";
+        } else {
+          if (btnAskToReturn) btnAskToReturn.style.display = "";
+        }
+      } else {
+        if (btnSave)    btnSave.style.display    = "";
+        if (btnApprove) btnApprove.style.display = "";
+        if (btnReturn)  btnReturn.style.display  = "";
+      }
     } else {
       if (btnSave) btnSave.style.display = "";
     }
