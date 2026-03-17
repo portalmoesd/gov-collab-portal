@@ -234,7 +234,10 @@
     }));
 
     const sectionStatus = String(section.status || '').toLowerCase();
-    const canDecision = !['approved_by_deputy', 'approved_by_minister', 'locked'].includes(sectionStatus);
+    const docSubmitter = String(section.documentSubmitterRole || '').toLowerCase();
+    const isApprovedByMeAsFinal = (sectionStatus === 'approved_by_deputy' && docSubmitter === 'deputy') ||
+                                  (sectionStatus === 'approved_by_minister' && docSubmitter === 'minister');
+    const canDecision = isApprovedByMeAsFinal || !['approved_by_deputy', 'approved_by_minister', 'locked'].includes(sectionStatus);
     if (canDecision) {
       wrap.appendChild(createMicroAction('Approve', 'approve', async () => {
         try{

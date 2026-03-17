@@ -163,13 +163,17 @@
 
     if (!isMyTurn(tp)) {
       // Not this user's turn — editor is read-only.
-      // Exception: deputy/minister who IS the original submitter can Return directly
+      // Exception: deputy/minister who IS the document submitter (final approver) can act
       // even after they've approved (section has moved past their stage).
       const isApprovedState = s.startsWith('approved_by_') || s === 'approved' || s === 'locked';
       if ((role === 'deputy' || role === 'minister') && isApprovedState) {
-        const originalSubmitter = String(tp.originalSubmitterRole || '').toLowerCase();
-        if (originalSubmitter === role) {
-          if (btnReturn) btnReturn.style.display = "";
+        const docSubmitter = String(tp.documentSubmitterRole || '').toLowerCase();
+        const isApprovedByMe = (role === 'deputy' && s === 'approved_by_deputy') ||
+                               (role === 'minister' && s === 'approved_by_minister');
+        if (docSubmitter === role && isApprovedByMe) {
+          if (btnSave)    btnSave.style.display    = "";
+          if (btnApprove) btnApprove.style.display = "";
+          if (btnReturn)  btnReturn.style.display  = "";
           return;
         }
       }
@@ -209,10 +213,14 @@
     } else if (['supervisor','deputy','minister','admin'].includes(role)) {
       const isApprovedState = s.startsWith('approved_by_') || s === 'approved' || s === 'locked';
       if ((role === 'deputy' || role === 'minister') && isApprovedState) {
-        // After approval: only Return if this user is the document submitter, else Ask to Return
-        const originalSubmitter = String(tp.originalSubmitterRole || '').toLowerCase();
-        if (originalSubmitter === role) {
-          if (btnReturn) btnReturn.style.display = "";
+        // After approval: full editing if this user is the document submitter (final approver), else Ask to Return
+        const docSubmitter = String(tp.documentSubmitterRole || '').toLowerCase();
+        const isApprovedByMe = (role === 'deputy' && s === 'approved_by_deputy') ||
+                               (role === 'minister' && s === 'approved_by_minister');
+        if (docSubmitter === role && isApprovedByMe) {
+          if (btnSave)    btnSave.style.display    = "";
+          if (btnApprove) btnApprove.style.display = "";
+          if (btnReturn)  btnReturn.style.display  = "";
         } else {
           if (btnAskToReturn) btnAskToReturn.style.display = "";
         }
