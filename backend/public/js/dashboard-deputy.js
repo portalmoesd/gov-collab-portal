@@ -340,6 +340,7 @@
     if (!Number.isFinite(evId) || evId <= 0) {
       currentEventId = null;
       approveDocBtn.disabled = true;
+      approveDocBtn.style.display = 'none';
       returnDocBtn.disabled = true;
       previewBtn.disabled = true;
       if (approveAllSectionsBtn) approveAllSectionsBtn.disabled = true;
@@ -378,12 +379,18 @@
       }
     }
 
+    // Show "Send to Library" only when deputy is the Document Submitter
     try {
       const evDetails = await window.GCP.apiFetch(`/events/${currentEventId}`, { method:'GET' });
       const sr = String(evDetails.submitterRole || evDetails.submitter_role || '').toLowerCase();
-      setActionButtonLabel(approveDocBtn, sr === 'minister' ? 'Submit to Minister' : 'Approve');
+      if (sr === 'deputy') {
+        setActionButtonLabel(approveDocBtn, 'Send to Library');
+        approveDocBtn.style.display = '';
+      } else {
+        approveDocBtn.style.display = 'none';
+      }
     } catch (e) {
-      setActionButtonLabel(approveDocBtn, 'Approve');
+      approveDocBtn.style.display = 'none';
     }
 
     approveDocBtn.disabled = false;
@@ -394,15 +401,16 @@
   approveDocBtn.addEventListener('click', async () => {
     setMsg('');
     if (!currentEventId) return;
-    if (!confirm('Approve the full document?')) return;
+    if (!confirm('Send this document to the Library?')) return;
     try{
       await window.GCP.apiFetch('/document/approve', {
         method:'POST',
         body: JSON.stringify({ eventId: currentEventId })
       });
+      setMsg('Document finalized and sent to Library.');
       await refresh();
     }catch(e){
-      setMsg(e.message || 'Failed to approve document', true);
+      setMsg(e.message || 'Failed to send to library', true);
     }
   });
 

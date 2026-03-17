@@ -28,8 +28,8 @@
   const msg                = document.getElementById('msg');
   const docStatusBox       = document.getElementById('docStatusBox');
 
-  // Update button labels for Super-collaborator
-  if (submitDocBtn) submitDocBtn.textContent = 'Approve Document to Supervisor';
+  // Hide submit button by default; only shown as "Send to Library" when user is the Document Submitter
+  if (submitDocBtn) submitDocBtn.style.display = 'none';
 
   let currentEventId = null;
   let currentSections = [];
@@ -349,25 +349,41 @@
       if(sectionsTbody) sectionsTbody.innerHTML='';
       if(sectionsCards) sectionsCards.innerHTML='';
       if(sectionsEmpty) sectionsEmpty.hidden=false;
-      if(submitDocBtn) submitDocBtn.disabled=true;
+      if(submitDocBtn){ submitDocBtn.disabled=true; submitDocBtn.style.display='none'; }
       if(docStatusBox) docStatusBox.innerHTML='';
       if(requiredSectionsPanel) requiredSectionsPanel.hidden=true;
       return;
     }
     if(requiredSectionsPanel) requiredSectionsPanel.hidden=false;
+
+    // Show "Send to Library" only when super_collaborator is the Document Submitter
+    let sr='';
+    try{
+      const evDetails=await window.GCP.apiFetch(`/events/${currentEventId}`,{method:'GET'});
+      sr=String(evDetails?.submitter_role||evDetails?.submitterRole||'').toLowerCase();
+    }catch(e){/* keep default */}
+    if(submitDocBtn){
+      if(sr==='super_collaborator'){
+        submitDocBtn.textContent='Send to Library';
+        submitDocBtn.style.display='';
+      } else {
+        submitDocBtn.style.display='none';
+      }
+    }
+
     try{ await refreshStatusGrid(); }
     catch(e){ setMsg(e.message||'Failed to load sections',true); }
   });
 
-  // "Approve Document to Supervisor" — approves all sections then submits to supervisor
+  // "Send to Library" — finalizes document when super_collaborator is the Document Submitter
   if(submitDocBtn) submitDocBtn.addEventListener('click', async()=>{
     if(!currentEventId||submitDocBtn.disabled) return;
-    if(!confirm('Approve all sections and send document to Supervisor?')) return;
+    if(!confirm('Send this document to the Library?')) return;
     setMsg('');
     try{
       const result=await window.GCP.apiFetch('/tp/submit-approved-to-supervisor',{method:'POST',body:JSON.stringify({eventId:currentEventId})});
-      if(result&&Number(result.submitted||0)>0) setMsg('Document approved and submitted to Supervisor.');
-      else setMsg('No sections ready for Supervisor. Approve all sections first.');
+      if(result&&Number(result.submitted||0)>0) setMsg('Document finalized and sent to Library.');
+      else setMsg('Approve all sections first.');
       await refreshStatusGrid();
     }catch(e){ setMsg(e.message||'Submit failed',true); }
   });
