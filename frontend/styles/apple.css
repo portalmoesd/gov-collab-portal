@@ -4164,6 +4164,12 @@ body.gp-shell-ready .gp-sidebar__scrim{
 .library-action--word{ --icon-url:url('../assets/export-word-icon.svg'); --icon-color:#1d4ed8; --hover-color:#1d4ed8; --hover-bg:#e8f0ff; }
 .library-action--files{ --icon-url:url('../assets/files-icon.svg'); --icon-color:#6d28d9; --hover-color:#6d28d9; --hover-bg:#ede9fe; }
 
+/* Library – filters bar */
+.library-filters{
+  display:flex; flex-wrap:wrap; gap:12px; align-items:flex-end;
+}
+.library-filters .field{ flex:1; min-width:160px; }
+
 /* Library – approval date, pills, approver */
 .library-approval-date{
   font-size:12px; font-weight:700; color:#3b82f6; margin-bottom:2px; letter-spacing:.3px;

@@ -11,8 +11,12 @@
   }
 
   const countrySelect = document.getElementById("countrySelect");
+  const keywordInput = document.getElementById("keywordInput");
+  const dateInput = document.getElementById("dateInput");
   const docsTbody = document.getElementById("docsTbody");
   const msg = document.getElementById("msg");
+
+  let allDocs = []; // cached full list for client-side filtering
 
   const modalBackdrop = document.getElementById("modalBackdrop");
   const modalContent = document.getElementById("modalContent");
@@ -31,7 +35,7 @@
 
   async function loadCountries(){
     const countries = await window.GCP.apiFetch("/countries", { method:"GET" });
-    countrySelect.innerHTML = `<option value="">Select country</option>` + countries.map(c => `<option value="${c.id}">${window.GCP.escapeHtml(c.name_en)}</option>`).join("");
+    countrySelect.innerHTML = `<option value="">All countries</option>` + countries.map(c => `<option value="${c.id}">${window.GCP.escapeHtml(c.name_en)}</option>`).join("");
   }
 
   function fmtDate(s){
@@ -83,23 +87,53 @@
 
   async function loadDocs(){
     msg.textContent = "";
+    allDocs = await window.GCP.apiFetch(`/library`, { method:"GET" });
+    renderDocs();
+  }
+
+  function renderDocs(){
     docsTbody.innerHTML = "";
     docsCards.innerHTML = "";
     docsEmpty.hidden = true;
-    const countryId = countrySelect.value;
-    if (!countryId) return;
 
-    const docs = await window.GCP.apiFetch(`/library?country_id=${encodeURIComponent(countryId)}`, { method:"GET" });
-    if (!docs.length){
+    const countryId = countrySelect.value;
+    const keyword = (keywordInput.value || "").trim().toLowerCase();
+    const dateVal = dateInput.value; // yyyy-mm-dd or ""
+
+    let filtered = allDocs;
+
+    if (countryId) {
+      filtered = filtered.filter(d => String(d.country_id) === countryId);
+    }
+    if (keyword) {
+      filtered = filtered.filter(d =>
+        (d.title || "").toLowerCase().includes(keyword) ||
+        (d.country_name || "").toLowerCase().includes(keyword) ||
+        (d.approver_name || "").toLowerCase().includes(keyword)
+      );
+    }
+    if (dateVal) {
+      filtered = filtered.filter(d => {
+        if (!d.approval_date) return false;
+        const ad = new Date(d.approval_date);
+        const dd = String(ad.getDate()).padStart(2,'0');
+        const mm = String(ad.getMonth()+1).padStart(2,'0');
+        const yyyy = ad.getFullYear();
+        return `${yyyy}-${mm}-${dd}` === dateVal;
+      });
+    }
+
+    if (!filtered.length){
       docsEmpty.hidden = false;
       return;
     }
 
-    for (const d of docs){
+    for (const d of filtered){
       const approvalDateStr = fmtDDMMYYYY(d.approval_date);
       const countryName = d.country_name || '—';
       const lang = langLabel(d.language);
       const approver = d.approver_name || '—';
+      const cId = d.country_id;
 
       // Table row
       const tr = document.createElement("tr");
@@ -116,7 +150,7 @@
         <td><div class="library-approver">${window.GCP.escapeHtml(approver)}</div></td>
         <td><div class="required-actions">${actionBtns()}</div></td>
       `;
-      wireActions(tr, d.event_id, countryId);
+      wireActions(tr, d.event_id, cId);
       docsTbody.appendChild(tr);
 
       // Card (mobile)
@@ -142,7 +176,7 @@
         </div>
         <div class="required-actions-card">${actionBtns()}</div>
       `;
-      wireActions(card, d.event_id, countryId);
+      wireActions(card, d.event_id, cId);
       docsCards.appendChild(card);
     }
   }
@@ -332,11 +366,14 @@
     }
   }
 
-  countrySelect.addEventListener("change", loadDocs);
+  countrySelect.addEventListener("change", renderDocs);
+  keywordInput.addEventListener("input", renderDocs);
+  dateInput.addEventListener("change", renderDocs);
 
   try{
     await loadCountries();
+    await loadDocs();
   }catch(err){
-    msg.textContent = err.message || "Failed to load countries";
+    msg.textContent = err.message || "Failed to load data";
   }
 })();
