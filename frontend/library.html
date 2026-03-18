@@ -18,13 +18,21 @@
 
 <div class="grid">
   <section class="card col-12">
-    <div class="row" style="justify-content:space-between;">
+    <div class="library-filters">
       <div class="field">
         <label>Country</label>
         <select id="countrySelect"></select>
       </div>
-      <div id="msg" class="small" style="color:var(--danger); font-weight:800;"></div>
+      <div class="field">
+        <label>Search</label>
+        <input type="text" id="keywordInput" placeholder="Search by keyword..." />
+      </div>
+      <div class="field">
+        <label>Date</label>
+        <input type="date" id="dateInput" />
+      </div>
     </div>
+    <div id="msg" class="small" style="color:var(--danger); font-weight:800;"></div>
   </section>
 
   <section class="card required-sections-panel col-12" id="approvedDocsPanel">
@@ -39,7 +47,7 @@
       <table class="table required-sections-table">
         <thead><tr>
           <th style="width:35%">Event</th>
-          <th style="width:13%">Date of Approval</th>
+          <th style="width:13%">Date</th>
           <th style="width:17%">Document Approver</th>
           <th class="th-actions" style="width:35%; text-align:right;">Actions</th>
         </tr></thead>
@@ -48,7 +56,7 @@
     </div>
 
     <div id="docsCards" class="required-sections-cards"></div>
-    <div id="docsEmpty" class="required-sections-empty" hidden>No approved documents for this country yet.</div>
+    <div id="docsEmpty" class="required-sections-empty" hidden>No approved documents found.</div>
   </section>
 </div>
 

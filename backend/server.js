@@ -2941,9 +2941,15 @@ app.post('/api/document/return', requireRole('deputy','minister','admin'), async
 }));
 
 app.get('/api/library', requireRole('admin','deputy','minister','supervisor','super_collaborator','protocol'), async (req, res) => {
-  // List approved documents for a country
-  const countryId = Number(req.query.country_id);
-  if (!Number.isFinite(countryId)) return res.status(400).json({ error: 'country_id required' });
+  // List approved documents — optionally filtered by country
+  const countryId = req.query.country_id ? Number(req.query.country_id) : null;
+
+  const conditions = [`ds.status = 'approved'`];
+  const params = [];
+  if (countryId && Number.isFinite(countryId)) {
+    params.push(countryId);
+    conditions.push(`ds.country_id = $${params.length}`);
+  }
 
   const rows = await queryAll(
     `
@@ -2951,6 +2957,7 @@ app.get('/api/library', requireRole('admin','deputy','minister','supervisor','su
            e.title,
            e.deadline_date,
            e.language,
+           e.country_id,
            c.name_en AS country_name,
            ds.updated_at AS last_updated,
            ds.updated_at AS approval_date,
@@ -2959,10 +2966,10 @@ app.get('/api/library', requireRole('admin','deputy','minister','supervisor','su
     JOIN events e ON e.id = ds.event_id
     JOIN countries c ON c.id = e.country_id
     LEFT JOIN users u ON u.id = ds.last_updated_by_user_id
-    WHERE ds.country_id = $1 AND ds.status = 'approved'
+    WHERE ${conditions.join(' AND ')}
     ORDER BY ds.updated_at DESC
     `,
-    [countryId]
+    params
   );
 
   return res.json(rows);
