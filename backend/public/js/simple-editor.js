@@ -38,7 +38,7 @@
       '.se-palette button:hover{border-color:rgba(43,68,91,.35);transform:scale(1.15);}',
       '.se-palette button.sel{border-color:#0a84ff;}',
       /* Body */
-      '.se-body{min-height:120px;max-height:400px;overflow-y:auto;padding:12px 16px;font-size:11pt;font-weight:500;line-height:1.65;color:#22395a;outline:none;white-space:pre-wrap;word-wrap:break-word;}',
+      '.se-body{min-height:180px;max-height:400px;overflow-y:auto;padding:12px 16px;font-size:11pt;font-weight:500;line-height:1.65;color:#22395a;outline:none;white-space:pre-wrap;word-wrap:break-word;}',
       '.se-body:empty::before{content:attr(data-placeholder);color:rgba(43,68,91,.35);pointer-events:none;font-weight:500;}',
     ].join('\n');
     document.head.appendChild(style);
