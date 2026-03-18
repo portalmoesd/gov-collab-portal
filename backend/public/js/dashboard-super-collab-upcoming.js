@@ -51,7 +51,9 @@
       card.setAttribute('tabindex', '0');
       const deadline = window.GCP.formatDate(ev.deadline_date) || '';
       const country = ev.country_name_en || '';
-      const task = ev.task || ev.occasion || '';
+      const taskTmp = document.createElement('div');
+      taskTmp.innerHTML = ev.task || ev.occasion || '';
+      const task = taskTmp.textContent || taskTmp.innerText || '';
       const langLabels = { en: 'English', ka: 'ქართული', ru: 'Русский' };
       const langDisplay = langLabels[ev.language] || (ev.language || '').toUpperCase() || 'EN';
       card.innerHTML = `
