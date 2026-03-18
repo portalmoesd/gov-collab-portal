@@ -804,6 +804,13 @@ hr, .divider{
   box-shadow:none;
 }
 .wf-step.skip .wf-step__label{ color:#cbd5e1; }
+/* Step completed but user did not act on it */
+.wf-step.done.no-actor .wf-step__circle{
+  opacity:.45;
+}
+.wf-step.done.no-actor .wf-step__label{
+  opacity:.45;
+}
 .wf-step.active .wf-step__circle{
   box-shadow:0 0 0 7px rgba(10,132,255,.12), 0 10px 24px rgba(10,132,255,.18);
 }

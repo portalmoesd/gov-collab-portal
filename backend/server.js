@@ -2578,7 +2578,7 @@ app.get('/api/tp/status-grid', authRequired, async (req, res) => {
            section_id, user_name AS full_name, user_role AS role_key
          FROM tp_section_history
          WHERE event_id = $1 AND section_id = ANY($2::int[])
-           AND user_role IN ('collaborator_1','collaborator_2','collaborator_3','collaborator','super_collaborator')
+           AND user_role IN ('collaborator_1','collaborator_2','collaborator_3','collaborator','super_collaborator','supervisor','deputy','minister')
          ORDER BY section_id, user_role, acted_at ASC`,
         [eventId, sectionIds]
       );
@@ -2588,7 +2588,7 @@ app.get('/api/tp/status-grid', authRequired, async (req, res) => {
     // Build per-section step-name map (null = not acted yet → show role label)
     const stepNames = {};
     sectionIds.forEach(id => {
-      stepNames[id] = { collabI: null, collabII: null, collabIII: null, collaborator: null, superCollab: null };
+      stepNames[id] = { collabI: null, collabII: null, collabIII: null, collaborator: null, superCollab: null, supervisor: null, deputy: null, minister: null };
     });
     for (const u of stepNameRows) {
       const sid = Number(u.section_id);
@@ -2598,6 +2598,9 @@ app.get('/api/tp/status-grid', authRequired, async (req, res) => {
         if (u.role_key === 'collaborator_3')    stepNames[sid].collabIII    = u.full_name;
         if (u.role_key === 'collaborator')      stepNames[sid].collaborator = u.full_name;
         if (u.role_key === 'super_collaborator')stepNames[sid].superCollab  = u.full_name;
+        if (u.role_key === 'supervisor')       stepNames[sid].supervisor   = u.full_name;
+        if (u.role_key === 'deputy')           stepNames[sid].deputy       = u.full_name;
+        if (u.role_key === 'minister')         stepNames[sid].minister     = u.full_name;
       }
     }
 
@@ -2640,7 +2643,7 @@ app.get('/api/tp/status-grid', authRequired, async (req, res) => {
         originalSubmitterRole: r.original_submitter_role || null,
         returnTargetRole: r.return_target_role || null,
         returnRequest: returnRequestsBySection[Number(r.id)] || null,
-        stepNames: stepNames[Number(r.id)] || { collabI: null, collabII: null, collabIII: null, collaborator: null, superCollab: null },
+        stepNames: stepNames[Number(r.id)] || { collabI: null, collabII: null, collabIII: null, collaborator: null, superCollab: null, supervisor: null, deputy: null, minister: null },
       }))
     });
   } catch (e) {
