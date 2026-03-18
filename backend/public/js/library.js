@@ -159,6 +159,12 @@
         container.style.fontFamily = "Arial, sans-serif";
         container.style.fontSize = "12px";
         container.innerHTML = `
+          <style>
+            del[data-tc-id] { display:none !important; }
+            ins[data-tc-id] { text-decoration:none; background:none; color:inherit; }
+            [data-tc-fmt-id] { background:none; border:none; }
+            [data-tc-initials] { }
+          </style>
           <div style="text-align:center; margin-bottom:14px;">
             <h1 style="margin:0; font-size:20px;">${window.GCP.escapeHtml(doc.event.title)}</h1>
           </div>
