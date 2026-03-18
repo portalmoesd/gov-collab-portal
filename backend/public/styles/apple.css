@@ -2772,6 +2772,7 @@ body.gp-shell-ready .gp-sidebar__scrim{
 }
 
 /* Event detail modal */
+.event-modal-overlay[hidden]{ display:none !important; }
 .event-modal-overlay{
   position:fixed;
   inset:0;
