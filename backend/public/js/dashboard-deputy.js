@@ -229,7 +229,7 @@
     wrap.className = 'required-actions';
 
     wrap.appendChild(createMicroAction('Open', 'open', () => {
-      window.open(`editor.html?event_id=${currentEventId}&section_id=${section.sectionId}`, '_blank');
+      window.location.href = `editor.html?event_id=${currentEventId}&section_id=${section.sectionId}`;
     }));
 
     const sectionStatus = String(section.status || '').toLowerCase();

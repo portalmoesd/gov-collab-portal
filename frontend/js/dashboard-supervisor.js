@@ -182,9 +182,9 @@
     const s = String(section.status || '').toLowerCase();
     const rtr = String(section.returnTargetRole || '').toLowerCase();
 
-    // Open — supervisor opens in new tab
+    // Open — supervisor opens in same tab
     wrap.appendChild(createMicroAction('Open', 'open', () => {
-      window.open(`editor.html?event_id=${currentEventId}&section_id=${section.sectionId}`, '_blank');
+      window.location.href = `editor.html?event_id=${currentEventId}&section_id=${section.sectionId}`;
     }));
 
     // Supervisor can approve/return at any stage before (and including) their own stage in the chain
