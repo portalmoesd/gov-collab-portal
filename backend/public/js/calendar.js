@@ -28,6 +28,7 @@
 
   let editEventId = null;
   let allEvents = [];
+  let activeTab = 'upcoming';
 
   if (!canManage){
     formCard.style.display = "none";
@@ -171,13 +172,18 @@
   }
 
   function renderEvents(){
-    const filtered = applyFilters(allEvents);
+    const tabEvents = allEvents.filter(ev => {
+      if (activeTab === 'past') return !!ev.ended_at;
+      return !ev.ended_at;
+    });
+    const filtered = applyFilters(tabEvents);
     eventsTbody.innerHTML = '';
     eventsCards.innerHTML = '';
 
     if (!filtered.length){
       eventsEmpty.hidden = false;
-      eventsTbody.innerHTML = `<tr class="calendar-events-empty-row"><td colspan="6">No events yet.</td></tr>`;
+      eventsEmpty.textContent = activeTab === 'past' ? 'No past events.' : 'No events yet.';
+      eventsTbody.innerHTML = `<tr class="calendar-events-empty-row"><td colspan="6">${activeTab === 'past' ? 'No past events.' : 'No events yet.'}</td></tr>`;
       return;
     }
     eventsEmpty.hidden = true;
@@ -220,7 +226,7 @@
   }
 
   async function loadEvents(){
-    const events = await window.GCP.apiFetch("/events", { method:"GET" });
+    const events = await window.GCP.apiFetch("/events?include_ended=1", { method:"GET" });
     const enriched = await Promise.all(events.map(async (ev) => {
       let doc = null;
       try {
@@ -318,6 +324,15 @@
     }
   });
 
+
+  document.querySelectorAll('.calendar-events-tab').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.calendar-events-tab').forEach(b => b.classList.remove('is-active'));
+      btn.classList.add('is-active');
+      activeTab = btn.dataset.tab;
+      renderEvents();
+    });
+  });
 
   try{
     await Promise.all([loadCountries(), loadSections()]);

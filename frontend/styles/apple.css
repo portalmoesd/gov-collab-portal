@@ -2605,6 +2605,31 @@ body.gp-shell-ready .gp-sidebar__scrim{
   font-size:12px;
   color:#73829c;
 }
+.calendar-events-tabs{
+  display:flex;
+  gap:0;
+  margin-top:12px;
+  border-bottom:2px solid #e5e9f0;
+}
+.calendar-events-tab{
+  background:none;
+  border:none;
+  padding:8px 18px;
+  font-size:13px;
+  font-weight:700;
+  color:#73829c;
+  cursor:pointer;
+  border-bottom:2px solid transparent;
+  margin-bottom:-2px;
+  transition:color .15s, border-color .15s;
+}
+.calendar-events-tab:hover{
+  color:#20314d;
+}
+.calendar-events-tab.is-active{
+  color:#2052a5;
+  border-bottom-color:#2052a5;
+}
 .calendar-events-toolbar{
   display:flex;
   flex-wrap:wrap;
