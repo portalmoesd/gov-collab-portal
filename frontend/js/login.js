@@ -25,7 +25,7 @@
     else if (r === "collaborator_1") location.href = "dashboard-collab.html";
     else if (r === "collaborator_3") location.href = "dashboard-collab-3.html";
     else if (r === "protocol") location.href = "calendar.html";
-    else if (r === "minister") location.href = "calendar.html";
+    else if (r === "minister") location.href = "dashboard-minister.html";
     else location.href = "statistics.html";
   }
   const form = document.getElementById("loginForm");

@@ -33,28 +33,28 @@
     ],
     super_collaborator: [
       { href: "dashboard-super-collab.html", label: "Dashboard" },
-      { href: "calendar.html", label: "Calendar (Read)" },
+      { href: "calendar.html", label: "Calendar" },
       { href: "library.html", label: "Library" },
       { href: "statistics.html", label: "Statistics" },
     ],
     collaborator: [
       { href: "dashboard-collab-review.html", label: "Dashboard" },
-      { href: "calendar.html", label: "Calendar (Read)" },
+      { href: "calendar.html", label: "Calendar" },
       { href: "statistics.html", label: "Statistics" },
     ],
     collaborator_3: [
       { href: "dashboard-collab-3.html", label: "Dashboard" },
-      { href: "calendar.html", label: "Calendar (Read)" },
+      { href: "calendar.html", label: "Calendar" },
       { href: "statistics.html", label: "Statistics" },
     ],
     collaborator_2: [
       { href: "dashboard-collab-2.html", label: "Dashboard" },
-      { href: "calendar.html", label: "Calendar (Read)" },
+      { href: "calendar.html", label: "Calendar" },
       { href: "statistics.html", label: "Statistics" },
     ],
     collaborator_1: [
       { href: "dashboard-collab.html", label: "Dashboard" },
-      { href: "calendar.html", label: "Calendar (Read)" },
+      { href: "calendar.html", label: "Calendar" },
       { href: "statistics.html", label: "Statistics" },
     ],
     viewer: [
