@@ -410,10 +410,11 @@
     if (!confirm('Approve all required sections for this event?')) return;
     setMsg('');
     try {
-      await window.GCP.apiFetch('/tp/approve-all-sections', {
+      const data = await window.GCP.apiFetch('/tp/approve-all-sections', {
         method:'POST',
         body: JSON.stringify({ eventId: currentEventId })
       });
+      setMsg(data && data.approved ? `${data.approved} section(s) approved.` : 'No sections were eligible for approval.');
       await refresh();
     } catch (e) {
       setMsg(e.message || 'Failed to approve all sections', true);

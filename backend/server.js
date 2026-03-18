@@ -2165,7 +2165,7 @@ app.post('/api/tp/approve-section', requireRole('super_collaborator','supervisor
   return res.json({ success:true, status: targetStatus });
 }));
 
-app.post('/api/tp/approve-all-sections', requireRole('supervisor','deputy','minister','admin'), async (req, res) => {
+app.post('/api/tp/approve-all-sections', requireRole('super_collaborator','supervisor','deputy','minister','admin'), async (req, res) => {
   try {
     const eventId = Number(req.body?.eventId);
     if (!Number.isFinite(eventId)) return res.status(400).json({ error: 'eventId required' });
@@ -2187,39 +2187,76 @@ app.post('/api/tp/approve-all-sections', requireRole('supervisor','deputy','mini
     }
     if (sectionIds.length === 0) return res.json({ success:true, approved: 0 });
 
-    for (const sid of sectionIds) {
-      await ensureTpRow(eventId, countryId, sid, req.user.id);
-    }
-
     const targetStatus = approveSectionStatus(roleKey);
     if (!targetStatus) return res.status(400).json({ error: 'Unsupported role for bulk approve' });
 
-    const allowedStatuses = decisionStatusesForRole(roleKey);
-    // Fetch from-statuses before update so we can record accurate history
-    const beforeRows = await queryAll(
-      `SELECT section_id, status::text AS status FROM tp_content WHERE event_id=$1 AND country_id=$2 AND section_id=ANY($3::int[]) AND status=ANY($4::text[])`,
-      [eventId, countryId, sectionIds, allowedStatuses]
-    );
-    const { rows } = await pool.query(
-      `
-      UPDATE tp_content
-      SET status=$4, status_comment=NULL, last_updated_at=NOW(), last_updated_by_user_id=$5
-      WHERE event_id=$1 AND country_id=$2 AND section_id = ANY($3::int[])
-        AND status = ANY($6::text[])
-      RETURNING section_id
-      `,
-      [eventId, countryId, sectionIds, targetStatus, req.user.id, allowedStatuses]
-    );
-    const updatedSet = new Set(rows.map(r => Number(r.section_id)));
-    for (const br of beforeRows) {
-      if (updatedSet.has(Number(br.section_id))) {
-        await recordHistory({ eventId, countryId, sectionId: Number(br.section_id), action: 'approved',
-          fromStatus: br.status, toStatus: targetStatus,
-          userId: req.user.id, userName: req.user.full_name || req.user.username, userRole: roleKey });
+    // Event metadata for upperTierReApprove check
+    const evMeta = await queryOne(`SELECT submitter_role FROM events WHERE id=$1`, [eventId]);
+    const eventSubmitterRole = String(evMeta?.submitter_role || '').toLowerCase();
+
+    // Statuses that are already at or past this role's approval (should NOT be re-approved)
+    const pastStatuses = {
+      super_collaborator: ['approved_by_super_collaborator','submitted_to_supervisor','returned_by_supervisor','approved_by_supervisor','submitted_to_deputy','returned_by_deputy','approved_by_deputy','submitted_to_minister','returned_by_minister','approved_by_minister','approved','locked'],
+      supervisor: ['approved_by_supervisor','submitted_to_deputy','returned_by_deputy','approved_by_deputy','submitted_to_minister','returned_by_minister','approved_by_minister','approved','locked'],
+      deputy: ['approved_by_deputy','submitted_to_minister','returned_by_minister','approved_by_minister','approved','locked'],
+      minister: ['approved_by_minister','approved','locked'],
+    };
+
+    let approved = 0;
+    for (const sid of sectionIds) {
+      await ensureTpRow(eventId, countryId, sid, req.user.id);
+
+      const contentRow = await queryOne(
+        `SELECT status::text AS status, original_submitter_role FROM tp_content WHERE event_id=$1 AND country_id=$2 AND section_id=$3`,
+        [eventId, countryId, sid]
+      );
+      const currentStatus = contentRow?.status || 'draft';
+
+      // Determine if this section can be approved by this role (same logic as individual endpoints)
+      const rolePast = pastStatuses[roleKey] || [];
+      if (rolePast.includes(currentStatus)) {
+        // Already at or past this role's level — check for upperTierReApprove
+        const isOwnApproved = (roleKey === 'deputy' && currentStatus === 'approved_by_deputy') ||
+                              (roleKey === 'minister' && currentStatus === 'approved_by_minister');
+        if (!(isOwnApproved && eventSubmitterRole === roleKey)) continue;
       }
+
+      // Set original_submitter_role when acting outside the normal pipeline entry point
+      const canActAsLowest = roleKey === 'super_collaborator' && currentStatus === 'draft';
+      const supervisorPreApproval = roleKey === 'supervisor' && !rolePast.includes(currentStatus);
+      const setOriginalRole = canActAsLowest ||
+        (supervisorPreApproval && !contentRow?.original_submitter_role);
+
+      if (setOriginalRole) {
+        await pool.query(
+          `UPDATE tp_content
+           SET status=$4, status_comment=NULL, last_updated_at=NOW(), last_updated_by_user_id=$5,
+               original_submitter_role=$6, return_target_role=NULL
+           WHERE event_id=$1 AND country_id=$2 AND section_id=$3`,
+          [eventId, countryId, sid, targetStatus, req.user.id, roleKey]
+        );
+      } else {
+        await pool.query(
+          `UPDATE tp_content
+           SET status=$4, status_comment=NULL, last_updated_at=NOW(), last_updated_by_user_id=$5
+           WHERE event_id=$1 AND country_id=$2 AND section_id=$3`,
+          [eventId, countryId, sid, targetStatus, req.user.id]
+        );
+      }
+
+      // Clean up return requests
+      await pool.query(
+        `DELETE FROM section_return_requests WHERE event_id=$1 AND country_id=$2 AND section_id=$3`,
+        [eventId, countryId, sid]
+      );
+
+      await recordHistory({ eventId, countryId, sectionId: sid, action: 'approved',
+        fromStatus: currentStatus, toStatus: targetStatus,
+        userId: req.user.id, userName: req.user.full_name || req.user.username, userRole: roleKey });
+      approved++;
     }
 
-    return res.json({ success:true, approved: rows.length, status: targetStatus });
+    return res.json({ success:true, approved, status: targetStatus });
   } catch (e) {
     console.error('POST /api/tp/approve-all-sections failed', e);
     return res.status(500).json({ error: 'Server error' });

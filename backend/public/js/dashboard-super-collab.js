@@ -389,23 +389,12 @@
 
   if(approveAllSectionsBtn) approveAllSectionsBtn.addEventListener('click', async()=>{
     if(!currentEventId) return;
-    const eligible=currentSections.filter(s=>{
-      const st=String(s.status||'').toLowerCase();
-      return [
-        'submitted_to_super_collaborator','returned_by_super_collaborator','approved_by_collaborator',
-        'submitted_to_collaborator','returned_by_collaborator','approved_by_collaborator_3',
-        'submitted_to_collaborator_2','returned_by_collaborator_2','approved_by_collaborator_2',
-        'submitted_to_collaborator_3','returned_by_collaborator_3',
-      ].includes(st);
-    });
-    if(!eligible.length){ setMsg('No sections ready for approval.'); return; }
-    if(!confirm(`Approve ${eligible.length} section(s)?`)) return;
+    if(!currentSections.length){ setMsg('No sections ready for approval.'); return; }
+    if(!confirm('Approve all eligible section(s)?')) return;
     setMsg('');
     try{
-      for(const s of eligible){
-        await window.GCP.apiFetch('/tp/approve-section',{method:'POST',body:JSON.stringify({eventId:currentEventId,sectionId:s.sectionId})});
-      }
-      setMsg('All eligible sections approved.');
+      const data = await window.GCP.apiFetch('/tp/approve-all-sections',{method:'POST',body:JSON.stringify({eventId:currentEventId})});
+      setMsg(data && data.approved ? `${data.approved} section(s) approved.` : 'No sections were eligible for approval.');
       await refreshStatusGrid();
     }catch(e){ setMsg(e.message||'Approve failed',true); }
   });
