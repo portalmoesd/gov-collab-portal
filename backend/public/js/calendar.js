@@ -104,21 +104,128 @@
 
   function escapeAttr(v){ return String(v ?? '').replace(/&/g,'&amp;').replace(/"/g,'&quot;'); }
 
-  function renderActions(ev){
+  function lowerSubmitterLabel(role){
+    const key = String(role || 'collaborator_2').toLowerCase();
+    if (key === 'collaborator_3') return 'Curator';
+    return 'Head Collaborator';
+  }
+
+  function languageLabel(lang){
+    const key = String(lang || 'en').toLowerCase();
+    if (key === 'ka') return 'Georgian';
+    if (key === 'ru') return 'Russian';
+    return 'English';
+  }
+
+  function renderActions(ev, isPast){
     return `<div class="calendar-event-actions">
       <button class="micro-action calendar-micro-action calendar-action--view" data-act="view" data-id="${ev.id}" aria-label="View">
         <span class="micro-action__icon"></span><span class="micro-action__label">View</span>
       </button>
-      ${canManage ? `<button class="micro-action calendar-micro-action calendar-action--edit" data-act="edit" data-id="${ev.id}" aria-label="Edit"><span class="micro-action__icon"></span><span class="micro-action__label">Edit</span></button>` : ''}
-      ${canEnd ? `<button class="micro-action calendar-micro-action calendar-action--end" data-act="end" data-id="${ev.id}" aria-label="End event"><span class="micro-action__icon"></span><span class="micro-action__label">End event</span></button>` : ''}
+      ${canManage && !isPast ? `<button class="micro-action calendar-micro-action calendar-action--edit" data-act="edit" data-id="${ev.id}" aria-label="Edit"><span class="micro-action__icon"></span><span class="micro-action__label">Edit</span></button>` : ''}
+      ${canEnd && !isPast ? `<button class="micro-action calendar-micro-action calendar-action--end" data-act="end" data-id="${ev.id}" aria-label="End event"><span class="micro-action__icon"></span><span class="micro-action__label">End event</span></button>` : ''}
     </div>`;
   }
 
+  // --- Event detail modal ---
+  const modalOverlay = document.createElement('div');
+  modalOverlay.className = 'event-modal-overlay';
+  modalOverlay.hidden = true;
+  modalOverlay.innerHTML = `
+    <div class="event-modal">
+      <button class="event-modal__close" aria-label="Close">&times;</button>
+      <div class="event-modal__body"></div>
+    </div>`;
+  document.body.appendChild(modalOverlay);
+  const modalBody = modalOverlay.querySelector('.event-modal__body');
+  const modalCloseBtn = modalOverlay.querySelector('.event-modal__close');
+
+  function closeModal(){ modalOverlay.hidden = true; }
+  modalCloseBtn.addEventListener('click', closeModal);
+  modalOverlay.addEventListener('click', (e) => { if (e.target === modalOverlay) closeModal(); });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !modalOverlay.hidden) closeModal(); });
+
+  function formatDateFull(d){
+    if (!d) return '—';
+    const dt = new Date(d);
+    if (Number.isNaN(dt.getTime())) return '—';
+    const dd = String(dt.getDate()).padStart(2,'0');
+    const mm = String(dt.getMonth()+1).padStart(2,'0');
+    const yyyy = dt.getFullYear();
+    const hh = String(dt.getHours()).padStart(2,'0');
+    const min = String(dt.getMinutes()).padStart(2,'0');
+    return `${dd}.${mm}.${yyyy} ${hh}:${min}`;
+  }
+
   async function handleViewEvent(ev){
-    const details = await window.GCP.apiFetch(`/events/${ev.id}`, { method:"GET" });
-    const req = (details.required_sections || details.requiredSections || []);
-    const labels = Array.isArray(req) ? req.map(s => s.label).filter(Boolean) : [];
-    alert(`Required sections\n\n${(labels.length ? labels.join('\n') : '—')}`);
+    modalBody.innerHTML = '<div style="text-align:center;padding:32px;color:#73829c;">Loading...</div>';
+    modalOverlay.hidden = false;
+
+    try {
+      const details = await window.GCP.apiFetch(`/events/${ev.id}`, { method:"GET" });
+      const req = (details.required_sections || details.requiredSections || []);
+      const sections = Array.isArray(req) ? req.map(s => window.GCP.escapeHtml(s.label)).filter(Boolean) : [];
+
+      const isPast = !!details.ended_at;
+      const status = statusMeta(null, !isPast);
+      const deadline = dateMeta(details.deadline_date, !isPast);
+
+      let html = `
+        <div class="event-modal__header">
+          <h2 class="event-modal__title">${window.GCP.escapeHtml(details.title || '—')}</h2>
+          <span class="calendar-status-badge ${isPast ? 'is-ended' : (ev.statusClass || '')}">${isPast ? 'Ended' : window.GCP.escapeHtml(ev.statusLabel || 'Active')}</span>
+        </div>
+        <div class="event-modal__grid">
+          <div class="event-modal__field">
+            <span class="event-modal__label">Country</span>
+            <span class="event-modal__value">${window.GCP.escapeHtml(details.country_name_en || '—')}</span>
+          </div>
+          <div class="event-modal__field">
+            <span class="event-modal__label">Deadline</span>
+            <span class="event-modal__value"><span class="calendar-deadline ${deadline.cls}">${window.GCP.escapeHtml(deadline.text)}</span></span>
+          </div>
+          <div class="event-modal__field">
+            <span class="event-modal__label">Document submitter</span>
+            <span class="event-modal__value">${window.GCP.escapeHtml(submitterLabel(details.submitter_role))}</span>
+          </div>
+          <div class="event-modal__field">
+            <span class="event-modal__label">Lower level submitter</span>
+            <span class="event-modal__value">${window.GCP.escapeHtml(lowerSubmitterLabel(details.lower_submitter_role))}</span>
+          </div>
+          <div class="event-modal__field">
+            <span class="event-modal__label">Language</span>
+            <span class="event-modal__value">${window.GCP.escapeHtml(languageLabel(details.language))}</span>
+          </div>
+          <div class="event-modal__field">
+            <span class="event-modal__label">Created</span>
+            <span class="event-modal__value">${window.GCP.escapeHtml(formatDateFull(details.created_at))}</span>
+          </div>
+          ${isPast ? `<div class="event-modal__field">
+            <span class="event-modal__label">Ended</span>
+            <span class="event-modal__value">${window.GCP.escapeHtml(formatDateFull(details.ended_at))}</span>
+          </div>` : ''}
+        </div>`;
+
+      if (details.occasion) {
+        html += `
+        <div class="event-modal__section">
+          <div class="event-modal__label">Task</div>
+          <div class="event-modal__task">${details.occasion}</div>
+        </div>`;
+      }
+
+      html += `
+        <div class="event-modal__section">
+          <div class="event-modal__label">Required sections</div>
+          ${sections.length
+            ? `<ul class="event-modal__sections">${sections.map(s => `<li>${s}</li>`).join('')}</ul>`
+            : '<div class="event-modal__empty">No sections assigned.</div>'}
+        </div>`;
+
+      modalBody.innerHTML = html;
+    } catch (e) {
+      modalBody.innerHTML = `<div style="text-align:center;padding:32px;color:var(--danger);font-weight:700;">${window.GCP.escapeHtml(e.message || 'Failed to load event details')}</div>`;
+    }
   }
 
   async function handleEditEvent(ev){
@@ -220,6 +327,7 @@
     if (currentPage > totalPages) currentPage = totalPages;
     const start = (currentPage - 1) * PAGE_SIZE;
     const pageItems = filtered.slice(start, start + PAGE_SIZE);
+    const isPast = activeTab === 'past';
 
     pageItems.forEach((ev, index) => {
       const row = document.createElement('tr');
@@ -233,7 +341,7 @@
         <td><span class="calendar-deadline ${ev.deadlineClass}">${window.GCP.escapeHtml(ev.deadlineLabel)}</span></td>
         <td>${window.GCP.escapeHtml(ev.submitterLabel)}</td>
         <td><span class="calendar-status-badge ${ev.statusClass}">${window.GCP.escapeHtml(ev.statusLabel)}</span></td>
-        <td>${renderActions(ev)}</td>
+        <td>${renderActions(ev, isPast)}</td>
       `;
       eventsTbody.appendChild(row);
 
@@ -250,7 +358,7 @@
         <div class="calendar-event-card__body">
           <div class="calendar-event-card__line"><span>Deadline</span><strong class="calendar-deadline ${ev.deadlineClass}">${window.GCP.escapeHtml(ev.deadlineLabel)}</strong></div>
         </div>
-        ${renderActions(ev)}
+        ${renderActions(ev, isPast)}
       `;
       eventsCards.appendChild(card);
     });
