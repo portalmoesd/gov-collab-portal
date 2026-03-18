@@ -106,13 +106,13 @@
       tr.className = "required-sections-row";
       tr.innerHTML = `
         <td>
-          <div class="library-approval-date">${window.GCP.escapeHtml(approvalDateStr)}</div>
           <div class="required-section-name">${window.GCP.escapeHtml(d.title)}</div>
           <div class="library-pills">
             <span class="library-pill library-pill--country">${window.GCP.escapeHtml(countryName)}</span>
             <span class="library-pill library-pill--lang">${window.GCP.escapeHtml(lang)}</span>
           </div>
         </td>
+        <td><div class="library-approval-date">${window.GCP.escapeHtml(approvalDateStr)}</div></td>
         <td><div class="library-approver">${window.GCP.escapeHtml(approver)}</div></td>
         <td><div class="required-actions">${actionBtns()}</div></td>
       `;
@@ -125,13 +125,16 @@
       card.innerHTML = `
         <div class="required-section-card__top">
           <div class="required-section-card__meta">
-            <div class="library-approval-date">${window.GCP.escapeHtml(approvalDateStr)}</div>
             <div class="required-section-name">${window.GCP.escapeHtml(d.title)}</div>
             <div class="library-pills">
               <span class="library-pill library-pill--country">${window.GCP.escapeHtml(countryName)}</span>
               <span class="library-pill library-pill--lang">${window.GCP.escapeHtml(lang)}</span>
             </div>
           </div>
+        </div>
+        <div class="required-section-card__line">
+          <span>Date of Approval</span>
+          <strong class="library-approval-date">${window.GCP.escapeHtml(approvalDateStr)}</strong>
         </div>
         <div class="required-section-card__line">
           <span>Document Approver</span>
