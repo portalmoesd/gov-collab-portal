@@ -66,11 +66,13 @@
         <td style="white-space:nowrap;">
           <button class="btn" data-act="preview">Preview</button>
           <button class="btn primary" data-act="pdf">Export PDF</button>
+          <button class="btn primary" data-act="word">Export Word</button>
         </td>
       `;
 
       tr.querySelector('[data-act="preview"]').addEventListener("click", () => previewDoc(d.event_id, countryId));
       tr.querySelector('[data-act="pdf"]').addEventListener("click", () => exportPdf(d.event_id, countryId));
+      tr.querySelector('[data-act="word"]').addEventListener("click", () => exportWord(d.event_id, countryId));
       docsTbody.appendChild(tr);
     }
   }
@@ -186,6 +188,62 @@
         closeModal();
 
         await html2pdf().set(opt).from(container).save();
+      });
+
+    }catch(err){
+      msg.textContent = err.message || "Export failed";
+    }
+  }
+
+  async function exportWord(eventId, countryId){
+    msg.textContent = "";
+    try{
+      const doc = await window.GCP.apiFetch(`/library/document?event_id=${encodeURIComponent(eventId)}&country_id=${encodeURIComponent(countryId)}`, { method:"GET" });
+
+      const checklistHtml = doc.sections.map(s => `
+        <label class="checkitem">
+          <input type="checkbox" class="secCheck" value="${s.sectionId}" checked />
+          <span>${window.GCP.escapeHtml(s.sectionLabel)}</span>
+        </label>
+      `).join("");
+
+      openModal(`
+        <h2 style="margin:0 0 6px;">Export Word</h2>
+        <div class="small muted" style="margin-bottom:10px;">
+          ${window.GCP.escapeHtml(doc.event.title)} &bull; choose sections to include
+        </div>
+        <div class="checklist" style="max-height:320px; overflow:auto; margin-bottom:12px;">
+          ${checklistHtml}
+        </div>
+        <div class="small muted" style="margin-bottom:12px;">
+          Track changes will be preserved as native Word revisions (accept / reject in Word).
+        </div>
+        <div class="row" style="justify-content:flex-end; gap:10px;">
+          <button class="btn" id="btnSelectAll">Select all</button>
+          <button class="btn" id="btnSelectNone">Select none</button>
+          <button class="btn primary" id="btnDoExport">Export</button>
+        </div>
+      `);
+
+      const checks = Array.from(modalContent.querySelectorAll(".secCheck"));
+      modalContent.querySelector("#btnSelectAll").addEventListener("click", () => checks.forEach(c => c.checked = true));
+      modalContent.querySelector("#btnSelectNone").addEventListener("click", () => checks.forEach(c => c.checked = false));
+
+      modalContent.querySelector("#btnDoExport").addEventListener("click", async () => {
+        const selectedIds = checks.filter(c => c.checked).map(c => Number(c.value));
+        if (!selectedIds.length){
+          alert("Please select at least one section.");
+          return;
+        }
+
+        const selected = doc.sections.filter(s => selectedIds.includes(Number(s.sectionId)));
+        closeModal();
+
+        try{
+          await window.GCP.exportDocx(doc.event.title, selected);
+        }catch(e){
+          msg.textContent = e.message || "Word export failed";
+        }
       });
 
     }catch(err){
