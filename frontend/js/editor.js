@@ -287,9 +287,12 @@
     if (taskTitleEl) taskTitleEl.textContent = tp.eventTitle || 'Untitled task';
     meta.innerHTML = `
       <span class="editor-meta-pill">${window.GCP.escapeHtml(tp.countryName || 'Unknown country')}</span>
-      <span class="editor-meta-pill editor-meta-pill--editable" id="sectionLabelPill" title="Click to rename section">${window.GCP.escapeHtml(tp.sectionLabel || 'Unknown section')}</span>
     `;
-    initSectionLabelEdit(tp.sectionLabel || '');
+    const sectionLabelRow = document.getElementById('sectionLabelRow');
+    if (sectionLabelRow) {
+      sectionLabelRow.innerHTML = `<span class="editor-section-label-pill" id="sectionLabelPill" title="Click to rename section">${window.GCP.escapeHtml(tp.sectionLabel || 'Unknown section')}</span>`;
+      initSectionLabelEdit(tp.sectionLabel || '');
+    }
 
     // Show last content edit (actual text change), not workflow actions
     if (lastUpdatedEl){
