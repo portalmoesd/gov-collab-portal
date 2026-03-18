@@ -1331,7 +1331,7 @@ app.get('/api/events/upcoming', authRequired, attachUser, async (req, res) => {
   const rows = await queryAll(
     `
     SELECT e.id, e.country_id, c.name_en AS country_name_en, c.code AS country_code,
-           e.title, e.occasion, e.submitter_role, e.lower_submitter_role, e.deadline_date, e.ended_at
+           e.title, e.occasion, e.language, e.submitter_role, e.lower_submitter_role, e.deadline_date, e.ended_at
     FROM events e
     JOIN countries c ON c.id = e.country_id
     WHERE ${where.join(' AND ')}

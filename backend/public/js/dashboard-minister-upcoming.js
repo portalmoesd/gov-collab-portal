@@ -37,6 +37,8 @@
       const deadline = window.GCP.formatDate(ev.deadline_date) || '';
       const country = ev.country_name_en || '';
       const task = ev.task || ev.occasion || '';
+      const langLabels = { en: 'English', ka: 'ქართული', ru: 'Русский' };
+      const langDisplay = langLabels[ev.language] || (ev.language || '').toUpperCase() || 'EN';
       card.innerHTML = `
         <div class="row1">
           <div>
@@ -44,6 +46,7 @@
             <div class="meta">
               <span class="badge primary">${escapeHtml(country)}</span>
               ${deadline ? `<span class="badge">Deadline: ${escapeHtml(deadline)}</span>` : ''}
+              <span class="badge lang">${escapeHtml(langDisplay)}</span>
             </div>
           </div>
         </div>

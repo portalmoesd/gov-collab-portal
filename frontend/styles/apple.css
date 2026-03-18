@@ -326,6 +326,11 @@ hr, .divider{
   background: var(--accent-2);
   border-color: rgba(10,132,255,0.25);
 }
+.badge.lang{
+  background: rgba(139,92,246,.12);
+  border-color: rgba(139,92,246,.25);
+  color: #6d28d9;
+}
 .event-card .task{
   margin-top: 12px;
   color: rgba(0,0,0,0.76);
