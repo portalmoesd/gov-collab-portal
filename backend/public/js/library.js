@@ -43,37 +43,78 @@
     try{ return new Date(s).toLocaleString(); }catch{ return String(s); }
   }
 
+  const docsCards = document.getElementById("docsCards");
+  const docsEmpty = document.getElementById("docsEmpty");
+
+  function actionBtn(cls, label){
+    return `<button class="micro-action library-action ${cls}" type="button">
+      <span class="micro-action__icon"></span>
+      <span class="micro-action__label">${label}</span>
+    </button>`;
+  }
+
+  function actionBtns(){
+    return actionBtn("library-action--preview", "Preview")
+      + actionBtn("library-action--pdf", "Export PDF")
+      + actionBtn("library-action--word", "Export Word")
+      + actionBtn("library-action--files", "Other Files");
+  }
+
+  function wireActions(el, eventId, countryId){
+    el.querySelector(".library-action--preview").addEventListener("click", () => previewDoc(eventId, countryId));
+    el.querySelector(".library-action--pdf").addEventListener("click", () => exportPdf(eventId, countryId));
+    el.querySelector(".library-action--word").addEventListener("click", () => exportWord(eventId, countryId));
+    el.querySelector(".library-action--files").addEventListener("click", () => { /* placeholder */ });
+  }
+
   async function loadDocs(){
     msg.textContent = "";
     docsTbody.innerHTML = "";
+    docsCards.innerHTML = "";
+    docsEmpty.hidden = true;
     const countryId = countrySelect.value;
     if (!countryId) return;
 
     const docs = await window.GCP.apiFetch(`/library?country_id=${encodeURIComponent(countryId)}`, { method:"GET" });
     if (!docs.length){
-      const tr = document.createElement("tr");
-      tr.innerHTML = `<td colspan="4" class="muted">No approved documents for this country yet.</td>`;
-      docsTbody.appendChild(tr);
+      docsEmpty.hidden = false;
       return;
     }
 
     for (const d of docs){
+      // Table row
       const tr = document.createElement("tr");
+      tr.className = "required-sections-row";
       tr.innerHTML = `
-        <td>${window.GCP.escapeHtml(d.title)}</td>
-        <td>${d.deadline_date ? window.GCP.escapeHtml(fmtDate(d.deadline_date)) : '<span class="muted">—</span>'}</td>
-        <td>${d.last_updated ? window.GCP.escapeHtml(fmtDateTime(d.last_updated)) : '<span class="muted">—</span>'}</td>
-        <td style="white-space:nowrap;">
-          <button class="btn" data-act="preview">Preview</button>
-          <button class="btn primary" data-act="pdf">Export PDF</button>
-          <button class="btn primary" data-act="word">Export Word</button>
-        </td>
+        <td><div class="required-section-name">${window.GCP.escapeHtml(d.title)}</div></td>
+        <td><div class="required-updated-at">${d.deadline_date ? window.GCP.escapeHtml(fmtDate(d.deadline_date)) : '<span class="muted">—</span>'}</div></td>
+        <td><div class="required-updated-at">${d.last_updated ? window.GCP.escapeHtml(fmtDateTime(d.last_updated)) : '<span class="muted">—</span>'}</div></td>
+        <td><div class="required-actions">${actionBtns()}</div></td>
       `;
-
-      tr.querySelector('[data-act="preview"]').addEventListener("click", () => previewDoc(d.event_id, countryId));
-      tr.querySelector('[data-act="pdf"]').addEventListener("click", () => exportPdf(d.event_id, countryId));
-      tr.querySelector('[data-act="word"]').addEventListener("click", () => exportWord(d.event_id, countryId));
+      wireActions(tr, d.event_id, countryId);
       docsTbody.appendChild(tr);
+
+      // Card (mobile)
+      const card = document.createElement("div");
+      card.className = "required-section-card";
+      card.innerHTML = `
+        <div class="required-section-card__top">
+          <div class="required-section-card__meta">
+            <div class="required-section-name">${window.GCP.escapeHtml(d.title)}</div>
+          </div>
+        </div>
+        <div class="required-section-card__line">
+          <span>Deadline</span>
+          <strong>${d.deadline_date ? window.GCP.escapeHtml(fmtDate(d.deadline_date)) : '—'}</strong>
+        </div>
+        <div class="required-section-card__line">
+          <span>Last updated</span>
+          <strong>${d.last_updated ? window.GCP.escapeHtml(fmtDateTime(d.last_updated)) : '—'}</strong>
+        </div>
+        <div class="required-actions-card">${actionBtns()}</div>
+      `;
+      wireActions(card, d.event_id, countryId);
+      docsCards.appendChild(card);
     }
   }
 
