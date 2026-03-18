@@ -4162,7 +4162,7 @@ body.gp-shell-ready .gp-sidebar__scrim{
 .library-action--preview{ --icon-url:url('../assets/view-icon.svg'); --icon-color:#20314d; --hover-color:#20314d; --hover-bg:#eef3f8; }
 .library-action--pdf{ --icon-url:url('../assets/export-pdf-icon.svg'); --icon-color:#c53030; --hover-color:#c53030; --hover-bg:#fef0f0; }
 .library-action--word{ --icon-url:url('../assets/export-word-icon.svg'); --icon-color:#1d4ed8; --hover-color:#1d4ed8; --hover-bg:#e8f0ff; }
-.library-action--files{ --icon-url:url('../assets/open-icon.svg'); --icon-color:#6d28d9; --hover-color:#6d28d9; --hover-bg:#ede9fe; }
+.library-action--files{ --icon-url:url('../assets/files-icon.svg'); --icon-color:#6d28d9; --hover-color:#6d28d9; --hover-bg:#ede9fe; }
 
 /* File upload action */
 .micro-action--upload{ --icon-url:url('../assets/upload-icon.svg'); --icon-color:#6d28d9; --hover-color:#6d28d9; --hover-bg:#ede9fe; }
