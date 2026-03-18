@@ -2732,6 +2732,44 @@ body.gp-shell-ready .gp-sidebar__scrim{
 .calendar-events-empty-row td{
   text-align:center; color:#71819a; font-weight:700; background:#fbfdff !important;
 }
+.calendar-events-pagination{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:4px;
+  margin-top:16px;
+  padding:8px 0;
+}
+.calendar-page-btn{
+  min-width:34px;
+  height:34px;
+  padding:0 8px;
+  border:1px solid rgba(39,70,112,.12);
+  border-radius:10px;
+  background:#fff;
+  font-size:13px;
+  font-weight:700;
+  color:#3a5276;
+  cursor:pointer;
+  transition:background .15s, color .15s, border-color .15s;
+}
+.calendar-page-btn:hover:not(:disabled){
+  background:#eef3f8;
+  border-color:rgba(32,82,165,.25);
+}
+.calendar-page-btn.is-active{
+  background:#2052a5;
+  color:#fff;
+  border-color:#2052a5;
+}
+.calendar-page-btn:disabled{
+  opacity:.35;
+  cursor:default;
+}
+.calendar-page-arrow{
+  font-size:16px;
+  line-height:1;
+}
 .calendar-events-cards{ display:none; }
 .calendar-event-card{
   background:#fbfdff; border:1px solid rgba(39,70,112,.08); border-radius:20px; padding:16px; box-shadow:0 12px 24px rgba(15,23,42,.04); display:flex; flex-direction:column; gap:12px;
