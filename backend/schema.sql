@@ -99,10 +99,11 @@ CREATE INDEX IF NOT EXISTS idx_events_deadline_date ON events(deadline_date);
 
 -- Required sections per event
 CREATE TABLE IF NOT EXISTS event_required_sections (
-  id          SERIAL PRIMARY KEY,
-  event_id    INTEGER NOT NULL REFERENCES events(id) ON DELETE CASCADE,
-  section_id  INTEGER NOT NULL REFERENCES sections(id),
-  created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  id            SERIAL PRIMARY KEY,
+  event_id      INTEGER NOT NULL REFERENCES events(id) ON DELETE CASCADE,
+  section_id    INTEGER NOT NULL REFERENCES sections(id),
+  custom_label  TEXT,
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   CONSTRAINT uq_event_required_sections UNIQUE (event_id, section_id)
 );
 

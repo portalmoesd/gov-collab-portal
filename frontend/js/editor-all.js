@@ -258,12 +258,55 @@
 
     header.innerHTML = `
       <div class="editor-all-section__info">
-        <h3 class="editor-all-section__title">${window.GCP.escapeHtml(section.label)}</h3>
+        <h3 class="editor-all-section__title editor-meta-pill--editable" title="Click to rename section">${window.GCP.escapeHtml(section.label)}</h3>
         <div class="editor-all-section__updated">${updatedHtml}</div>
       </div>
       <span class="pill pill-status ${window.GCP.escapeHtml(s)}">${window.GCP.escapeHtml(statusLabel)}</span>
     `;
     wrapper.appendChild(header);
+
+    // Inline title editing
+    (function(titleEl, sid, lbl) {
+      let currentLabel = lbl;
+      titleEl.addEventListener('click', function() {
+        if (titleEl.querySelector('input')) return;
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.className = 'editor-meta-pill-input';
+        input.value = currentLabel;
+        input.style.width = '100%';
+        input.style.font = 'inherit';
+        titleEl.textContent = '';
+        titleEl.appendChild(input);
+        input.focus();
+        input.select();
+
+        async function save() {
+          const val = input.value.trim();
+          if (!val || val === currentLabel) {
+            titleEl.textContent = currentLabel;
+            return;
+          }
+          titleEl.textContent = val;
+          try {
+            await window.GCP.apiFetch('/tp/section-label', {
+              method: 'PATCH',
+              body: JSON.stringify({ eventId, sectionId: sid, label: val })
+            });
+            currentLabel = val;
+            showMsg('Section title updated.');
+          } catch(e) {
+            titleEl.textContent = currentLabel;
+            showMsg(e.message || 'Failed to rename section', true);
+          }
+        }
+        input.addEventListener('blur', save);
+        input.addEventListener('keydown', function(e) {
+          if (e.key === 'Enter') { e.preventDefault(); input.blur(); }
+          if (e.key === 'Escape') { input.value = currentLabel; input.blur(); }
+        });
+      });
+    })(header.querySelector('.editor-all-section__title'), sectionId, section.label);
 
     // Return comment if any
     const note = (tp.statusComment || '').trim();

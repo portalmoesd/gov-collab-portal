@@ -180,6 +180,7 @@ async function ensureSchema() {
   await pool.query(`ALTER TABLE tp_section_comments ADD COLUMN IF NOT EXISTS anchor_id TEXT`).catch(()=>{});
   await pool.query(`ALTER TABLE tp_section_comments ADD COLUMN IF NOT EXISTS parent_id INTEGER REFERENCES tp_section_comments(id) ON DELETE CASCADE`).catch(()=>{});
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_tsc_lookup ON tp_section_comments(event_id, country_id, section_id)`).catch(()=>{});
+  await pool.query(`ALTER TABLE event_required_sections ADD COLUMN IF NOT EXISTS custom_label TEXT`).catch(()=>{});
 }
 
 async function ensureRolesExist() {
@@ -666,7 +667,7 @@ async function getEventWithSections(eventId, countryIdForStatuses = null) {
 
   const requiredSections = await queryAll(
     `
-    SELECT s.id, s.key, s.label, s.order_index
+    SELECT s.id, s.key, COALESCE(ers.custom_label, s.label) AS label, s.order_index
     FROM event_required_sections ers
     JOIN sections s ON s.id = ers.section_id
     WHERE ers.event_id = $1
@@ -1363,7 +1364,7 @@ app.get('/api/events/:id', authRequired, attachUser, async (req, res) => {
 
   const required = await queryAll(
     `
-    SELECT ers.section_id AS id, s.label, s.order_index
+    SELECT ers.section_id AS id, COALESCE(ers.custom_label, s.label) AS label, s.order_index
     FROM event_required_sections ers
     JOIN sections s ON s.id = ers.section_id
     WHERE ers.event_id=$1
@@ -1411,7 +1412,7 @@ app.get('/api/events/:id/my-sections', authRequired, attachUser, async (req, res
     if (!canSee) return res.status(403).json({ error: 'Forbidden' });
 
     const required = await queryAll(
-      `SELECT ers.section_id AS id, s.label, s.order_index
+      `SELECT ers.section_id AS id, COALESCE(ers.custom_label, s.label) AS label, s.order_index
        FROM event_required_sections ers
        JOIN sections s ON s.id = ers.section_id
        WHERE ers.event_id=$1
@@ -1447,7 +1448,7 @@ app.get('/api/my/sections', authRequired, attachUser, async (req, res) => {
     if (!isSectionPipelineRole(roleKey)) {
       const r = await pool.query(
         `
-        SELECT s.id, s.label, s.order_index
+        SELECT s.id, COALESCE(ers.custom_label, s.label) AS label, s.order_index
         FROM event_required_sections ers
         JOIN sections s ON s.id = ers.section_id
         WHERE ers.event_id = $1
@@ -1469,7 +1470,7 @@ app.get('/api/my/sections', authRequired, attachUser, async (req, res) => {
         WHERE id = $1 AND is_active = TRUE
       ),
       required AS (
-        SELECT section_id
+        SELECT section_id, custom_label
         FROM event_required_sections
         WHERE event_id = $1
       ),
@@ -1483,7 +1484,7 @@ app.get('/api/my/sections', authRequired, attachUser, async (req, res) => {
         FROM country_assignments
         WHERE user_id = $2
       )
-      SELECT s.id, s.label, s.order_index
+      SELECT s.id, COALESCE(rqs.custom_label, s.label) AS label, s.order_index
       FROM ev
       JOIN required rqs ON TRUE
       JOIN assigned_sections asg ON asg.section_id = rqs.section_id
@@ -1709,7 +1710,7 @@ app.get('/api/tp', authRequired, async (req, res) => {
     e.submitter_role AS document_submitter_role,
     c.name_en AS country_name,
     s.id AS section_id,
-    s.label AS section_label,
+    COALESCE(ers.custom_label, s.label) AS section_label,
     t.html_content,
     t.status,
     t.status_comment,
@@ -1723,6 +1724,7 @@ app.get('/api/tp', authRequired, async (req, res) => {
   JOIN events e ON e.id = t.event_id
   JOIN countries c ON c.id = t.country_id
   JOIN sections s ON s.id = t.section_id
+  LEFT JOIN event_required_sections ers ON ers.event_id = t.event_id AND ers.section_id = t.section_id
   LEFT JOIN users u ON u.id = t.last_updated_by_user_id
   LEFT JOIN users ue ON ue.id = t.last_content_edited_by_user_id
   WHERE t.event_id=$1 AND t.country_id=$2 AND t.section_id=$3
@@ -1839,6 +1841,28 @@ app.post('/api/tp/save', authRequired, asyncRoute(async (req, res) => {
     userId: req.user.id, userName: req.user.full_name || req.user.username, userRole: roleKey });
 
   return res.json({ success:true });
+}));
+
+// Rename a section title (per-event custom label)
+app.patch('/api/tp/section-label', authRequired, asyncRoute(async (req, res) => {
+  const eventId   = Number(req.body?.eventId);
+  const sectionId = Number(req.body?.sectionId);
+  const label     = String(req.body?.label || '').trim();
+  if (!Number.isFinite(eventId) || !Number.isFinite(sectionId)) {
+    return res.status(400).json({ error: 'Missing eventId/sectionId' });
+  }
+  if (!label) {
+    return res.status(400).json({ error: 'Label cannot be empty' });
+  }
+  // Get the default label to check if they're resetting to default
+  const sec = await queryOne('SELECT label FROM sections WHERE id=$1', [sectionId]);
+  const customLabel = (sec && label === sec.label) ? null : label;
+
+  await pool.query(
+    `UPDATE event_required_sections SET custom_label = $1 WHERE event_id = $2 AND section_id = $3`,
+    [customLabel, eventId, sectionId]
+  );
+  return res.json({ success: true, label });
 }));
 
 // Ask to Return — any user can request the current holder to return a section
@@ -2572,7 +2596,7 @@ app.get('/api/tp/status-grid', authRequired, async (req, res) => {
     let q = `
       SELECT
         ers.section_id AS id,
-        s.label,
+        COALESCE(ers.custom_label, s.label) AS label,
         s.order_index,
         COALESCE(t.status::text, 'draft') AS status,
         t.status_comment,
@@ -2954,7 +2978,7 @@ app.get('/api/library/document', requireRole('admin','deputy','minister','superv
 
   const sections = await queryAll(
     `
-    SELECT s.id AS section_id, s.label AS section_label, s.order_index,
+    SELECT s.id AS section_id, COALESCE(ers.custom_label, s.label) AS section_label, s.order_index,
            t.html_content, t.status, t.last_updated_at AS last_updated_at
     FROM event_required_sections ers
     JOIN sections s ON s.id = ers.section_id

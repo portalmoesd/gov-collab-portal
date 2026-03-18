@@ -239,6 +239,47 @@
     if (firstVisible) firstVisible.classList.add('is-expanded');
   }
 
+  function initSectionLabelEdit(currentLabel) {
+    const pill = document.getElementById('sectionLabelPill');
+    if (!pill || isViewer || isProtocol) return;
+    pill.addEventListener('click', function handler() {
+      if (pill.querySelector('input')) return;
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.className = 'editor-meta-pill-input';
+      input.value = currentLabel;
+      pill.textContent = '';
+      pill.appendChild(input);
+      input.focus();
+      input.select();
+
+      async function save() {
+        const val = input.value.trim();
+        if (!val || val === currentLabel) {
+          pill.textContent = currentLabel;
+          return;
+        }
+        pill.textContent = val;
+        try {
+          await window.GCP.apiFetch('/tp/section-label', {
+            method: 'PATCH',
+            body: JSON.stringify({ eventId, sectionId, label: val })
+          });
+          currentLabel = val;
+          showMsg('Section title updated.');
+        } catch(e) {
+          pill.textContent = currentLabel;
+          showMsg(e.message || 'Failed to rename section', true);
+        }
+      }
+      input.addEventListener('blur', save);
+      input.addEventListener('keydown', e => {
+        if (e.key === 'Enter') { e.preventDefault(); input.blur(); }
+        if (e.key === 'Escape') { input.value = currentLabel; input.blur(); }
+      });
+    });
+  }
+
   async function load(){
     showMsg('');
     const tp = await window.GCP.apiFetch(`/tp?event_id=${encodeURIComponent(eventId)}&section_id=${encodeURIComponent(sectionId)}`, { method:"GET" });
@@ -246,8 +287,9 @@
     if (taskTitleEl) taskTitleEl.textContent = tp.eventTitle || 'Untitled task';
     meta.innerHTML = `
       <span class="editor-meta-pill">${window.GCP.escapeHtml(tp.countryName || 'Unknown country')}</span>
-      <span class="editor-meta-pill">${window.GCP.escapeHtml(tp.sectionLabel || 'Unknown section')}</span>
+      <span class="editor-meta-pill editor-meta-pill--editable" id="sectionLabelPill" title="Click to rename section">${window.GCP.escapeHtml(tp.sectionLabel || 'Unknown section')}</span>
     `;
+    initSectionLabelEdit(tp.sectionLabel || '');
 
     // Show last content edit (actual text change), not workflow actions
     if (lastUpdatedEl){
