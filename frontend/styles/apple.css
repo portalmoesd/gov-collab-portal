@@ -1611,6 +1611,54 @@ body.gp-shell-ready .gp-sidebar__scrim{
 .editor-msg--success{ color:var(--success); }
 .editor-msg--error{ color:var(--danger); }
 .editor-note{ text-align:right; font-size:12px; max-width:360px; }
+
+/* Editor All Sections page */
+.editor-all-section{
+  margin-top:16px;
+  padding:24px 24px 18px;
+  border-radius:22px;
+}
+.editor-all-section__head{
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:12px;
+  margin-bottom:14px;
+  padding-bottom:12px;
+  border-bottom:1px solid rgba(39,70,112,.08);
+}
+.editor-all-section__info{ flex:1 1 auto; min-width:0; }
+.editor-all-section__title{
+  font-size:17px;
+  font-weight:900;
+  color:#20314d;
+  margin:0;
+  line-height:1.2;
+}
+.editor-all-section__updated{
+  margin-top:4px;
+  font-size:12px;
+  color:#73829c;
+  font-weight:600;
+}
+.editor-all-section__error{
+  margin-top:6px;
+  font-size:13px;
+  color:var(--danger);
+  font-weight:700;
+}
+.editor-all-empty{
+  text-align:center;
+  padding:48px 24px;
+  color:#73829c;
+  font-weight:700;
+  font-size:14px;
+}
+@media (max-width: 600px){
+  .editor-all-section{ padding:16px 14px 12px; }
+  .editor-all-section__head{ flex-direction:column; }
+  .editor-all-section__title{ font-size:15px; }
+}
 #editor + .cke{
   border-radius:18px;
   overflow:hidden;
@@ -2937,6 +2985,7 @@ body.gp-shell-ready .gp-sidebar__scrim{
 .required-sections-head{display:flex; align-items:flex-start; justify-content:space-between; gap:16px; margin-bottom:14px; flex-wrap:wrap;}
 .required-sections-title{font-size:18px; font-weight:900; color:#22395a; line-height:1.1;}
 .required-sections-subtitle{margin-top:4px; font-size:12px; color:#71819a; font-weight:700;}
+.required-sections-actions{display:flex; gap:8px; flex-wrap:wrap; align-items:flex-start;}
 .required-sections-tablewrap{overflow-x:auto; overflow-y:visible; -webkit-overflow-scrolling:touch;}
 .required-sections-table{width:100%; min-width:0; table-layout:fixed; border-collapse:separate; border-spacing:0 10px;}
 .required-sections-table thead th{font-size:11px; text-transform:uppercase; letter-spacing:.12em; color:#7b8aa4; font-weight:800; border-bottom:none; padding:0 14px 4px;}
@@ -2995,7 +3044,8 @@ body.gp-shell-ready .gp-sidebar__scrim{
 }
 
 @media (max-width: 760px){
-  .required-sections-head .btn.success{width:100%;}
+  .required-sections-actions{width:100%;}
+  .required-sections-actions .btn{flex:1;}
   .required-section-card{padding:14px;}
   .required-section-card__line{align-items:flex-start; flex-direction:column;}
 }

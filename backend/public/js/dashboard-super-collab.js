@@ -21,6 +21,7 @@
   const requiredSectionsPanel = document.getElementById('requiredSectionsPanel');
   const sendToLibraryBtn      = document.getElementById('sendToLibraryBtn');
   const approveAllSectionsBtn = document.getElementById('approveAllSectionsBtn');
+  const openAllSectionsBtn    = document.getElementById('openAllSectionsBtn');
   const previewFullBtn        = document.getElementById('previewFullBtn');
   const modalBackdrop      = document.getElementById('modalBackdrop');
   const modalContent       = document.getElementById('modalContent');
@@ -397,6 +398,11 @@
       setMsg(data && data.approved ? `${data.approved} section(s) approved.` : 'No sections were eligible for approval.');
       await refreshStatusGrid();
     }catch(e){ setMsg(e.message||'Approve failed',true); }
+  });
+
+  if(openAllSectionsBtn) openAllSectionsBtn.addEventListener('click', ()=>{
+    if(!currentEventId) return;
+    window.location.href = `editor-all.html?event_id=${currentEventId}`;
   });
 
   if(previewFullBtn) previewFullBtn.addEventListener('click', async()=>{
