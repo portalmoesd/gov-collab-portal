@@ -133,7 +133,7 @@
           </div>
         </div>
         <div class="required-section-card__line">
-          <span>Date of Approval</span>
+          <span>Date</span>
           <strong class="library-approval-date">${window.GCP.escapeHtml(approvalDateStr)}</strong>
         </div>
         <div class="required-section-card__line">
