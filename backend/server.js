@@ -2950,9 +2950,15 @@ app.get('/api/library', requireRole('admin','deputy','minister','supervisor','su
     SELECT e.id AS event_id,
            e.title,
            e.deadline_date,
-           ds.updated_at AS last_updated
+           e.language,
+           c.name_en AS country_name,
+           ds.updated_at AS last_updated,
+           ds.updated_at AS approval_date,
+           u.full_name AS approver_name
     FROM document_status ds
     JOIN events e ON e.id = ds.event_id
+    JOIN countries c ON c.id = e.country_id
+    LEFT JOIN users u ON u.id = ds.last_updated_by_user_id
     WHERE ds.country_id = $1 AND ds.status = 'approved'
     ORDER BY ds.updated_at DESC
     `,

@@ -42,6 +42,20 @@
     if (!s) return "—";
     try{ return new Date(s).toLocaleString(); }catch{ return String(s); }
   }
+  function fmtDDMMYYYY(s){
+    if (!s) return "—";
+    try{
+      const d = new Date(s);
+      const dd = String(d.getDate()).padStart(2,'0');
+      const mm = String(d.getMonth()+1).padStart(2,'0');
+      const yyyy = d.getFullYear();
+      return `${dd}.${mm}.${yyyy}`;
+    }catch{ return String(s); }
+  }
+  function langLabel(code){
+    const map = { en:'English', fr:'French', ar:'Arabic', es:'Spanish', ru:'Russian', zh:'Chinese', pt:'Portuguese', de:'German' };
+    return map[code] || code || '—';
+  }
 
   const docsCards = document.getElementById("docsCards");
   const docsEmpty = document.getElementById("docsEmpty");
@@ -82,13 +96,24 @@
     }
 
     for (const d of docs){
+      const approvalDateStr = fmtDDMMYYYY(d.approval_date);
+      const countryName = d.country_name || '—';
+      const lang = langLabel(d.language);
+      const approver = d.approver_name || '—';
+
       // Table row
       const tr = document.createElement("tr");
       tr.className = "required-sections-row";
       tr.innerHTML = `
-        <td><div class="required-section-name">${window.GCP.escapeHtml(d.title)}</div></td>
-        <td><div class="required-updated-at">${d.deadline_date ? window.GCP.escapeHtml(fmtDate(d.deadline_date)) : '<span class="muted">—</span>'}</div></td>
-        <td><div class="required-updated-at">${d.last_updated ? window.GCP.escapeHtml(fmtDateTime(d.last_updated)) : '<span class="muted">—</span>'}</div></td>
+        <td>
+          <div class="library-approval-date">${window.GCP.escapeHtml(approvalDateStr)}</div>
+          <div class="required-section-name">${window.GCP.escapeHtml(d.title)}</div>
+          <div class="library-pills">
+            <span class="library-pill library-pill--country">${window.GCP.escapeHtml(countryName)}</span>
+            <span class="library-pill library-pill--lang">${window.GCP.escapeHtml(lang)}</span>
+          </div>
+        </td>
+        <td><div class="library-approver">${window.GCP.escapeHtml(approver)}</div></td>
         <td><div class="required-actions">${actionBtns()}</div></td>
       `;
       wireActions(tr, d.event_id, countryId);
@@ -100,16 +125,17 @@
       card.innerHTML = `
         <div class="required-section-card__top">
           <div class="required-section-card__meta">
+            <div class="library-approval-date">${window.GCP.escapeHtml(approvalDateStr)}</div>
             <div class="required-section-name">${window.GCP.escapeHtml(d.title)}</div>
+            <div class="library-pills">
+              <span class="library-pill library-pill--country">${window.GCP.escapeHtml(countryName)}</span>
+              <span class="library-pill library-pill--lang">${window.GCP.escapeHtml(lang)}</span>
+            </div>
           </div>
         </div>
         <div class="required-section-card__line">
-          <span>Deadline</span>
-          <strong>${d.deadline_date ? window.GCP.escapeHtml(fmtDate(d.deadline_date)) : '—'}</strong>
-        </div>
-        <div class="required-section-card__line">
-          <span>Last updated</span>
-          <strong>${d.last_updated ? window.GCP.escapeHtml(fmtDateTime(d.last_updated)) : '—'}</strong>
+          <span>Document Approver</span>
+          <strong>${window.GCP.escapeHtml(approver)}</strong>
         </div>
         <div class="required-actions-card">${actionBtns()}</div>
       `;
