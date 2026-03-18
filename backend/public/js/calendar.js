@@ -33,6 +33,10 @@
   let currentPage = 1;
   const eventsPagination = document.getElementById("eventsPagination");
 
+  const eventsSearchInput = document.getElementById("eventsSearchInput");
+  const eventsDateFilter = document.getElementById("eventsDateFilter");
+  const eventsCountryFilter = document.getElementById("eventsCountryFilter");
+
   if (!canManage){
     formCard.style.display = "none";
   }
@@ -276,9 +280,35 @@
   }
 
   function applyFilters(events){
-    return [...events].sort((a,b) => {
+    let result = [...events];
+
+    const keyword = (eventsSearchInput.value || '').trim().toLowerCase();
+    if (keyword) {
+      result = result.filter(ev =>
+        (ev.title || '').toLowerCase().includes(keyword) ||
+        (ev.country_name_en || '').toLowerCase().includes(keyword) ||
+        (ev.submitterLabel || '').toLowerCase().includes(keyword)
+      );
+    }
+
+    const dateVal = (eventsDateFilter.value || '').trim();
+    if (dateVal) {
+      result = result.filter(ev => {
+        const evDate = ev.deadline_date ? String(ev.deadline_date).slice(0, 10) : '';
+        return evDate === dateVal;
+      });
+    }
+
+    const countryVal = eventsCountryFilter.value;
+    if (countryVal) {
+      result = result.filter(ev => String(ev.country_id) === countryVal);
+    }
+
+    result.sort((a,b) => {
       return (a.deadlineSort === Infinity ? Number.MAX_SAFE_INTEGER : a.deadlineSort) - (b.deadlineSort === Infinity ? Number.MAX_SAFE_INTEGER : b.deadlineSort);
     });
+
+    return result;
   }
 
   function renderPagination(totalItems){
@@ -315,9 +345,11 @@
     eventsCards.innerHTML = '';
 
     if (!filtered.length){
+      const hasFilters = eventsSearchInput.value.trim() || eventsDateFilter.value || eventsCountryFilter.value;
+      const emptyMsg = hasFilters ? 'No events match your filters.' : (activeTab === 'past' ? 'No past events.' : 'No events yet.');
       eventsEmpty.hidden = false;
-      eventsEmpty.textContent = activeTab === 'past' ? 'No past events.' : 'No events yet.';
-      eventsTbody.innerHTML = `<tr class="calendar-events-empty-row"><td colspan="6">${activeTab === 'past' ? 'No past events.' : 'No events yet.'}</td></tr>`;
+      eventsEmpty.textContent = emptyMsg;
+      eventsTbody.innerHTML = `<tr class="calendar-events-empty-row"><td colspan="6">${window.GCP.escapeHtml(emptyMsg)}</td></tr>`;
       eventsPagination.hidden = true;
       return;
     }
@@ -393,6 +425,20 @@
       };
     }));
     allEvents = enriched;
+
+    // Populate country filter from loaded events
+    const countries = new Map();
+    enriched.forEach(ev => {
+      if (ev.country_id && ev.country_name_en) countries.set(String(ev.country_id), ev.country_name_en);
+    });
+    const currentVal = eventsCountryFilter.value;
+    eventsCountryFilter.innerHTML = '<option value="">All countries</option>' +
+      [...countries.entries()]
+        .sort((a,b) => a[1].localeCompare(b[1]))
+        .map(([id, name]) => `<option value="${id}">${window.GCP.escapeHtml(name)}</option>`)
+        .join('');
+    eventsCountryFilter.value = currentVal;
+
     renderEvents();
   }
 
@@ -466,6 +512,14 @@
     }
   });
 
+
+  function onFilterChange(){
+    currentPage = 1;
+    renderEvents();
+  }
+  eventsSearchInput.addEventListener('input', onFilterChange);
+  eventsDateFilter.addEventListener('change', onFilterChange);
+  eventsCountryFilter.addEventListener('change', onFilterChange);
 
   document.querySelectorAll('.calendar-events-tab').forEach(btn => {
     btn.addEventListener('click', () => {
