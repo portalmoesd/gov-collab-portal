@@ -399,7 +399,8 @@
           { label: 'Collaborator',       name: sn.collaborator || null },
           { label: 'Super-Collaborator', name: sn.superCollab  || null },
         ];
-    const upperSteps = getUpperTierSteps(documentSubmitterRole).map(label => ({ label, name: null }));
+    const upperNameMap = { Supervisor: sn.supervisor || null, Deputy: sn.deputy || null, Minister: sn.minister || null, Approved: null };
+    const upperSteps = getUpperTierSteps(documentSubmitterRole).map(label => ({ label, name: upperNameMap[label] || null }));
     const allSteps = lowerCollabSteps.concat(upperSteps);
     // Determine first visible step from originalSubmitterRole
     let startStep = 0;
@@ -426,8 +427,9 @@
     const fillPercent = visibleSteps.length > 1 ? (active / (visibleSteps.length - 1)) * 100 : 100;
     const stepHtml = visibleSteps.map((step, idx) => {
       const state = idx < active ? 'done' : (idx === active ? 'active' : 'todo');
+      const noActor = (state === 'done' && !step.name) ? ' no-actor' : '';
       const displayLabel = step.name ? escapeHtml(step.name) : escapeHtml(step.label);
-      return `<div class="wf-step ${state}" role="listitem" aria-current="${idx === active ? 'step' : 'false'}">
+      return `<div class="wf-step ${state}${noActor}" role="listitem" aria-current="${idx === active ? 'step' : 'false'}">
         <div class="wf-step__circle" aria-hidden="true">${idx + 1}</div>
         <div class="wf-step__label">${displayLabel}</div>
       </div>`;
