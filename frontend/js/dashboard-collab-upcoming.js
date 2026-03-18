@@ -21,6 +21,18 @@
       const opt = Array.from(eventSelect.options).find(o => o.value === String(ev.id));
       if (text && opt) text.textContent = opt.textContent;
     }
+    // Populate event details panel
+    const detailsEl = document.getElementById('eventDetails');
+    if (detailsEl) {
+      const langLabels = { en: 'English', ka: 'ქართული', ru: 'Русский' };
+      const langVal = langLabels[ev.language] || (ev.language || '').toUpperCase() || 'EN';
+      detailsEl.innerHTML = `
+        <div class="event-details__item"><span class="event-details__label">Country</span><span>${escapeHtml(ev.country_name_en || '')}</span></div>
+        <div class="event-details__item"><span class="event-details__label">Language</span><span class="badge lang">${escapeHtml(langVal)}</span></div>
+        <div class="event-details__item"><span class="event-details__label">Deadline</span><span>${escapeHtml(window.GCP.formatDate(ev.deadline_date) || '—')}</span></div>
+        <div class="event-details__item"><span class="event-details__label">Task</span><span>${escapeHtml(ev.task || ev.occasion || '—')}</span></div>`;
+      detailsEl.hidden = false;
+    }
     eventSelect.dispatchEvent(new Event('change', { bubbles:true }));
     const target = document.getElementById('sectionStatusBox') || document.querySelector('.grid');
     if (target) target.scrollIntoView({behavior:'smooth', block:'start'});
