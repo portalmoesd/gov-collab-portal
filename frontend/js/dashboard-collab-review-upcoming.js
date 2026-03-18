@@ -26,14 +26,14 @@
     if (detailsEl) {
       const langLabels = { en: 'English', ka: 'ქართული', ru: 'Русский' };
       const langVal = langLabels[ev.language] || (ev.language || '').toUpperCase() || 'EN';
-      const tmp = document.createElement('div');
-      tmp.innerHTML = ev.task || ev.occasion || '';
-      const taskText = tmp.textContent || tmp.innerText || '—';
+      const taskHtml = ev.task || ev.occasion || '';
       detailsEl.innerHTML = `
-        <div class="event-details__item"><span class="event-details__label">Country</span><span>${escapeHtml(ev.country_name_en || '')}</span></div>
-        <div class="event-details__item"><span class="event-details__label">Language</span><span class="badge lang">${escapeHtml(langVal)}</span></div>
-        <div class="event-details__item"><span class="event-details__label">Deadline</span><span>${escapeHtml(window.GCP.formatDate(ev.deadline_date) || '—')}</span></div>
-        <div class="event-details__item"><span class="event-details__label">Task</span><span>${escapeHtml(taskText)}</span></div>`;
+        <div class="event-details__task">${taskHtml || '—'}</div>
+        <div class="event-details__meta">
+          <div class="event-details__item"><span class="event-details__label">Country</span><span>${escapeHtml(ev.country_name_en || '')}</span></div>
+          <div class="event-details__item"><span class="event-details__label">Language</span><span class="badge lang">${escapeHtml(langVal)}</span></div>
+          <div class="event-details__item"><span class="event-details__label">Deadline</span><span>${escapeHtml(window.GCP.formatDate(ev.deadline_date) || '—')}</span></div>
+        </div>`;
       detailsEl.hidden = false;
     }
     eventSelect.dispatchEvent(new Event('change', { bubbles:true }));

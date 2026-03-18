@@ -332,14 +332,24 @@ hr, .divider{
   color: #6d28d9;
 }
 .event-details{
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px 24px;
   margin-top: 12px;
-  padding: 12px 14px;
+  padding: 14px 16px;
   background: rgba(0,0,0,.03);
   border-radius: 12px;
   font-size: 13px;
+}
+.event-details__task{
+  line-height: 1.55;
+  color: rgba(0,0,0,.82);
+  margin-bottom: 10px;
+}
+.event-details__task p{ margin:0 0 6px; }
+.event-details__meta{
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 20px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(0,0,0,.08);
 }
 .event-details__item{
   display: flex;
