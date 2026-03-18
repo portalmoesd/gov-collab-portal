@@ -2421,12 +2421,14 @@ body.gp-shell-ready .gp-sidebar__scrim{
   border-color: rgba(10,132,255,.26);
   box-shadow: 0 0 0 4px rgba(10,132,255,.12);
 }
+.calendar-form-col--right{ align-self:stretch; }
 .field-sections{ height:100%; display:flex; flex-direction:column; }
 .calendar-sections-grid{
   display:flex;
   flex-direction:column;
   gap:8px;
-  max-height:290px !important;
+  flex:1;
+  max-height:none !important;
   overflow:auto !important;
   padding:10px;
   background: rgba(255,255,255,.92);
