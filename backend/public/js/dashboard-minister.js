@@ -13,8 +13,7 @@
   const requiredSectionsPanel = document.getElementById('requiredSectionsPanel');
   const approveAllSectionsBtn = document.getElementById('approveAllSectionsBtn');
   const sendToLibraryBtn = document.getElementById('sendToLibraryBtn');
-  const returnDocBtn = document.getElementById('returnDocBtn');
-  const previewBtn = document.getElementById('previewBtn');
+  const previewFullBtn = document.getElementById('previewFullBtn');
   const msg = document.getElementById('msg');
   const ministerControlPanel = document.getElementById('ministerControlPanel');
 
@@ -316,8 +315,7 @@
       currentEventId = null;
       sendToLibraryBtn.disabled = true;
       sendToLibraryBtn.style.display = 'none';
-      returnDocBtn.disabled = true;
-      previewBtn.disabled = true;
+      previewFullBtn.disabled = true;
       if (approveAllSectionsBtn) approveAllSectionsBtn.disabled = true;
       if (sectionsEmpty) sectionsEmpty.hidden = false;
       sectionsTbody.innerHTML = `<tr class="required-sections-empty-row"><td colspan="3">Choose an event to review required sections.</td></tr>`;
@@ -359,8 +357,7 @@
     }
 
     sendToLibraryBtn.disabled = false;
-    returnDocBtn.disabled = false;
-    previewBtn.disabled = false;
+    previewFullBtn.disabled = false;
   }
 
   sendToLibraryBtn.addEventListener('click', async () => {
@@ -379,24 +376,7 @@
     }
   });
 
-  returnDocBtn.addEventListener('click', async () => {
-    setMsg('');
-    if (!currentEventId) return;
-    const note = await window.GCP.showCommentDropdown(returnDocBtn, { title: 'Return document', placeholder: 'Add a comment (optional)…', sendLabel: 'Return' });
-    if (note === null) return;
-    if (!confirm('Return the full document?')) return;
-    try {
-      await window.GCP.apiFetch('/document/return', {
-        method:'POST',
-        body: JSON.stringify({ eventId: currentEventId, note })
-      });
-      await refresh();
-    } catch (e) {
-      setMsg(e.message || 'Failed to return document', true);
-    }
-  });
-
-  previewBtn.addEventListener('click', async () => {
+  previewFullBtn.addEventListener('click', async () => {
     setMsg('');
     if (!currentEventId) return;
     try {
