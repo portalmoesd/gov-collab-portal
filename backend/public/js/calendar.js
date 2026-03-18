@@ -29,6 +29,9 @@
   let editEventId = null;
   let allEvents = [];
   let activeTab = 'upcoming';
+  const PAGE_SIZE = 5;
+  let currentPage = 1;
+  const eventsPagination = document.getElementById("eventsPagination");
 
   if (!canManage){
     formCard.style.display = "none";
@@ -171,6 +174,30 @@
     });
   }
 
+  function renderPagination(totalItems){
+    const totalPages = Math.ceil(totalItems / PAGE_SIZE);
+    if (totalPages <= 1){ eventsPagination.hidden = true; return; }
+    eventsPagination.hidden = false;
+
+    let html = '';
+    html += `<button class="calendar-page-btn calendar-page-arrow" data-page="${currentPage - 1}" ${currentPage === 1 ? 'disabled' : ''}>&lsaquo;</button>`;
+    for (let p = 1; p <= totalPages; p++){
+      html += `<button class="calendar-page-btn${p === currentPage ? ' is-active' : ''}" data-page="${p}">${p}</button>`;
+    }
+    html += `<button class="calendar-page-btn calendar-page-arrow" data-page="${currentPage + 1}" ${currentPage === totalPages ? 'disabled' : ''}>&rsaquo;</button>`;
+    eventsPagination.innerHTML = html;
+
+    eventsPagination.querySelectorAll('[data-page]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const p = Number(btn.dataset.page);
+        if (p >= 1 && p <= totalPages && p !== currentPage){
+          currentPage = p;
+          renderEvents();
+        }
+      });
+    });
+  }
+
   function renderEvents(){
     const tabEvents = allEvents.filter(ev => {
       if (activeTab === 'past') return !!ev.ended_at;
@@ -184,11 +211,17 @@
       eventsEmpty.hidden = false;
       eventsEmpty.textContent = activeTab === 'past' ? 'No past events.' : 'No events yet.';
       eventsTbody.innerHTML = `<tr class="calendar-events-empty-row"><td colspan="6">${activeTab === 'past' ? 'No past events.' : 'No events yet.'}</td></tr>`;
+      eventsPagination.hidden = true;
       return;
     }
     eventsEmpty.hidden = true;
 
-    filtered.forEach((ev, index) => {
+    const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
+    if (currentPage > totalPages) currentPage = totalPages;
+    const start = (currentPage - 1) * PAGE_SIZE;
+    const pageItems = filtered.slice(start, start + PAGE_SIZE);
+
+    pageItems.forEach((ev, index) => {
       const row = document.createElement('tr');
       row.className = 'calendar-events-row';
       row.innerHTML = `
@@ -223,6 +256,7 @@
     });
 
     attachEventActions();
+    renderPagination(filtered.length);
   }
 
   async function loadEvents(){
@@ -330,6 +364,7 @@
       document.querySelectorAll('.calendar-events-tab').forEach(b => b.classList.remove('is-active'));
       btn.classList.add('is-active');
       activeTab = btn.dataset.tab;
+      currentPage = 1;
       renderEvents();
     });
   });
