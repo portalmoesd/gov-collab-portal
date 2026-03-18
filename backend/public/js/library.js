@@ -83,6 +83,11 @@
       const doc = await window.GCP.apiFetch(`/library/document?event_id=${encodeURIComponent(eventId)}&country_id=${encodeURIComponent(countryId)}`, { method:"GET" });
 
       const parts = [];
+      parts.push(`<style>
+        del[data-tc-id] { display:none !important; }
+        ins[data-tc-id] { text-decoration:none; background:none; color:inherit; }
+        [data-tc-fmt-id] { background:none; border:none; }
+      </style>`);
       parts.push(`<div style="display:flex; justify-content:space-between; align-items:flex-start; gap:12px;">
         <div>
           <h2 style="margin:0 0 6px;">${window.GCP.escapeHtml(doc.event.title)}</h2>
