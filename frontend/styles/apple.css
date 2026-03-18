@@ -2633,8 +2633,9 @@ body.gp-shell-ready .gp-sidebar__scrim{
 .calendar-events-toolbar{
   display:flex;
   flex-wrap:wrap;
-  justify-content:flex-end;
+  justify-content:flex-start;
   gap:10px;
+  margin-bottom:14px;
 }
 .calendar-events-search{ position:relative; min-width:240px; }
 .calendar-events-search input,
