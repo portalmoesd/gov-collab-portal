@@ -3095,9 +3095,17 @@ app.get('/api/tp/files', authRequired, attachUser, async (req, res) => {
     if (!eventId || !sectionId) return res.status(400).json({ error: 'Missing event_id/section_id' });
     const dir = path.join(UPLOADS_DIR, String(eventId), String(sectionId));
     if (!fs.existsSync(dir)) return res.json({ files: [] });
-    const files = fs.readdirSync(dir).map(filename => {
+    let meta = {};
+    try { meta = JSON.parse(fs.readFileSync(path.join(dir, '.meta.json'), 'utf8')); } catch {}
+    const files = fs.readdirSync(dir).filter(f => f !== '.meta.json').map(filename => {
       const stat = fs.statSync(path.join(dir, filename));
-      return { filename, size: stat.size };
+      const m = meta[filename] || {};
+      return {
+        filename,
+        size: stat.size,
+        uploadedBy: m.uploadedBy || '—',
+        uploadedAt: m.uploadedAt || stat.mtime.toISOString()
+      };
     });
     res.json({ files });
   } catch (e) {

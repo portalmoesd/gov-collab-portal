@@ -471,9 +471,28 @@
     }
   });
 
+  // ---- Modal ----
+  const modalBackdrop = document.getElementById("modalBackdrop");
+  const modalContent = document.getElementById("modalContent");
+  const closeModalBtn = document.getElementById("closeModalBtn");
+
+  function openModal(html){
+    modalContent.innerHTML = html;
+    modalBackdrop.style.display = "flex";
+  }
+  function closeModal(){
+    modalBackdrop.style.display = "none";
+    modalContent.innerHTML = "";
+  }
+  if(closeModalBtn) closeModalBtn.addEventListener("click", closeModal);
+  if(modalBackdrop) modalBackdrop.addEventListener("click", (e) => { if(e.target === modalBackdrop) closeModal(); });
+
   // ---- File upload ----
   const fileInput = document.getElementById('fileInput');
   const filesSection = document.getElementById('filesSection');
+  const btnUploadedFiles = document.getElementById('btnUploadedFiles');
+  const uploadedFilesCount = document.getElementById('uploadedFilesCount');
+  let cachedFiles = [];
 
   function renderFilesList(files){
     if(!filesSection) return;
@@ -504,10 +523,22 @@
     });
   }
 
+  function updateUploadedFilesBtn(){
+    if(!btnUploadedFiles) return;
+    if(cachedFiles.length){
+      btnUploadedFiles.style.display = '';
+      if(uploadedFilesCount) uploadedFilesCount.textContent = cachedFiles.length;
+    } else {
+      btnUploadedFiles.style.display = 'none';
+    }
+  }
+
   async function loadFiles(){
     try{
       const data = await window.GCP.apiFetch(`/tp/files?event_id=${encodeURIComponent(eventId)}&section_id=${encodeURIComponent(sectionId)}`,{method:'GET'});
-      renderFilesList(data.files||[]);
+      cachedFiles = data.files || [];
+      renderFilesList(cachedFiles);
+      updateUploadedFilesBtn();
     }catch(e){
       if(filesSection){ filesSection.style.display=''; filesSection.innerHTML=`<div class="editor-file-error">Files unavailable: ${window.GCP.escapeHtml(e.message||'unknown error')}</div>`; }
     }
@@ -540,6 +571,71 @@
       } finally {
         btnUpload.disabled = false;
       }
+    });
+  }
+
+  // ---- Uploaded Files modal ----
+  if(btnUploadedFiles){
+    btnUploadedFiles.addEventListener('click', () => {
+      if(!cachedFiles.length){
+        openModal(`<h2 style="margin:0 0 12px;">Uploaded Files</h2><p class="muted">No files uploaded yet.</p>`);
+        return;
+      }
+      function fmtDDMMYYYY(s){
+        if(!s) return '—';
+        try{ const d=new Date(s); return String(d.getDate()).padStart(2,'0')+'.'+String(d.getMonth()+1).padStart(2,'0')+'.'+d.getFullYear(); }catch{ return String(s); }
+      }
+      const rows = cachedFiles.map(f => {
+        const safeName = window.GCP.escapeHtml(f.filename);
+        const sizeStr = f.size ? Math.ceil(f.size/1024)+' KB' : '';
+        const dateStr = fmtDDMMYYYY(f.uploadedAt);
+        const uploader = window.GCP.escapeHtml(f.uploadedBy || '—');
+        return `<tr>
+          <td><button class="event-file-download" data-filename="${safeName}">${safeName}</button></td>
+          <td class="small">${dateStr}</td>
+          <td class="small">${uploader}</td>
+          <td class="small muted">${sizeStr}</td>
+        </tr>`;
+      }).join('');
+
+      openModal(`
+        <h2 style="margin:0 0 12px;">Uploaded Files</h2>
+        <div style="overflow:auto; max-height:60vh;">
+          <table class="event-files-table" style="width:100%; border-collapse:collapse;">
+            <thead>
+              <tr>
+                <th style="text-align:left; padding:8px 10px; border-bottom:2px solid var(--border); font-size:13px;">File Name</th>
+                <th style="text-align:left; padding:8px 10px; border-bottom:2px solid var(--border); font-size:13px;">Date</th>
+                <th style="text-align:left; padding:8px 10px; border-bottom:2px solid var(--border); font-size:13px;">Uploaded By</th>
+                <th style="text-align:left; padding:8px 10px; border-bottom:2px solid var(--border); font-size:13px;">Size</th>
+              </tr>
+            </thead>
+            <tbody>${rows}</tbody>
+          </table>
+        </div>
+      `);
+
+      // Wire download buttons
+      modalContent.querySelectorAll('.event-file-download').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          const fname = btn.dataset.filename;
+          try {
+            const token = localStorage.getItem('gcp_token');
+            const res = await fetch(`/api/tp/files/download?event_id=${encodeURIComponent(eventId)}&section_id=${encodeURIComponent(sectionId)}&filename=${encodeURIComponent(fname)}`, {
+              headers: token ? { 'Authorization': 'Bearer '+token } : {}
+            });
+            if(!res.ok) throw new Error('Download failed ('+res.status+')');
+            const blob = await res.blob();
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url; a.download = fname;
+            document.body.appendChild(a); a.click(); a.remove();
+            URL.revokeObjectURL(url);
+          } catch(e) {
+            showMsg(e.message || 'Download failed', true);
+          }
+        });
+      });
     });
   }
 

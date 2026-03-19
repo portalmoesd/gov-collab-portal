@@ -54,6 +54,10 @@
           <span class="micro-action__icon" aria-hidden="true"></span>
           <span class="micro-action__label">Ask to Return</span>
         </button>
+        <button class="micro-action micro-action--uploaded-files" id="btnUploadedFiles" type="button" aria-label="Uploaded Files" style="display:none;">
+          <span class="micro-action__icon" aria-hidden="true"></span>
+          <span class="micro-action__label">Uploaded Files (<span id="uploadedFilesCount">0</span>)</span>
+        </button>
         <input type="file" id="fileInput" multiple style="display:none;" />
         </div>
       </div>
@@ -65,6 +69,13 @@
   <div class="editor-frame" id="editorFrame"></div>
   <div id="filesSection" class="editor-files-list" style="display:none;"></div>
 </section>
+
+<div class="modal-backdrop" id="modalBackdrop">
+  <div class="modal">
+    <div class="close-row"><button class="btn" id="closeModalBtn">Close</button></div>
+    <div id="modalContent"></div>
+  </div>
+</div>
 
   </main>
 </div>
