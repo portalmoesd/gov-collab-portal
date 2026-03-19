@@ -391,24 +391,78 @@
     previewFullBtn.disabled = false;
   }
 
-  sendToLibraryBtn.addEventListener('click', async () => {
+  sendToLibraryBtn.addEventListener('click', () => {
     setMsg('');
     if (!currentEventId) return;
-    if (!confirm('Send this document to the Library?')) return;
-    try{
-      await window.GCP.apiFetch('/document/approve', {
-        method:'POST',
-        body: JSON.stringify({ eventId: currentEventId })
-      });
-      setMsg('The Document successfully sent to Library.');
-      currentEventId = null;
-      eventSelect.value = '';
-      await loadEvents();
-      refreshCustomDropdown(eventSelect);
-      await refresh();
-    }catch(e){
-      setMsg(e.message || 'Failed to send to library', true);
-    }
+
+    modalContent.innerHTML = `
+      <div class="confirm-dialog">
+        <div class="confirm-dialog__icon confirm-dialog__icon--question">?</div>
+        <h2 class="confirm-dialog__title">Send to Library</h2>
+        <p class="confirm-dialog__text">Send this document to the Library?</p>
+        <div class="confirm-dialog__actions">
+          <button class="btn" id="confirmCancel">Cancel</button>
+          <button class="btn primary" id="confirmSend">Send</button>
+        </div>
+      </div>
+    `;
+    modalBackdrop.style.display = 'flex';
+
+    document.getElementById('confirmCancel').addEventListener('click', () => {
+      modalBackdrop.style.display = 'none';
+      modalContent.innerHTML = '';
+    });
+
+    document.getElementById('confirmSend').addEventListener('click', async () => {
+      const sendBtn = document.getElementById('confirmSend');
+      sendBtn.disabled = true;
+      sendBtn.textContent = 'Sending…';
+
+      try {
+        await window.GCP.apiFetch('/document/approve', {
+          method:'POST',
+          body: JSON.stringify({ eventId: currentEventId })
+        });
+
+        modalContent.innerHTML = `
+          <div class="confirm-dialog">
+            <div class="confirm-dialog__icon confirm-dialog__icon--success">&#10003;</div>
+            <h2 class="confirm-dialog__title">Success</h2>
+            <p class="confirm-dialog__text">The Document successfully sent to Library.</p>
+            <div class="confirm-dialog__actions">
+              <button class="btn primary" id="confirmOk">OK</button>
+            </div>
+          </div>
+        `;
+
+        const closeAndRefresh = async () => {
+          modalBackdrop.style.display = 'none';
+          modalContent.innerHTML = '';
+          currentEventId = null;
+          eventSelect.value = '';
+          await loadEvents();
+          refreshCustomDropdown(eventSelect);
+          await refresh();
+        };
+
+        document.getElementById('confirmOk').addEventListener('click', closeAndRefresh);
+      } catch (e) {
+        modalContent.innerHTML = `
+          <div class="confirm-dialog">
+            <div class="confirm-dialog__icon confirm-dialog__icon--error">!</div>
+            <h2 class="confirm-dialog__title">Error</h2>
+            <p class="confirm-dialog__text">${window.GCP.escapeHtml(e.message || 'Failed to send to library')}</p>
+            <div class="confirm-dialog__actions">
+              <button class="btn" id="confirmOk">Close</button>
+            </div>
+          </div>
+        `;
+        document.getElementById('confirmOk').addEventListener('click', () => {
+          modalBackdrop.style.display = 'none';
+          modalContent.innerHTML = '';
+        });
+      }
+    });
   });
 
   previewFullBtn.addEventListener('click', async () => {

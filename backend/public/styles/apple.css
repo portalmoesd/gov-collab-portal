@@ -4399,3 +4399,32 @@ body.gp-shell-ready .gp-sidebar__scrim{
   border-top: none;
   box-shadow: none !important;
 }
+
+/* Confirmation dialog (Send to Library, etc.) */
+.confirm-dialog{
+  text-align:center;
+  padding:24px 16px 8px;
+}
+.confirm-dialog__icon{
+  width:56px; height:56px; border-radius:50%;
+  display:inline-flex; align-items:center; justify-content:center;
+  font-size:28px; font-weight:900; margin-bottom:16px;
+}
+.confirm-dialog__icon--question{
+  background:rgba(10,132,255,.12); color:var(--primary);
+}
+.confirm-dialog__icon--success{
+  background:rgba(52,199,89,.12); color:var(--success);
+}
+.confirm-dialog__icon--error{
+  background:rgba(255,59,48,.12); color:var(--danger);
+}
+.confirm-dialog__title{
+  font-size:20px; font-weight:900; margin:0 0 8px; color:var(--text);
+}
+.confirm-dialog__text{
+  font-size:15px; color:var(--muted); margin:0 0 24px; line-height:1.45;
+}
+.confirm-dialog__actions{
+  display:flex; justify-content:center; gap:10px;
+}
