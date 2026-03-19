@@ -11,17 +11,20 @@
   const tabUsers = document.getElementById("tabUsers");
   const tabSections = document.getElementById("tabSections");
   const tabDepartments = document.getElementById("tabDepartments");
+  const tabDeputySections = document.getElementById("tabDeputySections");
   const tabAssignments = document.getElementById("tabAssignments");
 
   const usersPanel = document.getElementById("usersPanel");
   const sectionsPanel = document.getElementById("sectionsPanel");
   const departmentsPanel = document.getElementById("departmentsPanel");
+  const deputySectionsPanel = document.getElementById("deputySectionsPanel");
   const assignmentsPanel = document.getElementById("assignmentsPanel");
 
   const tabs = [
     { btn: tabUsers, panel: usersPanel },
     { btn: tabSections, panel: sectionsPanel },
     { btn: tabDepartments, panel: departmentsPanel },
+    { btn: tabDeputySections, panel: deputySectionsPanel },
     { btn: tabAssignments, panel: assignmentsPanel },
   ];
 
@@ -35,6 +38,7 @@
   tabUsers.addEventListener("click", () => show(usersPanel));
   tabSections.addEventListener("click", () => show(sectionsPanel));
   tabDepartments.addEventListener("click", () => { show(departmentsPanel); loadDepartments(); });
+  tabDeputySections.addEventListener("click", () => { show(deputySectionsPanel); loadDeputySectionsPanel(); });
   tabAssignments.addEventListener("click", () => show(assignmentsPanel));
 
   show(usersPanel);
@@ -292,6 +296,107 @@
       await loadDepartments();
     }catch(err){
       msgDepartments.textContent = err.message || "Failed";
+    }
+  });
+
+  /** DEPUTY SECTIONS **/
+  const deputySelect = document.getElementById("deputySelect");
+  const saveDeputySectionsBtn = document.getElementById("saveDeputySectionsBtn");
+  const deputySectionsMsg = document.getElementById("deputySectionsMsg");
+  const deputySectionsChecklist = document.getElementById("deputySectionsChecklist");
+  const deputySectionsOverviewTbody = document.getElementById("deputySectionsOverviewTbody");
+
+  async function loadDeputySectionsPanel(){
+    // Load deputies (users with role=deputy)
+    const users = await window.GCP.apiFetch("/users", { method:"GET" });
+    const deputies = (users || []).filter(u => {
+      const rk = String(u.role || '').toLowerCase();
+      return rk === 'deputy' && u.isActive;
+    });
+
+    deputySelect.innerHTML = '<option value="">Select…</option>' + deputies.map(u =>
+      `<option value="${u.id}">${window.GCP.escapeHtml(u.fullName || u.full_name || '')} (${window.GCP.escapeHtml(u.username || '')})</option>`
+    ).join('');
+
+    // Load sections for the checklist
+    const sections = await window.GCP.apiFetch("/sections", { method:"GET" });
+    const activeSections = sections.filter(s => s.is_active);
+    deputySectionsChecklist.innerHTML = '';
+    for (const s of activeSections) {
+      const wrap = document.createElement('label');
+      wrap.className = 'checkitem';
+      wrap.innerHTML = `<input type="checkbox" value="${s.id}"> <span>${window.GCP.escapeHtml(s.label)}</span>`;
+      deputySectionsChecklist.appendChild(wrap);
+    }
+
+    saveDeputySectionsBtn.disabled = true;
+    deputySectionsMsg.textContent = '';
+
+    // Load overview table
+    await loadDeputySectionsOverview(deputies);
+  }
+
+  async function loadDeputySectionsOverview(deputies){
+    const allAssignments = await window.GCP.apiFetch("/deputy-sections", { method:"GET" });
+    // Group by user_id
+    const byDeputy = {};
+    for (const a of allAssignments) {
+      if (!byDeputy[a.user_id]) byDeputy[a.user_id] = { name: a.deputy_name, sections: [] };
+      byDeputy[a.user_id].sections.push(a.section_label);
+    }
+
+    deputySectionsOverviewTbody.innerHTML = '';
+    if (!deputies) {
+      const users = await window.GCP.apiFetch("/users", { method:"GET" });
+      deputies = (users || []).filter(u => String(u.role || '').toLowerCase() === 'deputy' && u.isActive);
+    }
+    for (const dep of deputies) {
+      const tr = document.createElement('tr');
+      const info = byDeputy[dep.id];
+      tr.innerHTML = `
+        <td>${window.GCP.escapeHtml(dep.fullName || dep.full_name || dep.username || '')}</td>
+        <td>${info ? info.sections.map(s => window.GCP.escapeHtml(s)).join(', ') : '<span class="muted">No sections assigned</span>'}</td>
+      `;
+      deputySectionsOverviewTbody.appendChild(tr);
+    }
+  }
+
+  deputySelect.addEventListener("change", async () => {
+    deputySectionsMsg.textContent = '';
+    const userId = Number(deputySelect.value);
+    if (!Number.isFinite(userId)) {
+      saveDeputySectionsBtn.disabled = true;
+      for (const cb of deputySectionsChecklist.querySelectorAll('input[type=checkbox]')) cb.checked = false;
+      return;
+    }
+    saveDeputySectionsBtn.disabled = false;
+
+    const data = await window.GCP.apiFetch(`/deputy-sections/${userId}`, { method:"GET" });
+    const assignedSet = new Set((data.sectionIds || []).map(String));
+    for (const cb of deputySectionsChecklist.querySelectorAll('input[type=checkbox]')) {
+      cb.checked = assignedSet.has(String(cb.value));
+    }
+  });
+
+  saveDeputySectionsBtn.addEventListener("click", async () => {
+    deputySectionsMsg.textContent = '';
+    const userId = Number(deputySelect.value);
+    if (!Number.isFinite(userId)) return;
+
+    const sectionIds = Array.from(deputySectionsChecklist.querySelectorAll('input[type=checkbox]:checked'))
+      .map(cb => Number(cb.value)).filter(Number.isFinite);
+
+    try {
+      await window.GCP.apiFetch(`/deputy-sections/${userId}`, {
+        method: "PUT",
+        body: JSON.stringify({ sectionIds })
+      });
+      deputySectionsMsg.textContent = 'Saved.';
+      deputySectionsMsg.style.color = '#2b445b';
+      await loadDeputySectionsOverview();
+    } catch (err) {
+      deputySectionsMsg.textContent = err.message || 'Failed to save';
+      deputySectionsMsg.style.color = 'crimson';
     }
   });
 

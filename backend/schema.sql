@@ -225,3 +225,15 @@ CREATE TABLE IF NOT EXISTS event_required_departments (
 
 CREATE INDEX IF NOT EXISTS idx_erd_event_id ON event_required_departments(event_id);
 CREATE INDEX IF NOT EXISTS idx_erd_department_id ON event_required_departments(department_id);
+
+-- Deputy-to-section assignments (which deputy is responsible for which sections)
+CREATE TABLE IF NOT EXISTS deputy_section_assignments (
+    id          SERIAL PRIMARY KEY,
+    user_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    section_id  INTEGER NOT NULL REFERENCES sections(id) ON DELETE CASCADE,
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CONSTRAINT uq_deputy_section_assignments UNIQUE (user_id, section_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_dsa_user_id ON deputy_section_assignments(user_id);
+CREATE INDEX IF NOT EXISTS idx_dsa_section_id ON deputy_section_assignments(section_id);

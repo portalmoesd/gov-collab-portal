@@ -21,6 +21,7 @@
     <button class="btn" id="tabUsers">Users</button>
     <button class="btn" id="tabSections">Sections</button>
     <button class="btn" id="tabDepartments">Departments</button>
+    <button class="btn" id="tabDeputySections">Deputy Sections</button>
     <button class="btn" id="tabAssignments">Assignments</button>
   </div>
 
@@ -108,6 +109,38 @@
         <table class="table">
           <thead><tr><th>Name</th><th>Section</th><th>Order</th><th>Active</th><th></th></tr></thead>
           <tbody id="departmentsTbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div id="deputySectionsPanel" style="display:none;">
+    <div class="grid">
+      <div class="col-12">
+        <div style="font-weight:900; margin-bottom:10px;">Assign sections to deputies</div>
+        <p class="small" style="color:#73829c; margin-bottom:12px;">Select a deputy, then check which sections they are responsible for.</p>
+        <div class="row" style="gap:12px; align-items:flex-end; flex-wrap:wrap;">
+          <div class="field">
+            <label>Deputy</label>
+            <select id="deputySelect"><option value="">Select…</option></select>
+          </div>
+          <div style="align-self:flex-end;">
+            <button class="btn primary" id="saveDeputySectionsBtn" disabled>Save</button>
+          </div>
+        </div>
+        <div id="deputySectionsMsg" class="small" style="color:#2b445b; font-weight:800; margin-top:6px;"></div>
+      </div>
+
+      <div class="col-12" style="margin-top:12px;">
+        <div style="font-weight:900; margin-bottom:10px;">Sections</div>
+        <div id="deputySectionsChecklist" class="checklist"></div>
+      </div>
+
+      <div class="col-12" style="margin-top:16px;">
+        <div style="font-weight:900; margin-bottom:10px;">Current deputy-section overview</div>
+        <table class="table">
+          <thead><tr><th>Deputy</th><th>Sections</th></tr></thead>
+          <tbody id="deputySectionsOverviewTbody"></tbody>
         </table>
       </div>
     </div>

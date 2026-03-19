@@ -209,6 +209,19 @@ async function ensureSchema() {
   `).catch(()=>{});
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_erd_event_id ON event_required_departments(event_id)`).catch(()=>{});
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_erd_department_id ON event_required_departments(department_id)`).catch(()=>{});
+
+  // Deputy-to-section assignments
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS deputy_section_assignments (
+      id          SERIAL PRIMARY KEY,
+      user_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      section_id  INTEGER NOT NULL REFERENCES sections(id) ON DELETE CASCADE,
+      created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      CONSTRAINT uq_deputy_section_assignments UNIQUE (user_id, section_id)
+    )
+  `).catch(()=>{});
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_dsa_user_id ON deputy_section_assignments(user_id)`).catch(()=>{});
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_dsa_section_id ON deputy_section_assignments(section_id)`).catch(()=>{});
 }
 
 async function ensureRolesExist() {
@@ -1197,6 +1210,70 @@ app.delete('/api/departments/:id', requireRole('admin'), async (req, res) => {
 
   await pool.query(`UPDATE departments SET is_active=false, updated_at=NOW() WHERE id=$1`, [id]);
   return res.json({ ok: true });
+});
+
+/** 7.3c Deputy-Section Assignments **/
+
+// GET all deputy-section assignments (public, for event creation UI)
+app.get('/api/deputy-sections', async (req, res) => {
+  const rows = await queryAll(
+    `SELECT dsa.id, dsa.user_id, dsa.section_id,
+            u.full_name AS deputy_name, u.username AS deputy_username,
+            s.key AS section_key, s.label AS section_label
+     FROM deputy_section_assignments dsa
+     JOIN users u ON u.id = dsa.user_id AND u.is_active = true
+     JOIN sections s ON s.id = dsa.section_id AND s.is_active = true
+     ORDER BY s.order_index ASC, u.full_name ASC`,
+    []
+  );
+  return res.json(rows);
+});
+
+// GET assignments for a specific deputy
+app.get('/api/deputy-sections/:userId', async (req, res) => {
+  const userId = Number(req.params.userId);
+  if (!Number.isFinite(userId)) return res.status(400).json({ error: 'Invalid userId' });
+
+  const rows = await queryAll(
+    `SELECT dsa.section_id, s.key AS section_key, s.label AS section_label
+     FROM deputy_section_assignments dsa
+     JOIN sections s ON s.id = dsa.section_id
+     WHERE dsa.user_id = $1
+     ORDER BY s.order_index ASC`,
+    [userId]
+  );
+  return res.json({ userId, sectionIds: rows.map(r => r.section_id), sections: rows });
+});
+
+// PUT (replace) deputy-section assignments for a deputy
+app.put('/api/deputy-sections/:userId', requireRole('admin'), async (req, res) => {
+  const userId = Number(req.params.userId);
+  if (!Number.isFinite(userId)) return res.status(400).json({ error: 'Invalid userId' });
+
+  const { sectionIds } = req.body || {};
+  if (!Array.isArray(sectionIds)) return res.status(400).json({ error: 'sectionIds array required' });
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    await client.query(`DELETE FROM deputy_section_assignments WHERE user_id=$1`, [userId]);
+    for (const sid of sectionIds.map(Number).filter(Number.isFinite)) {
+      await client.query(
+        `INSERT INTO deputy_section_assignments (user_id, section_id, created_at)
+         VALUES ($1, $2, NOW())
+         ON CONFLICT (user_id, section_id) DO NOTHING`,
+        [userId, sid]
+      );
+    }
+    await client.query('COMMIT');
+    return res.json({ ok: true });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    console.error(err);
+    return res.status(500).json({ error: 'Failed to save deputy-section assignments' });
+  } finally {
+    client.release();
+  }
 });
 
 /** 7.4 Section Assignments (Admin only) **/

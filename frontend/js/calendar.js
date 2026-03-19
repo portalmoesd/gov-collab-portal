@@ -47,14 +47,22 @@
   }
 
   let allDepartments = [];
+  let deputySectionMap = {}; // sectionId -> deputy name
 
   async function loadSections(){
-    const [sections, departments] = await Promise.all([
+    const [sections, departments, deputySections] = await Promise.all([
       window.GCP.apiFetch('/sections', { method:'GET' }),
       window.GCP.apiFetch('/departments', { method:'GET' }),
+      window.GCP.apiFetch('/deputy-sections', { method:'GET' }),
     ]);
     allDepartments = departments || [];
     const active = sections.filter(s => s.is_active);
+
+    // Build deputy-section lookup
+    deputySectionMap = {};
+    for (const ds of (deputySections || [])) {
+      deputySectionMap[ds.section_id] = ds.deputy_name;
+    }
 
     // Group departments by section_id
     const deptsBySection = {};
@@ -67,13 +75,14 @@
     requiredBox.innerHTML = '';
     for (const s of active) {
       const sectionDepts = deptsBySection[s.id] || [];
+      const deputyName = deputySectionMap[s.id];
       const group = document.createElement('div');
       group.className = 'section-dept-group';
 
-      // Section-level checkbox (master toggle)
+      // Section-level checkbox (master toggle) with deputy name badge
       const sectionLabel = document.createElement('label');
       sectionLabel.className = 'checkitem section-header';
-      sectionLabel.innerHTML = `<input type="checkbox" data-section-id="${s.id}" value="${s.id}"><strong>${window.GCP.escapeHtml(s.label)}</strong>`;
+      sectionLabel.innerHTML = `<input type="checkbox" data-section-id="${s.id}" value="${s.id}"><strong>${window.GCP.escapeHtml(s.label)}</strong>${deputyName ? `<span class="deputy-badge">${window.GCP.escapeHtml(deputyName)}</span>` : ''}`;
       group.appendChild(sectionLabel);
 
       const sectionCb = sectionLabel.querySelector('input');
@@ -95,6 +104,7 @@
         // Section checkbox toggles all its departments
         sectionCb.addEventListener('change', () => {
           for (const cb of deptCbs) cb.checked = sectionCb.checked;
+          updateInvolvedDeputies();
         });
 
         // If any dept unchecked, update section indeterminate; if all checked, check section
@@ -104,11 +114,41 @@
             const checked = Array.from(deptCbs).filter(c => c.checked).length;
             sectionCb.checked = checked > 0;
             sectionCb.indeterminate = checked > 0 && checked < total;
+            updateInvolvedDeputies();
           });
         }
+      } else {
+        sectionCb.addEventListener('change', () => updateInvolvedDeputies());
       }
 
       requiredBox.appendChild(group);
+    }
+  }
+
+  // Show which deputies are involved based on selected sections
+  function updateInvolvedDeputies(){
+    const selectedSections = Array.from(requiredBox.querySelectorAll('input[data-section-id]'))
+      .filter(cb => cb.checked || cb.indeterminate)
+      .map(cb => Number(cb.value));
+
+    const deputies = new Set();
+    for (const sid of selectedSections) {
+      if (deputySectionMap[sid]) deputies.add(deputySectionMap[sid]);
+    }
+
+    let container = document.getElementById('involvedDeputies');
+    if (!container) {
+      container = document.createElement('div');
+      container.id = 'involvedDeputies';
+      container.className = 'involved-deputies';
+      requiredBox.parentNode.appendChild(container);
+    }
+
+    if (deputies.size) {
+      container.innerHTML = `<span class="involved-deputies__label">Involved deputies:</span> ${[...deputies].map(n => `<span class="involved-deputies__name">${window.GCP.escapeHtml(n)}</span>`).join('')}`;
+      container.hidden = false;
+    } else {
+      container.hidden = true;
     }
   }
 
@@ -274,13 +314,30 @@
 
       const reqDepts = (details.required_departments || details.requiredDepartments || []);
 
+      // Show involved deputies
+      const involvedDeputyNames = new Set();
+      for (const s of req) {
+        if (deputySectionMap[s.id]) involvedDeputyNames.add(deputySectionMap[s.id]);
+      }
+
+      if (involvedDeputyNames.size) {
+        html += `
+        <div class="event-modal__section">
+          <div class="event-modal__label">Involved deputies</div>
+          <div style="display:flex; gap:6px; flex-wrap:wrap;">
+            ${[...involvedDeputyNames].map(n => `<span class="involved-deputies__name">${window.GCP.escapeHtml(n)}</span>`).join('')}
+          </div>
+        </div>`;
+      }
+
       html += `
         <div class="event-modal__section">
           <div class="event-modal__label">Required sections &amp; departments</div>
           ${req.length
             ? `<ul class="event-modal__sections">${req.map(s => {
+                const deputyName = deputySectionMap[s.id];
                 const sectionDepts = reqDepts.filter(d => d.section_id === s.id).map(d => window.GCP.escapeHtml(d.name));
-                return `<li><strong>${window.GCP.escapeHtml(s.label)}</strong>${sectionDepts.length ? `<ul>${sectionDepts.map(dn => `<li>${dn}</li>`).join('')}</ul>` : ''}</li>`;
+                return `<li><strong>${window.GCP.escapeHtml(s.label)}</strong>${deputyName ? ` <span class="deputy-badge">${window.GCP.escapeHtml(deputyName)}</span>` : ''}${sectionDepts.length ? `<ul>${sectionDepts.map(dn => `<li>${dn}</li>`).join('')}</ul>` : ''}</li>`;
               }).join('')}</ul>`
             : '<div class="event-modal__empty">No sections assigned.</div>'}
         </div>`;

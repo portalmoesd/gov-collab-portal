@@ -2684,6 +2684,42 @@ body.gp-shell-ready .gp-sidebar__scrim{
   padding:0; accent-color: var(--primary);
   box-shadow:none; flex:0 0 auto;
 }
+/* Deputy badge on section headers */
+.deputy-badge{
+  margin-left:auto;
+  font-size:11px;
+  font-weight:600;
+  color:#0a84ff;
+  background: rgba(10,132,255,.1);
+  padding:2px 8px;
+  border-radius:8px;
+  white-space:nowrap;
+}
+/* Involved deputies summary below section list */
+.involved-deputies{
+  margin-top:8px;
+  padding:8px 12px;
+  background: rgba(10,132,255,.06);
+  border:1px solid rgba(10,132,255,.14);
+  border-radius:12px;
+  font-size:12.5px;
+  color:#22395a;
+  display:flex;
+  flex-wrap:wrap;
+  gap:6px;
+  align-items:center;
+}
+.involved-deputies__label{
+  font-weight:700;
+  color:#73829c;
+}
+.involved-deputies__name{
+  font-weight:700;
+  color:#0a84ff;
+  background: rgba(10,132,255,.1);
+  padding:2px 8px;
+  border-radius:8px;
+}
 .calendar-form-col--task{ grid-column: 1 / -1; }
 .calendar-form-actions{
   display:flex;
