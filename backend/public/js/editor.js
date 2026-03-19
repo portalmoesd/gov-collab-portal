@@ -142,7 +142,7 @@
     if (role === 'collaborator_1')     return s === 'draft' || rtr === 'collaborator_1';
     if (role === 'collaborator_2')     return ['submitted_to_collaborator_2','returned_by_collaborator_2'].includes(s) || rtr === 'collaborator_2' || s === 'draft' || s.startsWith('returned_');
     if (role === 'collaborator_3')     return ['submitted_to_collaborator_3','returned_by_collaborator_3','approved_by_collaborator_2','submitted_to_collaborator_2','returned_by_collaborator_2'].includes(s) || rtr === 'collaborator_3' || s === 'draft' || s.startsWith('returned_');
-    if (role === 'collaborator')       return ['submitted_to_collaborator','returned_by_collaborator','approved_by_collaborator_2','approved_by_collaborator_3'].includes(s) || rtr === 'collaborator' || s === 'draft';
+    if (role === 'collaborator')       return ['submitted_to_collaborator','returned_by_collaborator','approved_by_collaborator_2','approved_by_collaborator_3','returned_by_super_collaborator','returned_by_supervisor','returned_by_deputy','returned_by_minister'].includes(s) || rtr === 'collaborator' || s === 'draft';
     if (role === 'super_collaborator') return true; // super-collaborator can act at any stage (same as supervisor+)
     return true; // supervisor / deputy / minister / admin always active
   }
@@ -188,19 +188,19 @@
       if (btnSave)   btnSave.style.display   = "";
       if (btnSubmit) btnSubmit.style.display = "";
       if (btnUpload) btnUpload.style.display = "";
-      const canReturn = ['submitted_to_collaborator_2', 'returned_by_collaborator_2'].includes(s);
+      const canReturn = ['submitted_to_collaborator_2','returned_by_collaborator_2','returned_by_collaborator_3','returned_by_collaborator','returned_by_super_collaborator','returned_by_supervisor','returned_by_deputy','returned_by_minister'].includes(s);
       if (btnReturn) btnReturn.style.display = canReturn ? "" : "none";
     } else if (role === 'collaborator_3') {
       if (btnSave)   btnSave.style.display   = "";
       if (btnSubmit) btnSubmit.style.display = "";
       if (btnUpload) btnUpload.style.display = "";
-      const canReturn = ['submitted_to_collaborator_3','returned_by_collaborator_3','approved_by_collaborator_2','submitted_to_collaborator_2','returned_by_collaborator_2'].includes(s);
+      const canReturn = ['submitted_to_collaborator_3','returned_by_collaborator_3','approved_by_collaborator_2','submitted_to_collaborator_2','returned_by_collaborator_2','returned_by_collaborator','returned_by_super_collaborator','returned_by_supervisor','returned_by_deputy','returned_by_minister'].includes(s);
       if (btnReturn) btnReturn.style.display = canReturn ? "" : "none";
     } else if (role === 'collaborator') {
       if (btnSave)   btnSave.style.display   = "";
       if (btnSubmit) btnSubmit.style.display = "";
       if (btnUpload) btnUpload.style.display = "";
-      const canReturn = ['submitted_to_collaborator', 'returned_by_collaborator'].includes(s);
+      const canReturn = ['submitted_to_collaborator','returned_by_collaborator','returned_by_super_collaborator','returned_by_supervisor','returned_by_deputy','returned_by_minister'].includes(s);
       if (btnReturn) btnReturn.style.display = canReturn ? "" : "none";
     } else if (role === 'super_collaborator') {
       if (btnSave)    btnSave.style.display    = "";
@@ -209,7 +209,14 @@
       if (btnUpload)  btnUpload.style.display  = "";
     } else if (['supervisor','deputy','minister','admin'].includes(role)) {
       const isApprovedState = s.startsWith('approved_by_') || s === 'approved' || s === 'locked';
-      if ((role === 'deputy' || role === 'minister') && isApprovedState) {
+      const rtr = String(tp.returnTargetRole || '').toLowerCase();
+      const isOriginalEditor = s === 'draft' || (s.startsWith('returned_by') && (rtr === role || rtr === ''));
+      if (isOriginalEditor) {
+        // Acting as original editor — show Save + Submit (not Approve/Return)
+        if (btnSave)   btnSave.style.display   = "";
+        if (btnSubmit) btnSubmit.style.display  = "";
+        if (btnUpload) btnUpload.style.display  = "";
+      } else if ((role === 'deputy' || role === 'minister') && isApprovedState) {
         // After approval: full editing if this user is the document submitter (final approver), else Ask to Return
         const docSubmitter = String(tp.documentSubmitterRole || '').toLowerCase();
         const isApprovedByMe = (role === 'deputy' && s === 'approved_by_deputy') ||
@@ -389,6 +396,8 @@
         submitted_to_supervisor: "Submitted to Supervisor.",
         submitted_to_deputy: "Submitted to Deputy.",
         submitted_to_minister: "Submitted to Minister.",
+        approved_by_deputy: "Submitted and approved.",
+        approved_by_minister: "Submitted and approved.",
       };
       showMsg(submitMsgMap[String(tp.status || '').toLowerCase()] || "Submitted.");
     }catch(err){

@@ -81,7 +81,6 @@
       approved_by_deputy: ['approved','Approved','is-approved'],
       submitted_to_minister: ['submitted_to_minister','Submitted to Minister','is-submitted'],
       approved_by_minister: ['submitted_to_minister','Submitted to Minister','is-submitted'],
-      returned: ['returned','Returned','is-returned'],
       approved: ['approved','Approved','is-approved'],
       locked: ['approved','Approved','is-approved']
     };

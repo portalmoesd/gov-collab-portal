@@ -329,9 +329,7 @@
     const ds = await window.GCP.apiFetch(`/tp/document-status?event_id=${encodeURIComponent(currentEventId)}`, { method:'GET' });
     const ev = eventsById.get(currentEventId);
 
-    docStatusBox.innerHTML = `
-      ${ds.deputyComment ? `<div class="muted" style="margin-top:8px;"><b>Comment:</b> ${escape(ds.deputyComment)}</div>` : ''}
-    `;
+    docStatusBox.innerHTML = '';
 
     const grid = await window.GCP.apiFetch(`/tp/status-grid?event_id=${encodeURIComponent(currentEventId)}`, { method:'GET' });
     currentSections = grid.sections || [];

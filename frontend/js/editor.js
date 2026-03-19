@@ -209,7 +209,14 @@
       if (btnUpload)  btnUpload.style.display  = "";
     } else if (['supervisor','deputy','minister','admin'].includes(role)) {
       const isApprovedState = s.startsWith('approved_by_') || s === 'approved' || s === 'locked';
-      if ((role === 'deputy' || role === 'minister') && isApprovedState) {
+      const rtr = String(tp.returnTargetRole || '').toLowerCase();
+      const isOriginalEditor = s === 'draft' || (s.startsWith('returned_by') && (rtr === role || rtr === ''));
+      if (isOriginalEditor) {
+        // Acting as original editor — show Save + Submit (not Approve/Return)
+        if (btnSave)   btnSave.style.display   = "";
+        if (btnSubmit) btnSubmit.style.display  = "";
+        if (btnUpload) btnUpload.style.display  = "";
+      } else if ((role === 'deputy' || role === 'minister') && isApprovedState) {
         // After approval: full editing if this user is the document submitter (final approver), else Ask to Return
         const docSubmitter = String(tp.documentSubmitterRole || '').toLowerCase();
         const isApprovedByMe = (role === 'deputy' && s === 'approved_by_deputy') ||
@@ -389,6 +396,8 @@
         submitted_to_supervisor: "Submitted to Supervisor.",
         submitted_to_deputy: "Submitted to Deputy.",
         submitted_to_minister: "Submitted to Minister.",
+        approved_by_deputy: "Submitted and approved.",
+        approved_by_minister: "Submitted and approved.",
       };
       showMsg(submitMsgMap[String(tp.status || '').toLowerCase()] || "Submitted.");
     }catch(err){

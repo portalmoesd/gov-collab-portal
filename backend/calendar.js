@@ -10,7 +10,6 @@
   const sectionsTbody = document.getElementById("sectionsTbody");
   const approveAllSectionsBtn = document.getElementById("approveAllSectionsBtn");
   const approveDocBtn = document.getElementById("approveDocBtn");
-  const returnDocBtn = document.getElementById("returnDocBtn");
   const previewBtn = document.getElementById("previewBtn");
   const msg = document.getElementById("msg");
 
@@ -53,8 +52,7 @@
       approved_by_supervisor: 'Approved by Supervisor',
       submitted_to_deputy: 'Submitted to Deputy',
       approved_by_deputy: 'Approved by Deputy',
-      approved: 'Approved',
-      returned: 'Returned'
+      approved: 'Approved'
     };
     return m[s] || s || '';
   }
@@ -80,7 +78,6 @@
     if (!Number.isFinite(evId)) {
       currentEventId = null;
       approveDocBtn.disabled = true;
-      returnDocBtn.disabled = true;
       previewBtn.disabled = true;
       endEventBtn.style.display = 'none';
       return;
@@ -93,7 +90,6 @@
     const last = ds.updatedAt ? window.GCP.formatDateTime(ds.updatedAt) : '';
     docStatusBox.innerHTML = `
       <div><b>Document status:</b> ${pill(ds.status)} ${last ? `<span class="muted">(${window.GCP.escapeHtml(last)})</span>` : ''}</div>
-      ${ds.deputyComment ? `<div class="muted" style="margin-top:6px;"><b>Comment:</b> ${window.GCP.escapeHtml(ds.deputyComment)}</div>` : ''}
     `;
 
     // Per-section status grid
@@ -159,7 +155,6 @@
     }
 
     approveDocBtn.disabled = false;
-    returnDocBtn.disabled = false;
     previewBtn.disabled = false;
   }
 
@@ -175,22 +170,6 @@
       await refresh();
     }catch(e){
       setMsg(e.message || 'Failed to approve document', true);
-    }
-  });
-
-  returnDocBtn.addEventListener('click', async () => {
-    setMsg('');
-    if (!currentEventId) return;
-    const note = prompt('Return note (optional):', '') || '';
-    if (!confirm('Return the full document?')) return;
-    try{
-      await window.GCP.apiFetch('/document/return', {
-        method:'POST',
-        body: JSON.stringify({ eventId: currentEventId, note })
-      });
-      await refresh();
-    }catch(e){
-      setMsg(e.message || 'Failed to return document', true);
     }
   });
 
