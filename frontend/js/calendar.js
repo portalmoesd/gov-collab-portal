@@ -46,15 +46,110 @@
     countrySelect.innerHTML = countries.map(c => `<option value="${c.id}">${window.GCP.escapeHtml(c.name_en)}</option>`).join("");
   }
 
+  let allDepartments = [];
+  let deputySectionMap = {}; // sectionId -> deputy name
+
   async function loadSections(){
-    const sections = await window.GCP.apiFetch('/sections', { method:'GET' });
+    const [sections, departments, deputySections] = await Promise.all([
+      window.GCP.apiFetch('/sections', { method:'GET' }),
+      window.GCP.apiFetch('/departments', { method:'GET' }),
+      window.GCP.apiFetch('/deputy-sections', { method:'GET' }),
+    ]);
+    allDepartments = departments || [];
     const active = sections.filter(s => s.is_active);
-    requiredBox.innerHTML = active.map(s => (
-      `<label class="checkitem">
-        <input type="checkbox" value="${s.id}">
-        <span>${window.GCP.escapeHtml(s.label)}</span>
-      </label>`
-    )).join('');
+
+    // Build deputy-section lookup
+    deputySectionMap = {};
+    for (const ds of (deputySections || [])) {
+      deputySectionMap[ds.section_id] = ds.deputy_name;
+    }
+
+    // Group departments by section_id
+    const deptsBySection = {};
+    for (const d of allDepartments) {
+      if (!d.section_id) continue;
+      if (!deptsBySection[d.section_id]) deptsBySection[d.section_id] = [];
+      deptsBySection[d.section_id].push(d);
+    }
+
+    requiredBox.innerHTML = '';
+    for (const s of active) {
+      const sectionDepts = deptsBySection[s.id] || [];
+      const deputyName = deputySectionMap[s.id];
+      const group = document.createElement('div');
+      group.className = 'section-dept-group';
+
+      // Section-level checkbox (master toggle) with deputy name badge
+      const sectionLabel = document.createElement('label');
+      sectionLabel.className = 'checkitem section-header';
+      sectionLabel.innerHTML = `<input type="checkbox" data-section-id="${s.id}" value="${s.id}"><strong>${window.GCP.escapeHtml(s.label)}</strong>${deputyName ? `<span class="deputy-badge">${window.GCP.escapeHtml(deputyName)}</span>` : ''}`;
+      group.appendChild(sectionLabel);
+
+      const sectionCb = sectionLabel.querySelector('input');
+
+      // Department checkboxes (indented under the section)
+      if (sectionDepts.length) {
+        const deptsWrap = document.createElement('div');
+        deptsWrap.className = 'section-depts';
+        for (const d of sectionDepts) {
+          const dLabel = document.createElement('label');
+          dLabel.className = 'checkitem dept-item';
+          dLabel.innerHTML = `<input type="checkbox" data-dept-id="${d.id}" data-parent-section="${s.id}" value="${d.id}"><span>${window.GCP.escapeHtml(d.name)}</span>`;
+          deptsWrap.appendChild(dLabel);
+        }
+        group.appendChild(deptsWrap);
+
+        const deptCbs = deptsWrap.querySelectorAll('input[type=checkbox]');
+
+        // Section checkbox toggles all its departments
+        sectionCb.addEventListener('change', () => {
+          for (const cb of deptCbs) cb.checked = sectionCb.checked;
+          updateInvolvedDeputies();
+        });
+
+        // If any dept unchecked, update section indeterminate; if all checked, check section
+        for (const cb of deptCbs) {
+          cb.addEventListener('change', () => {
+            const total = deptCbs.length;
+            const checked = Array.from(deptCbs).filter(c => c.checked).length;
+            sectionCb.checked = checked > 0;
+            sectionCb.indeterminate = checked > 0 && checked < total;
+            updateInvolvedDeputies();
+          });
+        }
+      } else {
+        sectionCb.addEventListener('change', () => updateInvolvedDeputies());
+      }
+
+      requiredBox.appendChild(group);
+    }
+  }
+
+  // Show which deputies are involved based on selected sections
+  function updateInvolvedDeputies(){
+    const selectedSections = Array.from(requiredBox.querySelectorAll('input[data-section-id]'))
+      .filter(cb => cb.checked || cb.indeterminate)
+      .map(cb => Number(cb.value));
+
+    const deputies = new Set();
+    for (const sid of selectedSections) {
+      if (deputySectionMap[sid]) deputies.add(deputySectionMap[sid]);
+    }
+
+    let container = document.getElementById('involvedDeputies');
+    if (!container) {
+      container = document.createElement('div');
+      container.id = 'involvedDeputies';
+      container.className = 'involved-deputies';
+      requiredBox.parentNode.appendChild(container);
+    }
+
+    if (deputies.size) {
+      container.innerHTML = `<span class="involved-deputies__label">Involved deputies:</span> ${[...deputies].map(n => `<span class="involved-deputies__name">${window.GCP.escapeHtml(n)}</span>`).join('')}`;
+      container.hidden = false;
+    } else {
+      container.hidden = true;
+    }
   }
 
   function formatDate(d){
@@ -217,11 +312,33 @@
         </div>`;
       }
 
+      const reqDepts = (details.required_departments || details.requiredDepartments || []);
+
+      // Show involved deputies
+      const involvedDeputyNames = new Set();
+      for (const s of req) {
+        if (deputySectionMap[s.id]) involvedDeputyNames.add(deputySectionMap[s.id]);
+      }
+
+      if (involvedDeputyNames.size) {
+        html += `
+        <div class="event-modal__section">
+          <div class="event-modal__label">Involved deputies</div>
+          <div style="display:flex; gap:6px; flex-wrap:wrap;">
+            ${[...involvedDeputyNames].map(n => `<span class="involved-deputies__name">${window.GCP.escapeHtml(n)}</span>`).join('')}
+          </div>
+        </div>`;
+      }
+
       html += `
         <div class="event-modal__section">
-          <div class="event-modal__label">Required sections</div>
-          ${sections.length
-            ? `<ul class="event-modal__sections">${sections.map(s => `<li>${s}</li>`).join('')}</ul>`
+          <div class="event-modal__label">Required sections &amp; departments</div>
+          ${req.length
+            ? `<ul class="event-modal__sections">${req.map(s => {
+                const deputyName = deputySectionMap[s.id];
+                const sectionDepts = reqDepts.filter(d => d.section_id === s.id).map(d => window.GCP.escapeHtml(d.name));
+                return `<li><strong>${window.GCP.escapeHtml(s.label)}</strong>${deputyName ? ` <span class="deputy-badge">${window.GCP.escapeHtml(deputyName)}</span>` : ''}${sectionDepts.length ? `<ul>${sectionDepts.map(dn => `<li>${dn}</li>`).join('')}</ul>` : ''}</li>`;
+              }).join('')}</ul>`
             : '<div class="event-modal__empty">No sections assigned.</div>'}
         </div>`;
 
@@ -243,8 +360,27 @@
     if (languageSelect) languageSelect.value = String(details.language || "en");
     const req = (details.required_sections || details.requiredSections || []);
     const reqIds = new Set((Array.isArray(req) ? req : []).map(s => String(s.id)));
-    for (const cb of requiredBox.querySelectorAll('input[type=checkbox]')){
+    const reqDepts = (details.required_departments || details.requiredDepartments || []);
+    const reqDeptIds = new Set((Array.isArray(reqDepts) ? reqDepts : []).map(d => String(d.id)));
+
+    // Restore section checkboxes
+    for (const cb of requiredBox.querySelectorAll('input[data-section-id]')){
       cb.checked = reqIds.has(String(cb.value));
+      cb.indeterminate = false;
+    }
+    // Restore department checkboxes
+    for (const cb of requiredBox.querySelectorAll('input[data-dept-id]')){
+      cb.checked = reqDeptIds.has(String(cb.value));
+    }
+    // Update section indeterminate state based on department selections
+    for (const cb of requiredBox.querySelectorAll('input[data-section-id]')){
+      const sectionId = cb.dataset.sectionId;
+      const deptCbs = requiredBox.querySelectorAll(`input[data-parent-section="${sectionId}"]`);
+      if (deptCbs.length) {
+        const checked = Array.from(deptCbs).filter(c => c.checked).length;
+        cb.checked = checked > 0;
+        cb.indeterminate = checked > 0 && checked < deptCbs.length;
+      }
     }
     saveBtn.textContent = "Update event";
     msg.textContent = `Editing event #${ev.id}`;
@@ -448,6 +584,10 @@
     if (submitterSelect) submitterSelect.value = "deputy";
     if (lowerSubmitterSelect) lowerSubmitterSelect.value = "collaborator_2";
     if (languageSelect) languageSelect.value = "en";
+    // Clear indeterminate state on section checkboxes
+    for (const cb of requiredBox.querySelectorAll('input[data-section-id]')) {
+      cb.indeterminate = false;
+    }
     saveBtn.textContent = "Create event";
     msg.style.color = "var(--danger)";
     msg.textContent = "";
@@ -472,14 +612,20 @@
     const submitterRole = submitterSelect ? String(submitterSelect.value || "deputy") : "deputy";
     const lowerSubmitterRole = lowerSubmitterSelect ? String(lowerSubmitterSelect.value || "collaborator_2") : "collaborator_2";
     const language = languageSelect ? String(languageSelect.value || "en") : "en";
-    const requiredSectionIds = Array.from(requiredBox.querySelectorAll('input[type=checkbox]:checked')).map(cb => Number(cb.value)).filter(Number.isFinite);
+    const requiredSectionIds = Array.from(requiredBox.querySelectorAll('input[data-section-id]:checked, input[data-section-id]:indeterminate')).map(cb => Number(cb.value)).filter(Number.isFinite);
+    // Also include sections that are indeterminate (some depts checked)
+    const indeterminateSections = Array.from(requiredBox.querySelectorAll('input[data-section-id]')).filter(cb => cb.indeterminate).map(cb => Number(cb.value));
+    for (const sid of indeterminateSections) {
+      if (!requiredSectionIds.includes(sid)) requiredSectionIds.push(sid);
+    }
+    const requiredDepartmentIds = Array.from(requiredBox.querySelectorAll('input[data-dept-id]:checked')).map(cb => Number(cb.value)).filter(Number.isFinite);
 
     if (!Number.isFinite(countryId) || !title) {
       msg.textContent = "Country and Title are required.";
       return;
     }
 
-    const payload = { countryId, title, occasion, deadlineDate, requiredSectionIds, submitterRole, lowerSubmitterRole, language };
+    const payload = { countryId, title, occasion, deadlineDate, requiredSectionIds, requiredDepartmentIds, submitterRole, lowerSubmitterRole, language };
 
     try {
       saveBtn.disabled = true;

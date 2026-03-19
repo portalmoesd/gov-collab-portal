@@ -10,15 +10,21 @@
 
   const tabUsers = document.getElementById("tabUsers");
   const tabSections = document.getElementById("tabSections");
+  const tabDepartments = document.getElementById("tabDepartments");
+  const tabDeputySections = document.getElementById("tabDeputySections");
   const tabAssignments = document.getElementById("tabAssignments");
 
   const usersPanel = document.getElementById("usersPanel");
   const sectionsPanel = document.getElementById("sectionsPanel");
+  const departmentsPanel = document.getElementById("departmentsPanel");
+  const deputySectionsPanel = document.getElementById("deputySectionsPanel");
   const assignmentsPanel = document.getElementById("assignmentsPanel");
 
   const tabs = [
     { btn: tabUsers, panel: usersPanel },
     { btn: tabSections, panel: sectionsPanel },
+    { btn: tabDepartments, panel: departmentsPanel },
+    { btn: tabDeputySections, panel: deputySectionsPanel },
     { btn: tabAssignments, panel: assignmentsPanel },
   ];
 
@@ -31,6 +37,8 @@
 
   tabUsers.addEventListener("click", () => show(usersPanel));
   tabSections.addEventListener("click", () => show(sectionsPanel));
+  tabDepartments.addEventListener("click", () => { show(departmentsPanel); loadDepartments(); });
+  tabDeputySections.addEventListener("click", () => { show(deputySectionsPanel); loadDeputySectionsPanel(); });
   tabAssignments.addEventListener("click", () => show(assignmentsPanel));
 
   show(usersPanel);
@@ -187,6 +195,208 @@
       await loadAssignmentsMeta();
     }catch(err){
       msgSections.textContent = err.message || "Failed";
+    }
+  });
+
+  /** DEPARTMENTS **/
+  const departmentsTbody = document.getElementById("departmentsTbody");
+  const createDepartmentForm = document.getElementById("createDepartmentForm");
+  const msgDepartments = document.getElementById("msgDepartments");
+  const newDeptSectionSelect = document.getElementById("newDeptSection");
+
+  async function populateDeptSectionSelect(){
+    const sections = await window.GCP.apiFetch("/sections", { method:"GET" });
+    newDeptSectionSelect.innerHTML = '<option value="">— No section —</option>' +
+      sections.filter(s => s.is_active).map(s =>
+        `<option value="${s.id}">${window.GCP.escapeHtml(s.label)}</option>`
+      ).join('');
+  }
+
+  async function loadDepartments(){
+    await populateDeptSectionSelect();
+    const departments = await window.GCP.apiFetch("/departments", { method:"GET" });
+    const sections = await window.GCP.apiFetch("/sections", { method:"GET" });
+    const secMap = {};
+    for (const s of sections) secMap[s.id] = s.label;
+
+    departmentsTbody.innerHTML = "";
+    for (const d of departments){
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td>${window.GCP.escapeHtml(d.name)}</td>
+        <td>${window.GCP.escapeHtml(d.section_label || secMap[d.section_id] || '—')}</td>
+        <td style="max-width:80px;">
+          <input type="number" class="deptOrderInput" value="${Number(d.order_index || 0)}" style="width:100%; padding:8px 10px; border:1px solid var(--border); border-radius:12px;" />
+        </td>
+        <td>${d.is_active ? 'Yes' : 'No'}</td>
+        <td class="row">
+          <button class="btn" data-act="rename">Rename</button>
+          <button class="btn" data-act="reassign">Change section</button>
+          <button class="btn" data-act="saveOrder">Save order</button>
+          <button class="btn ${d.is_active ? 'danger' : ''}" data-act="toggle">${d.is_active ? 'Deactivate' : 'Activate'}</button>
+        </td>
+      `;
+
+      tr.querySelector('[data-act="rename"]').addEventListener('click', async () => {
+        const newName = prompt('Department name:', d.name);
+        if (newName === null) return;
+        try{
+          await window.GCP.apiFetch(`/departments/${d.id}`, { method:"PUT", body: JSON.stringify({ name: newName }) });
+          await loadDepartments();
+        }catch(err){ alert(err.message || 'Failed'); }
+      });
+
+      tr.querySelector('[data-act="reassign"]').addEventListener('click', async () => {
+        const secs = await window.GCP.apiFetch("/sections", { method:"GET" });
+        const opts = secs.filter(s => s.is_active).map(s => `${s.id}: ${s.label}`).join('\n');
+        const input = prompt(`Reassign to section (enter section ID):\n\nAvailable sections:\n${opts}\n\nCurrent: ${d.section_label || '—'}`, d.section_id || '');
+        if (input === null) return;
+        const newSectionId = input.trim() === '' ? null : Number(input);
+        try{
+          await window.GCP.apiFetch(`/departments/${d.id}`, { method:"PUT", body: JSON.stringify({ sectionId: newSectionId }) });
+          await loadDepartments();
+        }catch(err){ alert(err.message || 'Failed'); }
+      });
+
+      tr.querySelector('[data-act="saveOrder"]').addEventListener('click', async () => {
+        const val = Number(tr.querySelector('.deptOrderInput').value);
+        if (!Number.isFinite(val)) return alert('Order must be a number');
+        try{
+          await window.GCP.apiFetch(`/departments/${d.id}`, { method:"PUT", body: JSON.stringify({ orderIndex: val }) });
+          await loadDepartments();
+        }catch(err){ alert(err.message || 'Failed'); }
+      });
+
+      tr.querySelector('[data-act="toggle"]').addEventListener('click', async () => {
+        try{
+          if (d.is_active){
+            if (!confirm('Deactivate this department?')) return;
+            await window.GCP.apiFetch(`/departments/${d.id}`, { method:"DELETE" });
+          }else{
+            await window.GCP.apiFetch(`/departments/${d.id}`, { method:"PUT", body: JSON.stringify({ isActive: true }) });
+          }
+          await loadDepartments();
+        }catch(err){ alert(err.message || 'Failed'); }
+      });
+
+      departmentsTbody.appendChild(tr);
+    }
+  }
+
+  createDepartmentForm.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    msgDepartments.textContent = "";
+    const name = document.getElementById("newDeptName").value.trim();
+    const sectionId = document.getElementById("newDeptSection").value ? Number(document.getElementById("newDeptSection").value) : null;
+    const orderIndex = Number(document.getElementById("newDeptOrder").value || "0");
+
+    try{
+      await window.GCP.apiFetch("/departments", { method:"POST", body: JSON.stringify({ name, sectionId, orderIndex }) });
+      createDepartmentForm.reset();
+      await loadDepartments();
+    }catch(err){
+      msgDepartments.textContent = err.message || "Failed";
+    }
+  });
+
+  /** DEPUTY SECTIONS **/
+  const deputySelect = document.getElementById("deputySelect");
+  const saveDeputySectionsBtn = document.getElementById("saveDeputySectionsBtn");
+  const deputySectionsMsg = document.getElementById("deputySectionsMsg");
+  const deputySectionsChecklist = document.getElementById("deputySectionsChecklist");
+  const deputySectionsOverviewTbody = document.getElementById("deputySectionsOverviewTbody");
+
+  async function loadDeputySectionsPanel(){
+    // Load deputies (users with role=deputy)
+    const users = await window.GCP.apiFetch("/users", { method:"GET" });
+    const deputies = (users || []).filter(u => {
+      const rk = String(u.role || '').toLowerCase();
+      return rk === 'deputy' && u.isActive;
+    });
+
+    deputySelect.innerHTML = '<option value="">Select…</option>' + deputies.map(u =>
+      `<option value="${u.id}">${window.GCP.escapeHtml(u.fullName || u.full_name || '')} (${window.GCP.escapeHtml(u.username || '')})</option>`
+    ).join('');
+
+    // Load sections for the checklist
+    const sections = await window.GCP.apiFetch("/sections", { method:"GET" });
+    const activeSections = sections.filter(s => s.is_active);
+    deputySectionsChecklist.innerHTML = '';
+    for (const s of activeSections) {
+      const wrap = document.createElement('label');
+      wrap.className = 'checkitem';
+      wrap.innerHTML = `<input type="checkbox" value="${s.id}"> <span>${window.GCP.escapeHtml(s.label)}</span>`;
+      deputySectionsChecklist.appendChild(wrap);
+    }
+
+    saveDeputySectionsBtn.disabled = true;
+    deputySectionsMsg.textContent = '';
+
+    // Load overview table
+    await loadDeputySectionsOverview(deputies);
+  }
+
+  async function loadDeputySectionsOverview(deputies){
+    const allAssignments = await window.GCP.apiFetch("/deputy-sections", { method:"GET" });
+    // Group by user_id
+    const byDeputy = {};
+    for (const a of allAssignments) {
+      if (!byDeputy[a.user_id]) byDeputy[a.user_id] = { name: a.deputy_name, sections: [] };
+      byDeputy[a.user_id].sections.push(a.section_label);
+    }
+
+    deputySectionsOverviewTbody.innerHTML = '';
+    if (!deputies) {
+      const users = await window.GCP.apiFetch("/users", { method:"GET" });
+      deputies = (users || []).filter(u => String(u.role || '').toLowerCase() === 'deputy' && u.isActive);
+    }
+    for (const dep of deputies) {
+      const tr = document.createElement('tr');
+      const info = byDeputy[dep.id];
+      tr.innerHTML = `
+        <td>${window.GCP.escapeHtml(dep.fullName || dep.full_name || dep.username || '')}</td>
+        <td>${info ? info.sections.map(s => window.GCP.escapeHtml(s)).join(', ') : '<span class="muted">No sections assigned</span>'}</td>
+      `;
+      deputySectionsOverviewTbody.appendChild(tr);
+    }
+  }
+
+  deputySelect.addEventListener("change", async () => {
+    deputySectionsMsg.textContent = '';
+    const userId = Number(deputySelect.value);
+    if (!Number.isFinite(userId)) {
+      saveDeputySectionsBtn.disabled = true;
+      for (const cb of deputySectionsChecklist.querySelectorAll('input[type=checkbox]')) cb.checked = false;
+      return;
+    }
+    saveDeputySectionsBtn.disabled = false;
+
+    const data = await window.GCP.apiFetch(`/deputy-sections/${userId}`, { method:"GET" });
+    const assignedSet = new Set((data.sectionIds || []).map(String));
+    for (const cb of deputySectionsChecklist.querySelectorAll('input[type=checkbox]')) {
+      cb.checked = assignedSet.has(String(cb.value));
+    }
+  });
+
+  saveDeputySectionsBtn.addEventListener("click", async () => {
+    deputySectionsMsg.textContent = '';
+    const userId = Number(deputySelect.value);
+    if (!Number.isFinite(userId)) return;
+
+    const sectionIds = Array.from(deputySectionsChecklist.querySelectorAll('input[type=checkbox]:checked'))
+      .map(cb => Number(cb.value)).filter(Number.isFinite);
+
+    try {
+      await window.GCP.apiFetch(`/deputy-sections/${userId}`, {
+        method: "PUT",
+        body: JSON.stringify({ sectionIds })
+      });
+      deputySectionsMsg.textContent = 'Saved.';
+      deputySectionsMsg.style.color = '#2b445b';
+      await loadDeputySectionsOverview();
+    } catch (err) {
+      deputySectionsMsg.textContent = err.message || 'Failed to save';
+      deputySectionsMsg.style.color = 'crimson';
     }
   });
 
