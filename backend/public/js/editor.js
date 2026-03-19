@@ -495,32 +495,7 @@
   let cachedFiles = [];
 
   function renderFilesList(files){
-    if(!filesSection) return;
-    if(!files||!files.length){ filesSection.style.display='none'; return; }
-    filesSection.style.display='';
-    filesSection.innerHTML = files.map(f=>{
-      const safeName = window.GCP.escapeHtml(f.filename);
-      const sizeStr = f.size ? Math.ceil(f.size/1024)+'KB' : '';
-      return `<div class="editor-file-item"><button class="editor-file-download" data-filename="${safeName}">${safeName}</button><span class="editor-file-size">${sizeStr}</span></div>`;
-    }).join('');
-    filesSection.querySelectorAll('.editor-file-download').forEach(btn=>{
-      btn.addEventListener('click', async()=>{
-        const filename = btn.dataset.filename;
-        try{
-          const token = localStorage.getItem('gcp_token');
-          const res = await fetch(`/api/tp/files/download?event_id=${encodeURIComponent(eventId)}&section_id=${encodeURIComponent(sectionId)}&filename=${encodeURIComponent(filename)}`, {
-            headers: token ? { 'Authorization': 'Bearer '+token } : {}
-          });
-          if(!res.ok) throw new Error('Download failed ('+res.status+')');
-          const blob = await res.blob();
-          const url = URL.createObjectURL(blob);
-          const a = document.createElement('a');
-          a.href=url; a.download=filename;
-          document.body.appendChild(a); a.click(); a.remove();
-          URL.revokeObjectURL(url);
-        }catch(e){ showMsg(e.message||'Download failed', true); }
-      });
-    });
+    if(filesSection) filesSection.style.display='none';
   }
 
   function updateUploadedFilesBtn(){
