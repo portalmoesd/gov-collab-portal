@@ -45,6 +45,57 @@ const DEFAULT_SECTIONS = [
   ['innovation', 'Innovation', 80],
 ];
 
+// Departments & Agencies grouped by section key
+const DEFAULT_DEPARTMENTS = {
+  investment: [
+    'Capital Markets and Pension Reform Department',
+    'Investment Policy Department',
+    'Invest in Georgia (Agency)',
+  ],
+  innovation: [
+    'Innovation and Technology Department',
+    'Georgia\'s Innovation and Technology Agency (GITA)',
+  ],
+  tourism: [
+    'Tourism Policy Department',
+    'Georgian National Tourism Administration (GNTA)',
+  ],
+  transport: [
+    'Transport and Logistics Policy Department',
+    'Road Safety Department',
+    'Maritime Transport Agency',
+    'Civil Aviation Agency',
+    'Land Transport Agency',
+  ],
+  communications_it_post: [
+    'Communications, Information Technologies and Post Department',
+    'Georgian Post (Agency)',
+  ],
+  energy: [
+    'Energy Reforms and International Relations Department',
+    'Energy Efficiency and Renewable Energy Department',
+    'Energy Policy and Investment Department',
+    'Georgian Oil and Gas Corporation',
+    'Georgian State Electrosystem',
+    'Electricity System Commercial Operator (ESCO)',
+  ],
+  economic_relations: [
+    'Foreign Trade Policy Department',
+    'Trade and International Economic Relations Department',
+    'Construction Policy Department',
+    'Technical and Construction Supervision Agency',
+    'National Agency of Standards and Metrology',
+  ],
+  international_relations: [
+    'Economic Analysis and Reforms Department',
+    'Economic Policy Department',
+    'Strategic Development Department',
+    'Legal Department',
+    'State Property Management Department',
+    'Spatial Planning and Construction Policy Department',
+  ],
+};
+
 // Full ISO country list (name_en, code)
 const COUNTRIES = [
   ["Afghanistan", "AF"],
@@ -335,6 +386,22 @@ async function main() {
            updated_at = NOW()`,
         [key, label, orderIndex]
       );
+    }
+
+    // Departments
+    for (const [sectionKey, deptNames] of Object.entries(DEFAULT_DEPARTMENTS)) {
+      const secRow = await client.query(`SELECT id FROM sections WHERE key=$1`, [sectionKey]);
+      if (!secRow.rows[0]) continue;
+      let idx = 0;
+      for (const name of deptNames) {
+        await client.query(
+          `INSERT INTO departments (name, section_id, is_active, order_index, created_at, updated_at)
+           VALUES ($1, $2, TRUE, $3, NOW(), NOW())
+           ON CONFLICT DO NOTHING`,
+          [name, secRow.rows[0].id, idx * 10]
+        );
+        idx++;
+      }
     }
 
     // Countries

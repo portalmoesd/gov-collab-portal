@@ -199,3 +199,29 @@ ALTER TYPE tp_section_status ADD VALUE IF NOT EXISTS 'submitted_to_deputy';
 ALTER TYPE tp_section_status ADD VALUE IF NOT EXISTS 'returned_by_deputy';
 ALTER TYPE tp_section_status ADD VALUE IF NOT EXISTS 'submitted_to_minister';
 ALTER TYPE tp_section_status ADD VALUE IF NOT EXISTS 'returned_by_minister';
+
+-- Departments & Agencies (belong to a section by default, admin can reassign)
+CREATE TABLE IF NOT EXISTS departments (
+    id          SERIAL PRIMARY KEY,
+    name        TEXT NOT NULL,
+    section_id  INTEGER REFERENCES sections(id) ON DELETE SET NULL,
+    is_active   BOOLEAN NOT NULL DEFAULT TRUE,
+    order_index INTEGER NOT NULL DEFAULT 0,
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_departments_section_id ON departments(section_id);
+CREATE INDEX IF NOT EXISTS idx_departments_is_active ON departments(is_active);
+
+-- Per-event department selection (which departments are included in a given event)
+CREATE TABLE IF NOT EXISTS event_required_departments (
+    id              SERIAL PRIMARY KEY,
+    event_id        INTEGER NOT NULL REFERENCES events(id) ON DELETE CASCADE,
+    department_id   INTEGER NOT NULL REFERENCES departments(id) ON DELETE CASCADE,
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CONSTRAINT uq_event_required_departments UNIQUE (event_id, department_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_erd_event_id ON event_required_departments(event_id);
+CREATE INDEX IF NOT EXISTS idx_erd_department_id ON event_required_departments(department_id);

@@ -181,6 +181,34 @@ async function ensureSchema() {
   await pool.query(`ALTER TABLE tp_section_comments ADD COLUMN IF NOT EXISTS parent_id INTEGER REFERENCES tp_section_comments(id) ON DELETE CASCADE`).catch(()=>{});
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_tsc_lookup ON tp_section_comments(event_id, country_id, section_id)`).catch(()=>{});
   await pool.query(`ALTER TABLE event_required_sections ADD COLUMN IF NOT EXISTS custom_label TEXT`).catch(()=>{});
+
+  // Departments & Agencies table
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS departments (
+      id          SERIAL PRIMARY KEY,
+      name        TEXT NOT NULL,
+      section_id  INTEGER REFERENCES sections(id) ON DELETE SET NULL,
+      is_active   BOOLEAN NOT NULL DEFAULT TRUE,
+      order_index INTEGER NOT NULL DEFAULT 0,
+      created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `).catch(()=>{});
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_departments_section_id ON departments(section_id)`).catch(()=>{});
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_departments_is_active ON departments(is_active)`).catch(()=>{});
+
+  // Per-event department selection
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS event_required_departments (
+      id              SERIAL PRIMARY KEY,
+      event_id        INTEGER NOT NULL REFERENCES events(id) ON DELETE CASCADE,
+      department_id   INTEGER NOT NULL REFERENCES departments(id) ON DELETE CASCADE,
+      created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      CONSTRAINT uq_event_required_departments UNIQUE (event_id, department_id)
+    )
+  `).catch(()=>{});
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_erd_event_id ON event_required_departments(event_id)`).catch(()=>{});
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_erd_department_id ON event_required_departments(department_id)`).catch(()=>{});
 }
 
 async function ensureRolesExist() {
@@ -273,6 +301,75 @@ async function ensureBaseData() {
         }
         console.log(`Base seed: inserted ${countries.length} countries.`);
       }
+    }
+    // Departments & Agencies (seeded once, grouped by section)
+    const deptCount = await queryOne(`SELECT COUNT(*)::int AS n FROM departments`, []);
+    if ((deptCount?.n || 0) === 0) {
+      // Map: section_key -> [department names]
+      const DEPT_MAP = {
+        investment: [
+          'Capital Markets and Pension Reform Department',
+          'Investment Policy Department',
+          'Invest in Georgia (Agency)',
+        ],
+        innovation: [
+          'Innovation and Technology Department',
+          'Georgia\'s Innovation and Technology Agency (GITA)',
+        ],
+        tourism: [
+          'Tourism Policy Department',
+          'Georgian National Tourism Administration (GNTA)',
+        ],
+        transport: [
+          'Transport and Logistics Policy Department',
+          'Road Safety Department',
+          'Maritime Transport Agency',
+          'Civil Aviation Agency',
+          'Land Transport Agency',
+        ],
+        communications_it_post: [
+          'Communications, Information Technologies and Post Department',
+          'Georgian Post (Agency)',
+        ],
+        energy: [
+          'Energy Reforms and International Relations Department',
+          'Energy Efficiency and Renewable Energy Department',
+          'Energy Policy and Investment Department',
+          'Georgian Oil and Gas Corporation',
+          'Georgian State Electrosystem',
+          'Electricity System Commercial Operator (ESCO)',
+        ],
+        economic_relations: [
+          'Foreign Trade Policy Department',
+          'Trade and International Economic Relations Department',
+          'Construction Policy Department',
+          'Technical and Construction Supervision Agency',
+          'National Agency of Standards and Metrology',
+        ],
+        international_relations: [
+          'Economic Analysis and Reforms Department',
+          'Economic Policy Department',
+          'Strategic Development Department',
+          'Legal Department',
+          'State Property Management Department',
+          'Spatial Planning and Construction Policy Department',
+        ],
+      };
+
+      for (const [sectionKey, deptNames] of Object.entries(DEPT_MAP)) {
+        const secRow = await queryOne(`SELECT id FROM sections WHERE key=$1`, [sectionKey]);
+        if (!secRow) continue;
+        let idx = 0;
+        for (const name of deptNames) {
+          await pool.query(
+            `INSERT INTO departments (name, section_id, is_active, order_index, created_at, updated_at)
+             VALUES ($1, $2, TRUE, $3, NOW(), NOW())`,
+            [name, secRow.id, idx * 10]
+          );
+          idx++;
+        }
+      }
+      console.log('Base seed: inserted default departments.');
     }
   } catch (e) {
     console.error('ensureBaseData failed:', e);
@@ -702,6 +799,16 @@ async function getEventWithSections(eventId, countryIdForStatuses = null) {
     );
   }
 
+  // Departments assigned to this event
+  const requiredDepartments = await queryAll(
+    `SELECT d.id, d.name, d.section_id, d.order_index
+     FROM event_required_departments erd
+     JOIN departments d ON d.id = erd.department_id
+     WHERE erd.event_id = $1
+     ORDER BY d.section_id ASC, d.order_index ASC, d.id ASC`,
+    [eventId]
+  );
+
   return {
     id: event.id,
     countryId: event.country_id,
@@ -716,6 +823,7 @@ async function getEventWithSections(eventId, countryIdForStatuses = null) {
     createdAt: event.created_at,
     updatedAt: event.updated_at,
     requiredSections,
+    requiredDepartments,
     sectionStatuses,
   };
 }
@@ -1027,6 +1135,65 @@ app.delete('/api/sections/:id', requireRole('admin'), async (req, res) => {
   if (!Number.isFinite(id)) return res.status(400).json({ error: 'Invalid id' });
 
   await pool.query(`UPDATE sections SET is_active=false, updated_at=NOW() WHERE id=$1`, [id]);
+  return res.json({ ok: true });
+});
+
+/** 7.3b Departments & Agencies **/
+app.get('/api/departments', async (req, res) => {
+  const rows = await queryAll(
+    `SELECT d.id, d.name, d.section_id, d.is_active, d.order_index,
+            s.key AS section_key, s.label AS section_label
+     FROM departments d
+     LEFT JOIN sections s ON s.id = d.section_id
+     WHERE d.is_active = true
+     ORDER BY s.order_index ASC, d.order_index ASC, d.id ASC`,
+    []
+  );
+  return res.json(rows);
+});
+
+app.post('/api/departments', requireRole('admin'), async (req, res) => {
+  const { name, sectionId, orderIndex } = req.body || {};
+  if (!name) return res.status(400).json({ error: 'name required' });
+
+  const row = await queryOne(
+    `INSERT INTO departments (name, section_id, is_active, order_index, created_at, updated_at)
+     VALUES ($1, $2, TRUE, $3, NOW(), NOW()) RETURNING *`,
+    [String(name), sectionId ? Number(sectionId) : null, Number(orderIndex) || 0]
+  );
+  return res.status(201).json(row);
+});
+
+app.put('/api/departments/:id', requireRole('admin'), async (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isFinite(id)) return res.status(400).json({ error: 'Invalid id' });
+
+  const { name, sectionId, orderIndex, isActive } = req.body || {};
+  const fields = [];
+  const values = [];
+  let idx = 1;
+
+  if (name !== undefined) { fields.push(`name=$${idx++}`); values.push(String(name)); }
+  if (sectionId !== undefined) { fields.push(`section_id=$${idx++}`); values.push(sectionId === null ? null : Number(sectionId)); }
+  if (orderIndex !== undefined) { fields.push(`order_index=$${idx++}`); values.push(Number(orderIndex) || 0); }
+  if (isActive !== undefined) { fields.push(`is_active=$${idx++}`); values.push(Boolean(isActive)); }
+
+  if (fields.length === 0) return res.status(400).json({ error: 'No fields to update' });
+  fields.push(`updated_at=NOW()`);
+
+  values.push(id);
+  await pool.query(`UPDATE departments SET ${fields.join(', ')} WHERE id=$${idx}`, values);
+
+  const out = await queryOne(`SELECT * FROM departments WHERE id=$1`, [id]);
+  if (!out) return res.status(404).json({ error: 'Department not found' });
+  return res.json(out);
+});
+
+app.delete('/api/departments/:id', requireRole('admin'), async (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isFinite(id)) return res.status(400).json({ error: 'Invalid id' });
+
+  await pool.query(`UPDATE departments SET is_active=false, updated_at=NOW() WHERE id=$1`, [id]);
   return res.json({ ok: true });
 });
 
@@ -1379,6 +1546,15 @@ app.get('/api/events/:id', authRequired, attachUser, async (req, res) => {
     [eventId]
   );
 
+  const requiredDepartments = await queryAll(
+    `SELECT d.id, d.name, d.section_id, d.order_index
+     FROM event_required_departments erd
+     JOIN departments d ON d.id = erd.department_id
+     WHERE erd.event_id=$1
+     ORDER BY d.section_id ASC, d.order_index ASC, d.id ASC`,
+    [eventId]
+  );
+
   return res.json({
     id: event.id,
     country_id: event.country_id,
@@ -1386,13 +1562,17 @@ app.get('/api/events/:id', authRequired, attachUser, async (req, res) => {
     country_code: event.country_code,
     title: event.title,
     occasion: event.occasion,
-    // Document submission endpoint config (Supervisor / Deputy / Minister)
     submitter_role: event.submitter_role,
     submitterRole: event.submitter_role,
+    lower_submitter_role: event.lower_submitter_role,
+    lowerSubmitterRole: event.lower_submitter_role,
+    language: event.language,
     deadline_date: event.deadline_date,
     is_active: event.is_active,
     ended_at: event.ended_at,
-    required_sections: required
+    created_at: event.created_at,
+    required_sections: required,
+    required_departments: requiredDepartments,
   });
   } catch (e) {
     console.error('GET /api/events/:id failed', e);
@@ -1513,7 +1693,7 @@ app.get('/api/my/sections', authRequired, attachUser, async (req, res) => {
 
 // Super-collaborators can also create/update events (they still cannot end events)
 app.post('/api/events', requireRole('admin', 'deputy', 'minister', 'supervisor', 'protocol', 'super_collaborator', 'collaborator'), async (req, res) => {
-  const { countryId, title, occasion, deadlineDate, requiredSectionIds, submitterRole, lowerSubmitterRole, language } = req.body || {};
+  const { countryId, title, occasion, deadlineDate, requiredSectionIds, requiredDepartmentIds, submitterRole, lowerSubmitterRole, language } = req.body || {};
   if (!countryId || !title) return res.status(400).json({ error: 'countryId and title required' });
 
   const normalizedSubmitterRole = ['supervisor','deputy','minister','super_collaborator'].includes(String(submitterRole||'').toLowerCase())
@@ -1557,6 +1737,17 @@ app.post('/api/events', requireRole('admin', 'deputy', 'minister', 'supervisor',
       );
     }
 
+    // Insert required departments
+    const departmentIds = Array.isArray(requiredDepartmentIds) ? requiredDepartmentIds.map(Number).filter(Number.isFinite) : [];
+    for (const did of departmentIds) {
+      await client.query(
+        `INSERT INTO event_required_departments (event_id, department_id, created_at)
+         VALUES ($1, $2, NOW())
+         ON CONFLICT (event_id, department_id) DO NOTHING`,
+        [eventId, did]
+      );
+    }
+
     await client.query('COMMIT');
 
     const out = await getEventWithSections(eventId, null);
@@ -1574,7 +1765,7 @@ app.put('/api/events/:id', requireRole('admin', 'deputy', 'minister', 'superviso
   const eventId = Number(req.params.id);
   if (!Number.isFinite(eventId)) return res.status(400).json({ error: 'Invalid id' });
 
-  const { countryId, title, occasion, deadlineDate, isActive, requiredSectionIds, submitterRole, lowerSubmitterRole, language } = req.body || {};
+  const { countryId, title, occasion, deadlineDate, isActive, requiredSectionIds, requiredDepartmentIds, submitterRole, lowerSubmitterRole, language } = req.body || {};
 
   const client = await pool.connect();
   try {
@@ -1625,6 +1816,19 @@ app.put('/api/events/:id', requireRole('admin', 'deputy', 'minister', 'superviso
           ON CONFLICT (event_id, section_id) DO NOTHING
           `,
           [eventId, sid]
+        );
+      }
+    }
+
+    if (Array.isArray(requiredDepartmentIds)) {
+      await client.query(`DELETE FROM event_required_departments WHERE event_id=$1`, [eventId]);
+      const departmentIds = requiredDepartmentIds.map(Number).filter(Number.isFinite);
+      for (const did of departmentIds) {
+        await client.query(
+          `INSERT INTO event_required_departments (event_id, department_id, created_at)
+           VALUES ($1, $2, NOW())
+           ON CONFLICT (event_id, department_id) DO NOTHING`,
+          [eventId, did]
         );
       }
     }
