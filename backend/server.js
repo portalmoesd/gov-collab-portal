@@ -261,21 +261,22 @@ function extractJsonArrayFromSeed(seedContent, constName) {
 }
 
 async function ensureBaseData() {
-  // Populate core reference data (sections + countries) on a fresh DB.
+  // Populate core reference data (sections + countries + departments + deputies) on a fresh DB.
   // This is intentionally idempotent and safe to run on every boot.
   try {
     // Sections
     const secCount = await queryOne(`SELECT COUNT(*)::int AS n FROM sections`, []);
     if ((secCount?.n || 0) === 0) {
       const DEFAULT_SECTIONS = [
-        ['international_relations', 'International Relations', 10],
-        ['economic_relations', 'Economic Relations', 20],
-        ['investment', 'Investment', 30],
-        ['tourism', 'Tourism', 40],
-        ['transport', 'Transport', 50],
+        ['investment', 'Investment', 10],
+        ['innovation', 'Innovation', 20],
+        ['tourism', 'Tourism', 30],
+        ['transport', 'Transport', 40],
+        ['communications_it_post', 'Communications, Information Technology and Post', 50],
         ['energy', 'Energy', 60],
-        ['communications_it_post', 'Communications, Information Technology and Post', 70],
-        ['innovation', 'Innovation', 80],
+        ['trade_construction', 'Trade and Construction', 70],
+        ['economic_policy', 'Economic Policy', 80],
+        ['legal_spatial', 'Legal and Spatial Development', 90],
       ];
       for (const [key, label, orderIndex] of DEFAULT_SECTIONS) {
         await pool.query(
@@ -315,10 +316,10 @@ async function ensureBaseData() {
         console.log(`Base seed: inserted ${countries.length} countries.`);
       }
     }
+
     // Departments & Agencies (seeded once, grouped by section)
     const deptCount = await queryOne(`SELECT COUNT(*)::int AS n FROM departments`, []);
     if ((deptCount?.n || 0) === 0) {
-      // Map: section_key -> [department names]
       const DEPT_MAP = {
         investment: [
           'Capital Markets and Pension Reform Department',
@@ -352,17 +353,19 @@ async function ensureBaseData() {
           'Georgian State Electrosystem',
           'Electricity System Commercial Operator (ESCO)',
         ],
-        economic_relations: [
+        trade_construction: [
           'Foreign Trade Policy Department',
           'Trade and International Economic Relations Department',
           'Construction Policy Department',
           'Technical and Construction Supervision Agency',
           'National Agency of Standards and Metrology',
         ],
-        international_relations: [
+        economic_policy: [
           'Economic Analysis and Reforms Department',
           'Economic Policy Department',
           'Strategic Development Department',
+        ],
+        legal_spatial: [
           'Legal Department',
           'State Property Management Department',
           'Spatial Planning and Construction Policy Department',
@@ -383,6 +386,61 @@ async function ensureBaseData() {
         }
       }
       console.log('Base seed: inserted default departments.');
+    }
+
+    // Deputy users (seeded once)
+    const deputyCount = await queryOne(
+      `SELECT COUNT(*)::int AS n FROM users u JOIN roles r ON r.id=u.role_id WHERE r.key='deputy'`, []
+    );
+    if ((deputyCount?.n || 0) === 0) {
+      const DEPUTIES = [
+        ['i.nadareishvili', 'Irakli Nadareishvili'],
+        ['t.ioseliani', 'Tamar Ioseliani'],
+        ['n.pkhaladze', 'Nino Pkhaladze'],
+        ['g.arveladze', 'Genadi Arveladze'],
+        ['k.tsintsadze', 'Ketevan Tsintsadze'],
+        ['e.enukidze', 'Ekaterine Enukidze'],
+      ];
+
+      const deputyRole = await queryOne(`SELECT id FROM roles WHERE key='deputy'`, []);
+      if (deputyRole) {
+        const hash = await bcrypt.hash('123', 10);
+        for (const [username, fullName] of DEPUTIES) {
+          await pool.query(
+            `INSERT INTO users (username, password_hash, full_name, role_id, is_active, created_at, updated_at)
+             VALUES ($1, $2, $3, $4, TRUE, NOW(), NOW())
+             ON CONFLICT (username) DO NOTHING`,
+            [username, hash, fullName, deputyRole.id]
+          );
+        }
+        console.log('Base seed: inserted default deputy users.');
+
+        // Deputy-section assignments
+        const DEPUTY_SECTION_MAP = {
+          'i.nadareishvili': ['investment', 'innovation', 'tourism'],
+          't.ioseliani': ['transport', 'communications_it_post'],
+          'n.pkhaladze': ['energy'],
+          'g.arveladze': ['trade_construction'],
+          'k.tsintsadze': ['economic_policy'],
+          'e.enukidze': ['legal_spatial'],
+        };
+
+        for (const [username, sectionKeys] of Object.entries(DEPUTY_SECTION_MAP)) {
+          const userRow = await queryOne(`SELECT id FROM users WHERE username=$1`, [username]);
+          if (!userRow) continue;
+          for (const sectionKey of sectionKeys) {
+            const secRow = await queryOne(`SELECT id FROM sections WHERE key=$1`, [sectionKey]);
+            if (!secRow) continue;
+            await pool.query(
+              `INSERT INTO deputy_section_assignments (user_id, section_id, created_at)
+               VALUES ($1, $2, NOW())
+               ON CONFLICT (user_id, section_id) DO NOTHING`,
+              [userRow.id, secRow.id]
+            );
+          }
+        }
+        console.log('Base seed: inserted deputy-section assignments.');
+      }
     }
   } catch (e) {
     console.error('ensureBaseData failed:', e);
