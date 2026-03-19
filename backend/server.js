@@ -2158,10 +2158,10 @@ app.post('/api/tp/approve-section', requireRole('super_collaborator','supervisor
   }
 
   // Set original_submitter_role when acting outside the normal pipeline entry point
-  const setOriginalRole = canActAsLowest ||
-    (supervisorPreApproval && !contentRowApp?.original_submitter_role);
+  // Only set if not already recorded (preserves earliest editor)
+  const setOriginalRole = (canActAsLowest || supervisorPreApproval) &&
+    !contentRowApp?.original_submitter_role;
   if (setOriginalRole) {
-    // Acting as lowest: set original_submitter_role
     await pool.query(
       `UPDATE tp_content
        SET status=$4, status_comment=NULL, last_updated_at=NOW(), last_updated_by_user_id=$5,
@@ -2246,10 +2246,11 @@ app.post('/api/tp/approve-all-sections', requireRole('super_collaborator','super
       }
 
       // Set original_submitter_role when acting outside the normal pipeline entry point
+      // Only set if not already recorded (preserves earliest editor)
       const canActAsLowest = roleKey === 'super_collaborator' && currentStatus === 'draft';
       const supervisorPreApproval = roleKey === 'supervisor' && !rolePast.includes(currentStatus);
-      const setOriginalRole = canActAsLowest ||
-        (supervisorPreApproval && !contentRow?.original_submitter_role);
+      const setOriginalRole = (canActAsLowest || supervisorPreApproval) &&
+        !contentRow?.original_submitter_role;
 
       if (setOriginalRole) {
         await pool.query(

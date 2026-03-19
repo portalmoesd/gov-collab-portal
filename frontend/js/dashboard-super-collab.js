@@ -210,6 +210,7 @@
       'submitted_to_collaborator','returned_by_collaborator','approved_by_collaborator_3',
       'submitted_to_collaborator_2','returned_by_collaborator_2','approved_by_collaborator_2',
       'submitted_to_collaborator_3','returned_by_collaborator_3',
+      'returned_by_supervisor','returned_by_deputy','returned_by_minister',
     ].includes(s)||rtr==='super_collaborator';
     const canActAsLowest=s==='draft';
     const canApprove=isAtMe||canActAsLowest;

@@ -198,7 +198,7 @@
     const rtr=String(section.returnTargetRole||'').toLowerCase();
     const isAssigned=!!section.isAssigned;
     // At me: section is submitted/returned to Head Collab, OR explicitly returned to me
-    const isAtMe=['submitted_to_collaborator_2','returned_by_collaborator_2'].includes(s)||rtr==='collaborator_2';
+    const isAtMe=['submitted_to_collaborator_2','returned_by_collaborator_2','returned_by_collaborator_3','returned_by_collaborator','returned_by_super_collaborator','returned_by_supervisor','returned_by_deputy','returned_by_minister'].includes(s)||rtr==='collaborator_2';
     // Can act as lowest: assigned section at draft state (no Collab I first)
     const canActAsLowest=isAssigned&&s==='draft';
     const canOpen=isAssigned||isAtMe||canActAsLowest;
@@ -326,6 +326,23 @@
     refreshCustomDropdown(eventSelect);
   }
 
+  function populateEventDetails(ev){
+    const el=document.getElementById('eventDetails');
+    if(!el||!ev) return;
+    const langLabels={en:'English',ka:'ქართული',ru:'Русский'};
+    const langVal=langLabels[ev.language]||(ev.language||'').toUpperCase()||'EN';
+    const taskHtml=ev.task||ev.occasion||'';
+    function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+    el.innerHTML=`
+      <div class="event-details__task">${taskHtml||'—'}</div>
+      <div class="event-details__meta">
+        <div class="event-details__item"><span class="event-details__label">Country</span><span>${esc(ev.country_name_en||'')}</span></div>
+        <div class="event-details__item"><span class="event-details__label">Language</span><span class="badge lang">${esc(langVal)}</span></div>
+        <div class="event-details__item"><span class="event-details__label">Deadline</span><span>${esc(window.GCP.formatDate(ev.deadline_date)||'—')}</span></div>
+      </div>`;
+    el.hidden=false;
+  }
+
   eventSelect.addEventListener('change', async()=>{
     setMsg('');
     currentEventId=Number(eventSelect.value);
@@ -336,9 +353,12 @@
       if(sectionsEmpty) sectionsEmpty.hidden=false;
       if(docStatusBox) docStatusBox.innerHTML='';
       if(requiredSectionsPanel) requiredSectionsPanel.hidden=true;
+      const detailsEl=document.getElementById('eventDetails');
+      if(detailsEl) detailsEl.hidden=true;
       return;
     }
     if(requiredSectionsPanel) requiredSectionsPanel.hidden=false;
+    populateEventDetails(eventsById.get(currentEventId));
     try{ await refreshStatusGrid(); }
     catch(e){ setMsg(e.message||'Failed to load sections',true); }
   });

@@ -140,14 +140,15 @@
     const s   = String(tp.status || 'draft').toLowerCase();
     const rtr = String(tp.returnTargetRole || '').toLowerCase();
     if (role === 'collaborator_1')     return s === 'draft' || rtr === 'collaborator_1';
-    if (role === 'collaborator_2')     return ['submitted_to_collaborator_2','returned_by_collaborator_2'].includes(s) || rtr === 'collaborator_2' || s === 'draft';
-    if (role === 'collaborator_3')     return ['submitted_to_collaborator_3','returned_by_collaborator_3','approved_by_collaborator_2','submitted_to_collaborator_2','returned_by_collaborator_2'].includes(s) || rtr === 'collaborator_3' || s === 'draft';
-    if (role === 'collaborator')       return ['submitted_to_collaborator','returned_by_collaborator','approved_by_collaborator_2','approved_by_collaborator_3'].includes(s) || rtr === 'collaborator' || s === 'draft';
+    if (role === 'collaborator_2')     return ['submitted_to_collaborator_2','returned_by_collaborator_2','returned_by_collaborator_3','returned_by_collaborator','returned_by_super_collaborator','returned_by_supervisor','returned_by_deputy','returned_by_minister'].includes(s) || rtr === 'collaborator_2' || s === 'draft';
+    if (role === 'collaborator_3')     return ['submitted_to_collaborator_3','returned_by_collaborator_3','approved_by_collaborator_2','submitted_to_collaborator_2','returned_by_collaborator_2','returned_by_collaborator','returned_by_super_collaborator','returned_by_supervisor','returned_by_deputy','returned_by_minister'].includes(s) || rtr === 'collaborator_3' || s === 'draft';
+    if (role === 'collaborator')       return ['submitted_to_collaborator','returned_by_collaborator','approved_by_collaborator_2','approved_by_collaborator_3','returned_by_super_collaborator','returned_by_supervisor','returned_by_deputy','returned_by_minister'].includes(s) || rtr === 'collaborator' || s === 'draft';
     if (role === 'super_collaborator') return [
       'submitted_to_super_collaborator','returned_by_super_collaborator','approved_by_collaborator',
       'submitted_to_collaborator','returned_by_collaborator','approved_by_collaborator_3',
       'submitted_to_collaborator_2','returned_by_collaborator_2','approved_by_collaborator_2',
       'submitted_to_collaborator_3','returned_by_collaborator_3',
+      'returned_by_supervisor','returned_by_deputy','returned_by_minister',
     ].includes(s) || rtr === 'super_collaborator' || s === 'draft';
     return true; // supervisor / deputy / minister / admin always active
   }
@@ -193,19 +194,19 @@
       if (btnSave)   btnSave.style.display   = "";
       if (btnSubmit) btnSubmit.style.display = "";
       if (btnUpload) btnUpload.style.display = "";
-      const canReturn = ['submitted_to_collaborator_2', 'returned_by_collaborator_2'].includes(s);
+      const canReturn = ['submitted_to_collaborator_2','returned_by_collaborator_2','returned_by_collaborator_3','returned_by_collaborator','returned_by_super_collaborator','returned_by_supervisor','returned_by_deputy','returned_by_minister'].includes(s);
       if (btnReturn) btnReturn.style.display = canReturn ? "" : "none";
     } else if (role === 'collaborator_3') {
       if (btnSave)   btnSave.style.display   = "";
       if (btnSubmit) btnSubmit.style.display = "";
       if (btnUpload) btnUpload.style.display = "";
-      const canReturn = ['submitted_to_collaborator_3','returned_by_collaborator_3','approved_by_collaborator_2','submitted_to_collaborator_2','returned_by_collaborator_2'].includes(s);
+      const canReturn = ['submitted_to_collaborator_3','returned_by_collaborator_3','approved_by_collaborator_2','submitted_to_collaborator_2','returned_by_collaborator_2','returned_by_collaborator','returned_by_super_collaborator','returned_by_supervisor','returned_by_deputy','returned_by_minister'].includes(s);
       if (btnReturn) btnReturn.style.display = canReturn ? "" : "none";
     } else if (role === 'collaborator') {
       if (btnSave)   btnSave.style.display   = "";
       if (btnSubmit) btnSubmit.style.display = "";
       if (btnUpload) btnUpload.style.display = "";
-      const canReturn = ['submitted_to_collaborator', 'returned_by_collaborator'].includes(s);
+      const canReturn = ['submitted_to_collaborator','returned_by_collaborator','returned_by_super_collaborator','returned_by_supervisor','returned_by_deputy','returned_by_minister'].includes(s);
       if (btnReturn) btnReturn.style.display = canReturn ? "" : "none";
     } else if (role === 'super_collaborator') {
       if (btnSave)    btnSave.style.display    = "";
