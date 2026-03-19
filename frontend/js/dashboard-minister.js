@@ -361,11 +361,26 @@
     previewFullBtn.disabled = false;
   }
 
+  function openConfirmModal(html){
+    const modal = modalBackdrop.querySelector('.modal');
+    modal.classList.add('confirm-modal');
+    modal.querySelector('.close-row').hidden = true;
+    modalContent.innerHTML = html;
+    modalBackdrop.style.display = 'flex';
+  }
+  function closeConfirmModal(){
+    const modal = modalBackdrop.querySelector('.modal');
+    modal.classList.remove('confirm-modal');
+    modal.querySelector('.close-row').hidden = false;
+    modalBackdrop.style.display = 'none';
+    modalContent.innerHTML = '';
+  }
+
   sendToLibraryBtn.addEventListener('click', () => {
     setMsg('');
     if (!currentEventId) return;
 
-    modalContent.innerHTML = `
+    openConfirmModal(`
       <div class="confirm-dialog">
         <div class="confirm-dialog__icon confirm-dialog__icon--question">?</div>
         <h2 class="confirm-dialog__title">Send to Library</h2>
@@ -375,13 +390,9 @@
           <button class="btn primary" id="confirmSend">Send</button>
         </div>
       </div>
-    `;
-    modalBackdrop.style.display = 'flex';
+    `);
 
-    document.getElementById('confirmCancel').addEventListener('click', () => {
-      modalBackdrop.style.display = 'none';
-      modalContent.innerHTML = '';
-    });
+    document.getElementById('confirmCancel').addEventListener('click', closeConfirmModal);
 
     document.getElementById('confirmSend').addEventListener('click', async () => {
       const sendBtn = document.getElementById('confirmSend');
@@ -405,17 +416,14 @@
           </div>
         `;
 
-        const closeAndRefresh = async () => {
-          modalBackdrop.style.display = 'none';
-          modalContent.innerHTML = '';
+        document.getElementById('confirmOk').addEventListener('click', async () => {
+          closeConfirmModal();
           currentEventId = null;
           eventSelect.value = '';
           await loadEvents();
           refreshCustomDropdown(eventSelect);
           await refresh();
-        };
-
-        document.getElementById('confirmOk').addEventListener('click', closeAndRefresh);
+        });
       } catch (e) {
         modalContent.innerHTML = `
           <div class="confirm-dialog">
@@ -427,10 +435,7 @@
             </div>
           </div>
         `;
-        document.getElementById('confirmOk').addEventListener('click', () => {
-          modalBackdrop.style.display = 'none';
-          modalContent.innerHTML = '';
-        });
+        document.getElementById('confirmOk').addEventListener('click', closeConfirmModal);
       }
     });
   });
