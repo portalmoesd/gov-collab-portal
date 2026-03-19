@@ -2205,7 +2205,7 @@ app.post('/api/tp/approve-all-sections', requireRole('super_collaborator','super
     );
     const roleKey = normalizeRoleKey(req.user.role_key);
     let sectionIds = required.map(r => Number(r.section_id)).filter(n => Number.isFinite(n));
-    if (isSectionPipelineRole(roleKey)) {
+    if (isSectionPipelineRole(roleKey) && !['collaborator','super_collaborator'].includes(roleKey)) {
       const assignedSectionIds = await getAssignedSectionIds(req.user.id);
       sectionIds = sectionIds.filter(id => assignedSectionIds.includes(id));
     }
