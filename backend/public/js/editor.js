@@ -208,7 +208,12 @@
       if (btnReturn)  btnReturn.style.display  = "";
       if (btnUpload)  btnUpload.style.display  = "";
     } else if (['supervisor','deputy','minister','admin'].includes(role)) {
-      const isApprovedState = s.startsWith('approved_by_') || s === 'approved' || s === 'locked';
+      // "Past me" means the section has already been approved by me or moved beyond my stage.
+      // approved_by_supervisor is the deputy's INCOMING status (not past deputy).
+      // approved_by_deputy is the minister's INCOMING status (not past minister).
+      const incomingApproval = (role === 'deputy' && s === 'approved_by_supervisor') ||
+                               (role === 'minister' && s === 'approved_by_deputy');
+      const isApprovedState = !incomingApproval && (s.startsWith('approved_by_') || s === 'approved' || s === 'locked');
       if ((role === 'deputy' || role === 'minister') && isApprovedState) {
         // After approval: full editing if this user is the document submitter (final approver), else Ask to Return
         const docSubmitter = String(tp.documentSubmitterRole || '').toLowerCase();
