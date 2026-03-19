@@ -4198,6 +4198,12 @@ body.gp-shell-ready .gp-sidebar__scrim{
 .editor-file-download:hover{ text-decoration:underline; }
 .editor-file-error{ padding:8px 12px; border-radius:12px; border:1px solid rgba(220,38,38,.2); background:rgba(254,226,226,.5); font-size:13px; color:#b91c1c; }
 
+.event-files-table tbody tr{ border-bottom:1px solid var(--border); }
+.event-files-table tbody tr:last-child{ border-bottom:none; }
+.event-files-table td{ padding:8px 10px; font-size:13px; vertical-align:middle; }
+.event-file-download{ background:none; border:none; padding:0; color:#0a84ff; font-weight:700; font-size:13px; cursor:pointer; text-align:left; word-break:break-all; }
+.event-file-download:hover{ text-decoration:underline; }
+
 /* Dark mode toggle button (light mode color) */
 .dm-toggle{
   color:#4b5563;

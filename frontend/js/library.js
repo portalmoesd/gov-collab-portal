@@ -82,7 +82,7 @@
     el.querySelector(".library-action--preview").addEventListener("click", () => previewDoc(eventId, countryId));
     el.querySelector(".library-action--pdf").addEventListener("click", () => exportPdf(eventId, countryId));
     el.querySelector(".library-action--word").addEventListener("click", () => exportWord(eventId, countryId));
-    el.querySelector(".library-action--files").addEventListener("click", () => { /* placeholder */ });
+    el.querySelector(".library-action--files").addEventListener("click", () => showEventFiles(eventId));
   }
 
   async function loadDocs(){
@@ -363,6 +363,82 @@
 
     }catch(err){
       msg.textContent = err.message || "Export failed";
+    }
+  }
+
+  async function showEventFiles(eventId){
+    msg.textContent = "";
+    try{
+      const data = await window.GCP.apiFetch(`/library/files?event_id=${encodeURIComponent(eventId)}`, { method:"GET" });
+      const files = data.files || [];
+
+      if(!files.length){
+        openModal(`
+          <h2 style="margin:0 0 12px;">Uploaded Files</h2>
+          <p class="muted">No files have been uploaded for this event.</p>
+        `);
+        return;
+      }
+
+      const rows = files.map(f => {
+        const safeName = window.GCP.escapeHtml(f.filename);
+        const sizeStr = f.size ? Math.ceil(f.size / 1024) + ' KB' : '';
+        const dateStr = fmtDDMMYYYY(f.uploadedAt);
+        const uploader = window.GCP.escapeHtml(f.uploadedBy);
+        const section = window.GCP.escapeHtml(f.sectionLabel);
+        return `<tr>
+          <td><button class="event-file-download" data-event-id="${eventId}" data-section-id="${f.sectionId}" data-filename="${safeName}">${safeName}</button></td>
+          <td class="small">${section}</td>
+          <td class="small">${dateStr}</td>
+          <td class="small">${uploader}</td>
+          <td class="small muted">${sizeStr}</td>
+        </tr>`;
+      }).join('');
+
+      openModal(`
+        <h2 style="margin:0 0 12px;">Uploaded Files</h2>
+        <div style="overflow:auto; max-height:60vh;">
+          <table class="event-files-table" style="width:100%; border-collapse:collapse;">
+            <thead>
+              <tr>
+                <th style="text-align:left; padding:8px 10px; border-bottom:2px solid var(--border); font-size:13px;">File Name</th>
+                <th style="text-align:left; padding:8px 10px; border-bottom:2px solid var(--border); font-size:13px;">Section</th>
+                <th style="text-align:left; padding:8px 10px; border-bottom:2px solid var(--border); font-size:13px;">Date</th>
+                <th style="text-align:left; padding:8px 10px; border-bottom:2px solid var(--border); font-size:13px;">Uploaded By</th>
+                <th style="text-align:left; padding:8px 10px; border-bottom:2px solid var(--border); font-size:13px;">Size</th>
+              </tr>
+            </thead>
+            <tbody>${rows}</tbody>
+          </table>
+        </div>
+      `);
+
+      // Wire download buttons
+      modalContent.querySelectorAll('.event-file-download').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          const eid = btn.dataset.eventId;
+          const sid = btn.dataset.sectionId;
+          const fname = btn.dataset.filename;
+          try {
+            const token = localStorage.getItem('gcp_token');
+            const res = await fetch(`/api/tp/files/download?event_id=${encodeURIComponent(eid)}&section_id=${encodeURIComponent(sid)}&filename=${encodeURIComponent(fname)}`, {
+              headers: token ? { 'Authorization': 'Bearer ' + token } : {}
+            });
+            if (!res.ok) throw new Error('Download failed (' + res.status + ')');
+            const blob = await res.blob();
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url; a.download = fname;
+            document.body.appendChild(a); a.click(); a.remove();
+            URL.revokeObjectURL(url);
+          } catch (e) {
+            msg.textContent = e.message || 'Download failed';
+          }
+        });
+      });
+
+    } catch(err) {
+      msg.textContent = err.message || "Failed to load files";
     }
   }
 
