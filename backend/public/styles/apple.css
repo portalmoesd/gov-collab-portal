@@ -4402,8 +4402,8 @@ body.gp-shell-ready .gp-sidebar__scrim{
 
 /* Confirmation dialog (Send to Library, etc.) */
 .modal.confirm-modal{
-  width:min(420px, 90vw);
-  padding:28px 24px 24px;
+  width:min(340px, 85vw);
+  padding:24px 20px 20px;
 }
 .confirm-dialog{
   text-align:center;
