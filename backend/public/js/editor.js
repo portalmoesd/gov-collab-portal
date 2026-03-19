@@ -174,6 +174,7 @@
           if (btnSave)    btnSave.style.display    = "";
           if (btnApprove) btnApprove.style.display = "";
           if (btnReturn)  btnReturn.style.display  = "";
+          if (btnUpload)  btnUpload.style.display  = "";
           return;
         }
       }
@@ -210,6 +211,7 @@
       if (btnSave)    btnSave.style.display    = "";
       if (btnApprove) btnApprove.style.display = "";
       if (btnReturn)  btnReturn.style.display  = "";
+      if (btnUpload)  btnUpload.style.display  = "";
     } else if (['supervisor','deputy','minister','admin'].includes(role)) {
       const isApprovedState = s.startsWith('approved_by_') || s === 'approved' || s === 'locked';
       if ((role === 'deputy' || role === 'minister') && isApprovedState) {
@@ -221,6 +223,7 @@
           if (btnSave)    btnSave.style.display    = "";
           if (btnApprove) btnApprove.style.display = "";
           if (btnReturn)  btnReturn.style.display  = "";
+          if (btnUpload)  btnUpload.style.display  = "";
         } else {
           if (btnAskToReturn) btnAskToReturn.style.display = "";
         }
@@ -228,6 +231,7 @@
         if (btnSave)    btnSave.style.display    = "";
         if (btnApprove) btnApprove.style.display = "";
         if (btnReturn)  btnReturn.style.display  = "";
+        if (btnUpload)  btnUpload.style.display  = "";
       }
     } else {
       if (btnSave) btnSave.style.display = "";
