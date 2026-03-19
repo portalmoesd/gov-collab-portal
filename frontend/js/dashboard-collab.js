@@ -21,7 +21,7 @@
   const sectionsEmpty         = document.getElementById('sectionsEmpty');
   const requiredSectionsPanel = document.getElementById('requiredSectionsPanel');
 
-  let eventMeta = {};
+  const eventsById = new Map();
   let currentEventId = null;
 
   // ---- Minimal custom dropdown ----
@@ -263,16 +263,33 @@
 
   async function loadUpcoming(){
     const events = await window.GCP.apiFetch('/events/upcoming',{method:'GET'});
-    eventMeta={};
+    eventsById.clear();
     eventSelect.innerHTML=`<option value="">Select event...</option>`;
     for(const ev of (events||[])){
-      eventMeta[ev.id]={ occasion:ev.task||ev.occasion||'', country:ev.country_name_en||'' };
+      eventsById.set(Number(ev.id),ev);
       const opt=document.createElement('option');
       opt.value=ev.id;
       opt.textContent=`${ev.title||'Event'} (${ev.country_name_en||''}${ev.deadline_date?', '+window.GCP.formatDate(ev.deadline_date):''})`;
       eventSelect.appendChild(opt);
     }
     refreshCustomDropdown(eventSelect);
+  }
+
+  function populateEventDetails(ev){
+    const el=document.getElementById('eventDetails');
+    if(!el||!ev) return;
+    const langLabels={en:'English',ka:'ქართული',ru:'Русский'};
+    const langVal=langLabels[ev.language]||(ev.language||'').toUpperCase()||'EN';
+    const taskHtml=ev.task||ev.occasion||'';
+    function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+    el.innerHTML=`
+      <div class="event-details__task">${taskHtml||'—'}</div>
+      <div class="event-details__meta">
+        <div class="event-details__item"><span class="event-details__label">Country</span><span>${esc(ev.country_name_en||'')}</span></div>
+        <div class="event-details__item"><span class="event-details__label">Language</span><span class="badge lang">${esc(langVal)}</span></div>
+        <div class="event-details__item"><span class="event-details__label">Deadline</span><span>${esc(window.GCP.formatDate(ev.deadline_date)||'—')}</span></div>
+      </div>`;
+    el.hidden=false;
   }
 
   eventSelect.addEventListener('change', async()=>{
@@ -284,9 +301,12 @@
       if(sectionsCards) sectionsCards.innerHTML='';
       if(sectionsEmpty) sectionsEmpty.hidden=false;
       if(requiredSectionsPanel) requiredSectionsPanel.hidden=true;
+      const detailsEl=document.getElementById('eventDetails');
+      if(detailsEl) detailsEl.hidden=true;
       return;
     }
     if(requiredSectionsPanel) requiredSectionsPanel.hidden=false;
+    populateEventDetails(eventsById.get(currentEventId));
     try{ await refreshStatusGrid(); }
     catch(e){ setMsg(e.message||'Failed to load sections',true); }
   });
