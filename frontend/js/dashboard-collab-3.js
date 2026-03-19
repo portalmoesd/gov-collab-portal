@@ -188,8 +188,8 @@
     const isAssigned=!!section.isAssigned;
     // At me: section submitted/returned to Curator, OR explicitly returned to Curator
     const isAtMe=['submitted_to_collaborator_3','returned_by_collaborator_3','returned_by_collaborator','returned_by_super_collaborator','returned_by_supervisor','returned_by_deputy','returned_by_minister'].includes(s)||rtr==='collaborator_3';
-    // Can act as lowest: assigned section at draft state (skip Collab I and Head Collab)
-    const canActAsLowest=isAssigned&&s==='draft';
+    // Can act as lowest: assigned section at draft state OR returned to a lower tier
+    const canActAsLowest=isAssigned&&(s==='draft'||(s.startsWith('returned_')&&!isAtMe));
     const canOpen=isAssigned||isAtMe||canActAsLowest;
 
     if(canOpen){
