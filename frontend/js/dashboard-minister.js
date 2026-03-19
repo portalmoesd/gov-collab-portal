@@ -370,7 +370,11 @@
         method:'POST',
         body: JSON.stringify({ eventId: currentEventId })
       });
-      setMsg('Document finalized and sent to Library.');
+      setMsg('The Document successfully sent to Library.');
+      currentEventId = null;
+      eventSelect.value = '';
+      await loadEvents();
+      refreshCustomDropdown(eventSelect);
       await refresh();
     } catch (e) {
       setMsg(e.message || 'Failed to send to library', true);

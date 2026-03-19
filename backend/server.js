@@ -2851,6 +2851,15 @@ app.post('/api/document/approve', requireRole('deputy','admin'), asyncRoute(asyn
       [eventId, req.user.id]
     );
   }
+
+  // When approved (sent to library), automatically end the event
+  if (newStatus === 'approved') {
+    await pool.query(
+      `UPDATE events SET ended_at=NOW(), ended_by_user_id=$2 WHERE id=$1 AND ended_at IS NULL`,
+      [eventId, req.user.id]
+    );
+  }
+
   return res.json({ success:true });
 }));
 
@@ -2886,6 +2895,13 @@ app.post('/api/document/approve-minister', requireRole('minister','admin'), asyn
       [eventId, req.user.id]
     );
   }
+
+  // Automatically end the event when sent to library
+  await pool.query(
+    `UPDATE events SET ended_at=NOW(), ended_by_user_id=$2 WHERE id=$1 AND ended_at IS NULL`,
+    [eventId, req.user.id]
+  );
+
   return res.json({ success:true });
 }));
 
