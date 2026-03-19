@@ -277,14 +277,10 @@
       html += `
         <div class="event-modal__section">
           <div class="event-modal__label">Required sections &amp; departments</div>
-          ${sections.length
-            ? `<ul class="event-modal__sections">${sections.map(s => {
-                // Find departments assigned to this section for this event
-                const sectionReq = req.find(r => window.GCP.escapeHtml(r.label) === s);
-                const sectionDepts = sectionReq
-                  ? reqDepts.filter(d => d.section_id === sectionReq.id).map(d => window.GCP.escapeHtml(d.name))
-                  : [];
-                return `<li><strong>${s}</strong>${sectionDepts.length ? `<ul>${sectionDepts.map(dn => `<li>${dn}</li>`).join('')}</ul>` : ''}</li>`;
+          ${req.length
+            ? `<ul class="event-modal__sections">${req.map(s => {
+                const sectionDepts = reqDepts.filter(d => d.section_id === s.id).map(d => window.GCP.escapeHtml(d.name));
+                return `<li><strong>${window.GCP.escapeHtml(s.label)}</strong>${sectionDepts.length ? `<ul>${sectionDepts.map(dn => `<li>${dn}</li>`).join('')}</ul>` : ''}</li>`;
               }).join('')}</ul>`
             : '<div class="event-modal__empty">No sections assigned.</div>'}
         </div>`;
@@ -531,6 +527,10 @@
     if (submitterSelect) submitterSelect.value = "deputy";
     if (lowerSubmitterSelect) lowerSubmitterSelect.value = "collaborator_2";
     if (languageSelect) languageSelect.value = "en";
+    // Clear indeterminate state on section checkboxes
+    for (const cb of requiredBox.querySelectorAll('input[data-section-id]')) {
+      cb.indeterminate = false;
+    }
     saveBtn.textContent = "Create event";
     msg.style.color = "var(--danger)";
     msg.textContent = "";

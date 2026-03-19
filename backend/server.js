@@ -1140,14 +1140,16 @@ app.delete('/api/sections/:id', requireRole('admin'), async (req, res) => {
 
 /** 7.3b Departments & Agencies **/
 app.get('/api/departments', async (req, res) => {
+  const roleKey = normalizeRoleKey(req.user.role_key);
+  const includeInactive = roleKey === 'admin';
   const rows = await queryAll(
     `SELECT d.id, d.name, d.section_id, d.is_active, d.order_index,
             s.key AS section_key, s.label AS section_label
      FROM departments d
      LEFT JOIN sections s ON s.id = d.section_id
-     WHERE d.is_active = true
+     WHERE ($1::boolean = true) OR (d.is_active = true)
      ORDER BY s.order_index ASC, d.order_index ASC, d.id ASC`,
-    []
+    [includeInactive]
   );
   return res.json(rows);
 });
