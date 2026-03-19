@@ -424,10 +424,7 @@
       ? _superIdx
       : (_simpleIdx >= _superIdx ? _simpleIdx + 1 : _simpleIdx);
     const active = Math.max(0, activeAbs - startStep);
-    // Only show steps up to the one immediately after the active step;
-    // tiers that haven't participated yet are hidden.
-    const endIdx = Math.min(active + 2, visibleSteps.length);
-    const shownSteps = visibleSteps.slice(0, endIdx);
+    const shownSteps = visibleSteps;
     const fillPercent = shownSteps.length > 1 ? (active / (shownSteps.length - 1)) * 100 : 100;
     const stepHtml = shownSteps.map((step, idx) => {
       const state = idx < active ? 'done' : (idx === active ? 'active' : 'todo');
