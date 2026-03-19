@@ -198,7 +198,7 @@
     const rtr=String(section.returnTargetRole||'').toLowerCase();
     const isAssigned=!!section.isAssigned;
     // At me: section is submitted/returned to Head Collab, OR explicitly returned to me
-    const isAtMe=['submitted_to_collaborator_2','returned_by_collaborator_2'].includes(s)||rtr==='collaborator_2';
+    const isAtMe=['submitted_to_collaborator_2','returned_by_collaborator_2','returned_by_collaborator_3','returned_by_collaborator','returned_by_super_collaborator','returned_by_supervisor','returned_by_deputy','returned_by_minister'].includes(s)||rtr==='collaborator_2';
     // Can act as lowest: assigned section at draft state (no Collab I first)
     const canActAsLowest=isAssigned&&s==='draft';
     const canOpen=isAssigned||isAtMe||canActAsLowest;

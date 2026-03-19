@@ -194,7 +194,7 @@
     const rtr=String(section.returnTargetRole||'').toLowerCase();
     const isAssigned=myAssignedSectionIds.has(Number(section.sectionId));
     // Collaborator can open: own sections, sections from lower tiers, or sections explicitly returned to them
-    const cameFromLower=['submitted_to_collaborator','returned_by_collaborator','approved_by_collaborator_2','approved_by_collaborator_3'].includes(s)||rtr==='collaborator';
+    const cameFromLower=['submitted_to_collaborator','returned_by_collaborator','approved_by_collaborator_2','approved_by_collaborator_3','returned_by_super_collaborator','returned_by_supervisor','returned_by_deputy','returned_by_minister'].includes(s)||rtr==='collaborator';
     // Can act as lowest: own assigned section at draft state
     const canActAsLowest=isAssigned&&s==='draft';
     const canOpen=isAssigned||cameFromLower||canActAsLowest;
