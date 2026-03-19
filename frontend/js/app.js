@@ -424,8 +424,12 @@
       ? _superIdx
       : (_simpleIdx >= _superIdx ? _simpleIdx + 1 : _simpleIdx);
     const active = Math.max(0, activeAbs - startStep);
-    const fillPercent = visibleSteps.length > 1 ? (active / (visibleSteps.length - 1)) * 100 : 100;
-    const stepHtml = visibleSteps.map((step, idx) => {
+    // Only show steps up to the one immediately after the active step;
+    // tiers that haven't participated yet are hidden.
+    const endIdx = Math.min(active + 2, visibleSteps.length);
+    const shownSteps = visibleSteps.slice(0, endIdx);
+    const fillPercent = shownSteps.length > 1 ? (active / (shownSteps.length - 1)) * 100 : 100;
+    const stepHtml = shownSteps.map((step, idx) => {
       const state = idx < active ? 'done' : (idx === active ? 'active' : 'todo');
       const noActor = (state === 'done' && !step.name) ? ' no-actor' : '';
       const displayLabel = step.name ? escapeHtml(step.name) : escapeHtml(step.label);
@@ -434,7 +438,7 @@
         <div class="wf-step__label">${displayLabel}</div>
       </div>`;
     }).join('');
-    return `<div class="wf-progress upper-tier-progress" style="--wf-count:${visibleSteps.length};" role="group" aria-label="Section workflow progress">
+    return `<div class="wf-progress upper-tier-progress" style="--wf-count:${shownSteps.length};" role="group" aria-label="Section workflow progress">
       <div class="wf-progress__steps" role="list">${stepHtml}</div>
       <div class="wf-progress__track" aria-hidden="true">
         <div class="wf-progress__fill" style="width:${fillPercent}%;"></div>
