@@ -14,7 +14,6 @@
     const map = {
       draft: 'Draft',
       submitted: 'Submitted',
-      returned: 'Returned',
       approved_by_supervisor: 'Approved (Supervisor)',
       approved_by_deputy: 'Approved (Deputy)'
     };

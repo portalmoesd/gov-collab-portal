@@ -2456,7 +2456,6 @@ app.get('/api/document-status', async (req, res) => {
     eventId: row.event_id,
     countryId: row.country_id,
     status: row.status,
-    deputyComment: row.deputy_comment,
     updatedAt: row.updated_at,
   });
 });
@@ -2479,7 +2478,6 @@ app.get('/api/tp/document-status', async (req, res) => {
   return res.json({
     eventId: row.event_id,
     status: row.status,
-    deputyComment: row.deputy_comment,
     updatedAt: row.updated_at,
     submitterRole,
   });
@@ -2787,56 +2785,6 @@ app.post('/api/document/approve-minister', requireRole('minister','admin'), asyn
   return res.json({ success:true });
 }));
 
-app.post('/api/document/return', requireRole('deputy','minister','admin'), asyncRoute(async (req, res) => {
-  const eventId = Number(req.body?.eventId);
-  const comment = (req.body?.comment ?? '').toString();
-  if (!Number.isFinite(eventId)) return res.status(400).json({ error: 'eventId required' });
-
-  const countryId = await resolveCountryIdForEvent(eventId);
-  if (!countryId) return res.status(404).json({ error: 'Event not found' });
-
-  const schema = await getDocumentStatusSchema();
-  await ensureDocumentStatus(eventId, countryId);
-
-  const tsCol = schema.tsCol || 'updated_at';
-  const byCol = schema.byCol || 'updated_by_user_id';
-  const commentCol = schema.commentCol;
-
-  if (schema.hasCountryId) {
-    if (commentCol) {
-      await pool.query(
-        `UPDATE document_status
-         SET status='returned', ${commentCol}=$3, ${tsCol}=NOW(), ${byCol}=$4
-         WHERE event_id=$1 AND country_id=$2`,
-        [eventId, countryId, comment, req.user.id]
-      );
-    } else {
-      await pool.query(
-        `UPDATE document_status
-         SET status='returned', ${tsCol}=NOW(), ${byCol}=$3
-         WHERE event_id=$1 AND country_id=$2`,
-        [eventId, countryId, req.user.id]
-      );
-    }
-  } else {
-    if (commentCol) {
-      await pool.query(
-        `UPDATE document_status
-         SET status='returned', ${commentCol}=$2, ${tsCol}=NOW(), ${byCol}=$3
-         WHERE event_id=$1`,
-        [eventId, comment, req.user.id]
-      );
-    } else {
-      await pool.query(
-        `UPDATE document_status
-         SET status='returned', ${tsCol}=NOW(), ${byCol}=$2
-         WHERE event_id=$1`,
-        [eventId, req.user.id]
-      );
-    }
-  }
-  return res.json({ success:true });
-}));
 
 app.get('/api/library', requireRole('admin','deputy','minister','supervisor','super_collaborator','protocol'), async (req, res) => {
   // List approved documents for a country
@@ -2890,7 +2838,7 @@ app.get('/api/library/document', requireRole('admin','deputy','minister','superv
 
   const doc = await queryOne(
     `
-    SELECT status, deputy_comment, updated_at
+    SELECT status, updated_at
     FROM document_status
     WHERE event_id=$1 AND country_id=$2
     `,
@@ -2901,7 +2849,6 @@ app.get('/api/library/document', requireRole('admin','deputy','minister','superv
     event,
     documentStatus: doc ? {
       status: doc.status,
-      deputyComment: doc.deputy_comment,
       updatedAt: doc.updated_at
     } : null,
     sections: sections.map(r => ({
