@@ -347,13 +347,19 @@ function isSectionPipelineRole(roleKey) {
   return ['collaborator_1','collaborator_2','collaborator_3','collaborator','super_collaborator'].includes(normalizeRoleKey(roleKey));
 }
 
-function nextSectionSubmitStatus(roleKey) {
+function nextSectionSubmitStatus(roleKey, eventSubmitterRole) {
   const rk = normalizeRoleKey(roleKey);
   if (rk === 'collaborator_1') return 'submitted_to_collaborator_2';
   if (rk === 'collaborator_2') return 'submitted_to_collaborator_3';
   if (rk === 'collaborator_3') return 'submitted_to_collaborator';
   if (rk === 'collaborator') return 'submitted_to_super_collaborator';
   if (rk === 'super_collaborator') return 'submitted_to_supervisor';
+  if (rk === 'supervisor') return 'submitted_to_deputy';
+  if (rk === 'deputy') {
+    const sr = normalizeRoleKey(eventSubmitterRole || 'deputy');
+    return sr === 'minister' ? 'submitted_to_minister' : 'approved_by_deputy';
+  }
+  if (rk === 'minister') return 'approved_by_minister';
   return null;
 }
 
@@ -1925,7 +1931,8 @@ app.post('/api/tp/submit', authRequired, attachUser, asyncRoute(async (req, res)
   }
 
   const roleKey = normalizeRoleKey(req.user.role_key);
-  if (!isSectionPipelineRole(roleKey)) {
+  const canSubmitRoles = ['collaborator_1','collaborator_2','collaborator_3','collaborator','super_collaborator','supervisor','deputy','minister','admin'];
+  if (!canSubmitRoles.includes(roleKey)) {
     return res.status(403).json({ error: 'Forbidden' });
   }
 
@@ -1950,6 +1957,10 @@ app.post('/api/tp/submit', authRequired, attachUser, asyncRoute(async (req, res)
            (currentStatus === 'draft' || decisionStatusesForRole(roleKey).includes(currentStatus));
     }
   }
+  // Upper-tier roles (supervisor/deputy/minister) can submit from draft or returned-to-them states
+  if (!ok && ['supervisor','deputy','minister','admin'].includes(roleKey)) {
+    ok = true;
+  }
   if (!ok) return res.status(403).json({ error: 'Forbidden' });
 
   const countryId = await resolveCountryIdForEvent(eventId);
@@ -1958,16 +1969,27 @@ app.post('/api/tp/submit', authRequired, attachUser, asyncRoute(async (req, res)
   await ensureDocumentStatus(eventId, countryId);
   await ensureTpRow(eventId, countryId, sectionId, req.user.id);
 
-  let targetStatus = nextSectionSubmitStatus(roleKey);
+  const evMeta = await queryOne(`SELECT lower_submitter_role, submitter_role FROM events WHERE id=$1`, [eventId]);
+  const lsr = String(evMeta?.lower_submitter_role || 'collaborator_2').toLowerCase();
+  const eventSubmitterRole = String(evMeta?.submitter_role || 'deputy').toLowerCase();
+
+  let targetStatus = nextSectionSubmitStatus(roleKey, eventSubmitterRole);
   if (roleKey === 'collaborator_2') {
-    const evMetaLsr = await queryOne(`SELECT lower_submitter_role FROM events WHERE id=$1`, [eventId]);
-    const lsr = String(evMetaLsr?.lower_submitter_role || 'collaborator_2').toLowerCase();
     if (lsr !== 'collaborator_3') targetStatus = 'submitted_to_collaborator';
   }
   if (!targetStatus) return res.status(400).json({ error: 'Unsupported role for submit' });
 
-  const fromStatusRow = await queryOne(`SELECT status::text AS status, original_submitter_role FROM tp_content WHERE event_id=$1 AND country_id=$2 AND section_id=$3`, [eventId, countryId, sectionId]);
+  const fromStatusRow = await queryOne(`SELECT status::text AS status, original_submitter_role, return_target_role FROM tp_content WHERE event_id=$1 AND country_id=$2 AND section_id=$3`, [eventId, countryId, sectionId]);
   const fromStatus = fromStatusRow?.status || 'draft';
+
+  // Upper-tier roles can only submit from draft or returned-to-them states (original editor flow).
+  // For their review stages they use approve/return instead.
+  if (['supervisor','deputy','minister'].includes(roleKey)) {
+    const returnTarget = normalizeRoleKey(fromStatusRow?.return_target_role || '');
+    const isOriginalEditor = fromStatus === 'draft' || (fromStatus.startsWith('returned_by') && (returnTarget === roleKey || returnTarget === ''));
+    if (!isOriginalEditor) return res.status(403).json({ error: 'Upper-tier roles can only submit from draft or when content is returned to them' });
+  }
+
   // Set original_submitter_role when starting a new round (from draft or any returned state)
   const isNewRound = fromStatus === 'draft' || fromStatus.startsWith('returned_by');
 
