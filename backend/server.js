@@ -3073,6 +3073,15 @@ app.post('/api/tp/files/upload', authRequired, attachUser, async (req, res) => {
     fs.mkdirSync(dir, { recursive: true });
     const buf = Buffer.from(base64, 'base64');
     fs.writeFileSync(path.join(dir, safeName), buf);
+    // Save upload metadata
+    const metaPath = path.join(dir, '.meta.json');
+    let meta = {};
+    try { meta = JSON.parse(fs.readFileSync(metaPath, 'utf8')); } catch {}
+    meta[safeName] = {
+      uploadedBy: req.user.full_name || req.user.username || 'Unknown',
+      uploadedAt: new Date().toISOString()
+    };
+    fs.writeFileSync(metaPath, JSON.stringify(meta, null, 2));
     res.json({ ok: true, filename: safeName });
   } catch (e) {
     console.error(e);
@@ -3092,6 +3101,52 @@ app.get('/api/tp/files', authRequired, attachUser, async (req, res) => {
     });
     res.json({ files });
   } catch (e) {
+    res.status(500).json({ error: 'Failed to list files' });
+  }
+});
+
+// List all uploaded files for an event (across all sections)
+app.get('/api/library/files', authRequired, attachUser, async (req, res) => {
+  try {
+    const { event_id: eventId } = req.query;
+    if (!eventId) return res.status(400).json({ error: 'Missing event_id' });
+    const eventDir = path.join(UPLOADS_DIR, String(eventId));
+    if (!fs.existsSync(eventDir)) return res.json({ files: [] });
+    const files = [];
+    const sectionDirs = fs.readdirSync(eventDir).filter(d => {
+      return fs.statSync(path.join(eventDir, d)).isDirectory();
+    });
+    // Resolve section labels
+    let sectionLabels = {};
+    try {
+      const rows = await pool.query(
+        `SELECT id, COALESCE(custom_label, label) AS label FROM sections WHERE event_id = $1`,
+        [eventId]
+      );
+      for (const r of rows.rows) sectionLabels[String(r.id)] = r.label;
+    } catch {}
+    for (const secId of sectionDirs) {
+      const secDir = path.join(eventDir, secId);
+      let meta = {};
+      try { meta = JSON.parse(fs.readFileSync(path.join(secDir, '.meta.json'), 'utf8')); } catch {}
+      const entries = fs.readdirSync(secDir).filter(f => f !== '.meta.json');
+      for (const filename of entries) {
+        const stat = fs.statSync(path.join(secDir, filename));
+        const m = meta[filename] || {};
+        files.push({
+          filename,
+          size: stat.size,
+          sectionId: secId,
+          sectionLabel: sectionLabels[secId] || `Section ${secId}`,
+          uploadedBy: m.uploadedBy || '—',
+          uploadedAt: m.uploadedAt || stat.mtime.toISOString()
+        });
+      }
+    }
+    files.sort((a, b) => new Date(b.uploadedAt) - new Date(a.uploadedAt));
+    res.json({ files });
+  } catch (e) {
+    console.error(e);
     res.status(500).json({ error: 'Failed to list files' });
   }
 });
