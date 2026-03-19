@@ -424,9 +424,14 @@
       ? _superIdx
       : (_simpleIdx >= _superIdx ? _simpleIdx + 1 : _simpleIdx);
     const active = Math.max(0, activeAbs - startStep);
-    // Only show steps up to the one immediately after the active step;
-    // tiers that haven't participated yet are hidden.
-    const endIdx = Math.min(active + 2, visibleSteps.length);
+    // Show steps up to the furthest one that has participated (has an actor name),
+    // plus one lookahead.  When a section is returned to an early step the later
+    // steps that already acted must remain visible.
+    let furthestActed = active;
+    for (let i = visibleSteps.length - 1; i > furthestActed; i--) {
+      if (visibleSteps[i].name) { furthestActed = i; break; }
+    }
+    const endIdx = Math.min(Math.max(active + 2, furthestActed + 2), visibleSteps.length);
     const shownSteps = visibleSteps.slice(0, endIdx);
     const fillPercent = shownSteps.length > 1 ? (active / (shownSteps.length - 1)) * 100 : 100;
     const stepHtml = shownSteps.map((step, idx) => {
